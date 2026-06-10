@@ -23,6 +23,7 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/members").permitAll()
+                        .requestMatchers("/api/auth/login").permitAll()
                         .anyRequest().permitAll()
                 );
 
