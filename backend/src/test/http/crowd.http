@@ -1,0 +1,3 @@
+### 혼잡도 조회 테스트
+GET http://localhost:8080/api/crowds?areaName=성수카페거리
+Authorization: Basic user 2a7bc0d4-aade-4a5c-9397-eabf2fc51067
