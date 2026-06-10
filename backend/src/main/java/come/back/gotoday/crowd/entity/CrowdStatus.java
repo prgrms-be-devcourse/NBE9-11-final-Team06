@@ -24,8 +24,9 @@ public class CrowdStatus {
     @Column(name = "area_name", nullable = false, length = 100)
     private String areaName;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "congestion_level", nullable = false, length = 30)
-    private String congestionLevel;
+    private CongestionLevel congestionLevel;
 
     @Column(name = "population_min")
     private Integer populationMin;
@@ -42,8 +43,27 @@ public class CrowdStatus {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private CrowdStatus(Place place, String areaName, String congestionLevel, Integer populationMin,
-                        Integer populationMax, String message, LocalDateTime measuredAt) {
+    public static CrowdStatus create(
+            Place place,
+            String areaName,
+            CongestionLevel congestionLevel,
+            Integer populationMin,
+            Integer populationMax,
+            String message,
+            LocalDateTime measuredAt
+    ) {
+        return new CrowdStatus(place, areaName, congestionLevel, populationMin, populationMax, message, measuredAt);
+    }
+
+    private CrowdStatus(
+            Place place,
+            String areaName,
+            CongestionLevel congestionLevel,
+            Integer populationMin,
+            Integer populationMax,
+            String message,
+            LocalDateTime measuredAt
+    ) {
         this.place = place;
         this.areaName = areaName;
         this.congestionLevel = congestionLevel;
@@ -52,11 +72,5 @@ public class CrowdStatus {
         this.message = message;
         this.measuredAt = measuredAt;
         this.createdAt = LocalDateTime.now();
-    }
-
-    // [규칙 반영] 정적 팩토리 메서드
-    public static CrowdStatus create(Place place, String areaName, String congestionLevel, Integer populationMin,
-                                     Integer populationMax, String message, LocalDateTime measuredAt) {
-        return new CrowdStatus(place, areaName, congestionLevel, populationMin, populationMax, message, measuredAt);
     }
 }
