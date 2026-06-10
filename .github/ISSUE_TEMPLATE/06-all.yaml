@@ -1,0 +1,42 @@
+name: "🌐 6. ALL ISSUE (상위 통합 관리)"
+description: "상위 통합 기능 트래킹 및 진척도 관리용"
+title: "[all] "
+labels: ["🌐 ALL"]
+body:
+  - type: textarea
+    id: all_goal
+    attributes:
+      label: "🎯 전체 목표"
+      description: "해당 기능(Epic)을 통해 달성하고자 하는 최종 결과물을 설명해주세요."
+    validations:
+      required: true
+  - type: textarea
+    id: task_list
+    attributes:
+      label: "📋 하위 태스크 목록 (Task List)"
+      description: "관련 be/fe 이슈들을 링크하고 담당자를 지정해주세요."
+      value: |
+        - [ ] #이슈번호 [be] 기능명 (@담당자)
+        - [ ] #이슈번호 [fe] 기능명 (@담당자)
+    validations:
+      required: true
+  - type: textarea
+    id: milestone
+    attributes:
+      label: "📅 일정 및 마일스톤"
+      value: |
+        - [ ] 개발 시작일: 2026-00-00
+        - [ ] 목표 완료일: 2026-00-00
+    validations:
+      required: true
+  - type: textarea
+    id: final_check
+    attributes:
+      label: "✅ 최종 검수 항목"
+      description: "모든 하위 이슈가 머지된 후, 리더가 최종적으로 확인할 사항입니다."
+      value: |
+        - [ ] 전체 비즈니스 로직 정상 작동 확인
+        - [ ] BE/FE 연동 및 데이터 흐름 확인
+        - [ ] 예외 케이스 테스트 완료
+    validations:
+      required: true
