@@ -2,8 +2,26 @@ spring:
   application:
     name: go-today
 
+  profiles:
+    active: dev
+
+  config:
+    import: optional:classpath:application-secret.yml
+
   jpa:
     open-in-view: false
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 jwt:
   secret: ${JWT_SECRET:gotoday-local-jwt-secret-key-must-be-at-least-32-bytes}
