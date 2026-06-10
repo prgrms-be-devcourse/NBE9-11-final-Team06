@@ -22,4 +22,20 @@ public record SeoulApiProperties(
         /** 서울시 Open API 인증키입니다. 실제 값은 환경변수로 관리합니다. */
         String apiKey
 ) {
+
+    /**
+     * 애플리케이션 구동 시점에 필수 설정값이 누락되었는지 검증합니다.
+     *
+     * 설정이 잘못된 상태로 서버가 실행되는 것을 막기 위해
+     * baseUrl 또는 apiKey가 비어 있으면 바로 예외를 발생시킵니다.
+     */
+    public SeoulApiProperties {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("서울시 API 기본 URL(baseUrl) 설정이 누락되었습니다.");
+        }
+
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalArgumentException("서울시 API 인증키(apiKey) 설정이 누락되었습니다.");
+        }
+    }
 }

@@ -41,6 +41,10 @@ public enum CongestionLevel {
      * @return 우리 서비스에서 사용하는 혼잡도 enum 값
      */
     public static CongestionLevel from(String value) {
+        if (value == null || value.isBlank()) {
+            return NORMAL;
+        }
+
         return switch (value) {
             case "여유" -> RELAXED;
             case "보통" -> NORMAL;

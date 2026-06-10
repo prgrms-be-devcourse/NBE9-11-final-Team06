@@ -51,10 +51,13 @@ public class CrowdService {
      */
     public CrowdResponse getCrowdStatus(String areaName) {
         SeoulCrowdResponse response = seoulCrowdClient.getCrowdStatus(areaName);
-        SeoulCrowdResponse.CityData cityData = response.CITYDATA();
+        SeoulCrowdResponse.CityData cityData = getCityData(response, areaName);
         SeoulCrowdResponse.LivePopulationStatus populationStatus = getLatestPopulationStatus(cityData.LIVE_PPLTN_STTS());
 
         CongestionLevel congestionLevel = CongestionLevel.from(populationStatus.AREA_CONGEST_LVL());
+        Integer populationMin = parseInteger(populationStatus.AREA_PPLTN_MIN());
+        Integer populationMax = parseInteger(populationStatus.AREA_PPLTN_MAX());
+        LocalDateTime measuredAt = parseDateTime(populationStatus.PPLTN_TIME());
 
         return new CrowdResponse(
                 cityData.AREA_NM(),
@@ -62,10 +65,28 @@ public class CrowdService {
                 congestionLevel,
                 congestionLevel.getText(),
                 populationStatus.AREA_CONGEST_MSG(),
-                parseInteger(populationStatus.AREA_PPLTN_MIN()),
-                parseInteger(populationStatus.AREA_PPLTN_MAX()),
-                parseDateTime(populationStatus.PPLTN_TIME())
+                populationMin,
+                populationMax,
+                measuredAt
         );
+    }
+
+    /**
+     * 서울시 API 응답에서 CITYDATA 영역을 안전하게 꺼냅니다.
+     *
+     * API 키 오류, 잘못된 지역명, 외부 API 응답 실패 등으로 CITYDATA가 없을 수 있으므로
+     * null 여부를 확인한 뒤 명확한 예외 메시지를 반환합니다.
+     *
+     * @param response 서울시 API 원본 응답
+     * @param areaName 요청한 핫스팟 장소명
+     * @return 서울시 API의 CITYDATA 영역
+     */
+    private SeoulCrowdResponse.CityData getCityData(SeoulCrowdResponse response, String areaName) {
+        if (response == null || response.CITYDATA() == null) {
+            throw new IllegalArgumentException("해당 지역의 혼잡도 정보를 조회할 수 없습니다: " + areaName);
+        }
+
+        return response.CITYDATA();
     }
 
     /**

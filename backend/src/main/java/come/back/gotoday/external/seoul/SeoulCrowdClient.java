@@ -1,6 +1,7 @@
 package come.back.gotoday.external.seoul;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -35,11 +36,15 @@ public class SeoulCrowdClient {
     /**
      * 서울시 API 설정 값을 주입받고 RestClient를 생성합니다.
      *
-     * RestClient.create()를 사용하면 별도의 RestClient.Builder 빈을 등록하지 않아도
-     * 간단하게 외부 API 호출용 클라이언트를 사용할 수 있습니다.
+     * Spring Boot가 제공하는 RestClient.Builder가 있으면 해당 Builder를 사용하고,
+     * 없으면 기본 Builder를 사용해 외부 API 호출용 클라이언트를 생성합니다.
      */
-    public SeoulCrowdClient(SeoulApiProperties seoulApiProperties) {
-        this.restClient = RestClient.create();
+    public SeoulCrowdClient(
+            SeoulApiProperties seoulApiProperties,
+            ObjectProvider<RestClient.Builder> restClientBuilderProvider
+    ) {
+        RestClient.Builder restClientBuilder = restClientBuilderProvider.getIfAvailable(RestClient::builder);
+        this.restClient = restClientBuilder.build();
         this.seoulApiProperties = seoulApiProperties;
     }
 
