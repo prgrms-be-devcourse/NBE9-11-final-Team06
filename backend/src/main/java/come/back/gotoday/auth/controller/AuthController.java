@@ -26,13 +26,13 @@ public class AuthController {
 
         return ResponseEntity.ok(ApiResponse.success(response, "로그인에 성공했습니다."));
     }
-    // 인증 테스트용 엔드포인트, 추후 삭제 예정
-    @GetMapping("/me-test")
-    public ResponseEntity<ApiResponse<String>> meTest(
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(
-                ApiResponse.success("memberId=" + userDetails.getMemberId(), "인증에 성공했습니다.")
-        );
+        authService.logout(userDetails.getMemberId());
+
+        return ResponseEntity.ok(ApiResponse.success("로그아웃에 성공했습니다."));
     }
 }

@@ -33,6 +33,14 @@ public class AuthService {
         return LoginResponse.of(accessToken, member);
     }
 
+    @Transactional(readOnly = true)
+    public void logout(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        validateActiveMember(member);
+    }
+
     private void validateActiveMember(Member member) {
         if (member.isDeleted()) {
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
