@@ -1,6 +1,7 @@
 package come.back.gotoday.auth.jwt;
 
 import come.back.gotoday.member.entity.Member;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,5 +37,27 @@ public class JwtTokenProvider {
                 .expiration(expiration)
                 .signWith(secretKey)
                 .compact();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            parseClaims(token);
+            return true;
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    public Long getMemberId(String token) {
+        Claims claims = parseClaims(token);
+        return Long.valueOf(claims.getSubject());
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }
