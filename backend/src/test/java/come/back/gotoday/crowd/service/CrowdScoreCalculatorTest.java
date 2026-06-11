@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CrowdScoreCalculatorTest {
 
-    private final CrowdScoreCalculator crowdScoreCalculator = new CrowdScoreCalculator();
+    private final CrowdScoreCalculator crowdScoreCalculator = new CrowdScoreCalculator(30, 10, -10, -30);
 
     @Test
     @DisplayName("혼잡도 단계가 여유이면 30점을 반환한다")

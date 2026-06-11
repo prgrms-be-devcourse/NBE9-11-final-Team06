@@ -1,6 +1,7 @@
 package come.back.gotoday.crowd.service;
 
 import come.back.gotoday.crowd.entity.CongestionLevel;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,22 +14,33 @@ import org.springframework.stereotype.Component;
 @Component
 public class CrowdScoreCalculator {
 
-    /**
-     * 혼잡도 단계에 따라 추천 점수를 계산합니다.
-     *
-     * @param congestionLevel 혼잡도 단계
-     * @return 추천 점수에 반영할 혼잡도 점수
-     */
+    private final int relaxedScore;
+    private final int normalScore;
+    private final int crowdedScore;
+    private final int veryCrowdedScore;
+
+    public CrowdScoreCalculator(
+            @Value("${recommendation.score.crowd.relaxed}") int relaxedScore,
+            @Value("${recommendation.score.crowd.normal}") int normalScore,
+            @Value("${recommendation.score.crowd.crowded}") int crowdedScore,
+            @Value("${recommendation.score.crowd.very-crowded}") int veryCrowdedScore
+    ) {
+        this.relaxedScore = relaxedScore;
+        this.normalScore = normalScore;
+        this.crowdedScore = crowdedScore;
+        this.veryCrowdedScore = veryCrowdedScore;
+    }
+
     public int calculate(CongestionLevel congestionLevel) {
         if (congestionLevel == null) {
             return 0;
         }
 
         return switch (congestionLevel) {
-            case RELAXED -> 30;
-            case NORMAL -> 10;
-            case CROWDED -> -10;
-            case VERY_CROWDED -> -30;
+            case RELAXED -> relaxedScore;
+            case NORMAL -> normalScore;
+            case CROWDED -> crowdedScore;
+            case VERY_CROWDED -> veryCrowdedScore;
         };
     }
 }
