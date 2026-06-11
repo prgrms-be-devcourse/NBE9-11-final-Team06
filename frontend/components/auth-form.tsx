@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORIES, COMPANIONS } from "@/lib/data"
 import { memberApi } from "@/lib/member-api"
+import { authStorage } from "@/lib/auth"
 import { toast } from "sonner"
 import { MapPin } from "lucide-react"
 
@@ -40,12 +41,31 @@ export function AuthForm() {
     )
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
 
-    // 로그인 API는 다음 단계에서 연결
-    toast.success("로그인되었습니다. 환영해요!")
-    router.push("/mypage")
+    setIsLoginLoading(true)
+
+    try {
+      const response = await memberApi.login({
+        email: loginEmail,
+        password: loginPassword,
+      })
+
+      if (!response.success || !response.data) {
+        toast.error(response.message ?? "로그인에 실패했습니다.")
+        return
+      }
+
+      authStorage.setAccessToken(response.data.accessToken)
+
+      toast.success("로그인되었습니다. 환영해요!")
+      router.push("/")
+    } catch {
+      toast.error("서버와 통신 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoginLoading(false)
+    }
   }
 
   async function handleSignup(e: React.FormEvent) {
