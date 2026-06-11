@@ -12,29 +12,75 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORIES, COMPANIONS } from "@/lib/data"
+import { memberApi } from "@/lib/member-api"
 import { toast } from "sonner"
 import { MapPin } from "lucide-react"
 
 export function AuthForm() {
   const router = useRouter()
+
   const [mode, setMode] = useState("login")
+
+  const [loginEmail, setLoginEmail] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
+
+  const [signupNickname, setSignupNickname] = useState("")
+  const [signupEmail, setSignupEmail] = useState("")
+  const [signupPassword, setSignupPassword] = useState("")
+
   const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [selectedCompanion, setSelectedCompanion] = useState<string>("")
 
+  const [isSignupLoading, setIsSignupLoading] = useState(false)
+  const [isLoginLoading, setIsLoginLoading] = useState(false)
+
   function toggleInterest(id: string) {
-    setSelectedInterests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setSelectedInterests((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
   }
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+
+    // 로그인 API는 다음 단계에서 연결
     toast.success("로그인되었습니다. 환영해요!")
     router.push("/mypage")
   }
 
-  function handleSignup(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
-    toast.success("회원가입이 완료되었어요. 맞춤 추천을 시작해보세요!")
-    router.push("/mypage")
+
+    setIsSignupLoading(true)
+
+    try {
+      const response = await memberApi.signup({
+        email: signupEmail,
+        password: signupPassword,
+        nickname: signupNickname,
+      })
+
+      if (!response.success) {
+        toast.error(response.message ?? "회원가입에 실패했습니다.")
+        return
+      }
+
+      toast.success("회원가입이 완료되었어요. 로그인해주세요!")
+
+      setMode("login")
+      setLoginEmail(signupEmail)
+      setLoginPassword("")
+
+      setSignupNickname("")
+      setSignupEmail("")
+      setSignupPassword("")
+      setSelectedInterests([])
+      setSelectedCompanion("")
+    } catch {
+      toast.error("서버와 통신 중 오류가 발생했습니다.")
+    } finally {
+      setIsSignupLoading(false)
+    }
   }
 
   return (
@@ -59,14 +105,30 @@ export function AuthForm() {
               <form onSubmit={handleLogin} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="login-email">이메일</Label>
-                  <Input id="login-email" type="email" placeholder="you@example.com" required />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                  />
                 </div>
+
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="login-password">비밀번호</Label>
-                  <Input id="login-password" type="password" placeholder="••••••••" required />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                  />
                 </div>
-                <Button type="submit" className="mt-2 w-full">
-                  로그인
+
+                <Button type="submit" className="mt-2 w-full" disabled={isLoginLoading}>
+                  {isLoginLoading ? "로그인 중..." : "로그인"}
                 </Button>
               </form>
             </TabsContent>
@@ -75,15 +137,37 @@ export function AuthForm() {
               <form onSubmit={handleSignup} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="signup-name">닉네임</Label>
-                  <Input id="signup-name" placeholder="여행자" required />
+                  <Input
+                    id="signup-name"
+                    placeholder="여행자"
+                    value={signupNickname}
+                    onChange={(e) => setSignupNickname(e.target.value)}
+                    required
+                  />
                 </div>
+
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="signup-email">이메일</Label>
-                  <Input id="signup-email" type="email" placeholder="you@example.com" required />
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
                 </div>
+
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="signup-password">비밀번호</Label>
-                  <Input id="signup-password" type="password" placeholder="••••••••" required />
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="영문, 숫자 포함 8자 이상"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    required
+                  />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -91,6 +175,7 @@ export function AuthForm() {
                   <div className="flex flex-wrap gap-2">
                     {CATEGORIES.map((it) => {
                       const active = selectedInterests.includes(it.value)
+
                       return (
                         <button
                           key={it.value}
@@ -114,6 +199,7 @@ export function AuthForm() {
                   <div className="flex flex-wrap gap-2">
                     {COMPANIONS.map((c) => {
                       const active = selectedCompanion === c.value
+
                       return (
                         <button
                           key={c.value}
@@ -138,8 +224,8 @@ export function AuthForm() {
                   </Badge>
                 )}
 
-                <Button type="submit" className="mt-2 w-full">
-                  가입하고 시작하기
+                <Button type="submit" className="mt-2 w-full" disabled={isSignupLoading}>
+                  {isSignupLoading ? "가입 중..." : "가입하고 시작하기"}
                 </Button>
               </form>
             </TabsContent>
