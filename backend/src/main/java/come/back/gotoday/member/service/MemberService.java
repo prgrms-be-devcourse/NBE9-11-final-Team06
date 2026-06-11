@@ -4,12 +4,15 @@ import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.dto.MemberCreateRequest;
 import come.back.gotoday.member.dto.MemberResponse;
+import come.back.gotoday.member.dto.MemberUpdateRequest;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -51,6 +54,22 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
+    @Transactional
+    public MemberResponse updateMyInfo(Long memberId, MemberUpdateRequest request) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        validateActiveMember(member);
+        validateNicknameForUpdate(member, request.nickname());
+
+        String nickname = Objects.requireNonNullElse(request.nickname(), member.getNickname());
+        String profileImageUrl = Objects.requireNonNullElse(request.profileImageUrl(), member.getProfileImageUrl());
+
+        member.updateProfile(nickname, profileImageUrl);
+
+        return MemberResponse.from(member);
+    }
+
     private void validateDuplicateEmail(String email) {
         if (memberRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
@@ -61,6 +80,14 @@ public class MemberService {
         if (memberRepository.existsByNickname(nickname)) {
             throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
+    }
+
+    private void validateNicknameForUpdate(Member member, String newNickname) {
+        if (newNickname == null || newNickname.equals(member.getNickname())) {
+            return;
+        }
+
+        validateDuplicateNickname(newNickname);
     }
 
     private void validateActiveMember(Member member) {
