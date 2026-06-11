@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "member")
@@ -64,6 +65,11 @@ public class Member {
     }
 
     public void withdraw() {
+        String deletedToken = UUID.randomUUID().toString().replace("-", "");
+
+        this.email = "deleted_email_" + deletedToken + "@deleted.local";
+        this.nickname = "탈퇴회원_" + deletedToken.substring(0, 8);
+        this.profileImageUrl = null;
         this.status = STATUS_DELETED;
         this.updatedAt = LocalDateTime.now();
     }

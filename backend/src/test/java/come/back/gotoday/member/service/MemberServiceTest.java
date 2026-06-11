@@ -113,19 +113,14 @@ class MemberServiceTest {
         verify(memberRepository, never()).save(any(Member.class));
         verify(passwordEncoder, never()).encode(anyString());
     }
+
     @Test
     @DisplayName("내 회원 정보를 조회한다")
     void getMyInfo_success() {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -159,13 +154,7 @@ class MemberServiceTest {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "DELETED"
-        );
+        Member member = createDeletedMember();
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -174,19 +163,14 @@ class MemberServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
+
     @Test
     @DisplayName("내 회원 정보를 수정한다")
     void updateMyInfo_success() {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
 
         MemberUpdateRequest request = new MemberUpdateRequest(
                 "낄낄수정",
@@ -210,13 +194,7 @@ class MemberServiceTest {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
 
         MemberUpdateRequest request = new MemberUpdateRequest(
                 "낄낄",
@@ -240,13 +218,7 @@ class MemberServiceTest {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
 
         MemberUpdateRequest request = new MemberUpdateRequest(
                 null,
@@ -264,18 +236,37 @@ class MemberServiceTest {
     }
 
     @Test
+    @DisplayName("프로필 이미지 URL을 입력하지 않으면 기존 프로필 이미지 URL을 유지한다")
+    void updateMyInfo_nullProfileImageUrl_success() {
+        // given
+        Long memberId = 1L;
+
+        Member member = createActiveMember();
+        member.updateProfile("낄낄", "https://example.com/original.png");
+
+        MemberUpdateRequest request = new MemberUpdateRequest(
+                "낄낄수정",
+                null
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(memberRepository.existsByNickname(request.nickname())).thenReturn(false);
+
+        // when
+        MemberResponse response = memberService.updateMyInfo(memberId, request);
+
+        // then
+        assertThat(response.nickname()).isEqualTo("낄낄수정");
+        assertThat(response.profileImageUrl()).isEqualTo("https://example.com/original.png");
+    }
+
+    @Test
     @DisplayName("이미 사용 중인 닉네임이면 회원 정보 수정에 실패한다")
     void updateMyInfo_duplicateNickname_fail() {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
 
         MemberUpdateRequest request = new MemberUpdateRequest(
                 "중복닉네임",
@@ -316,13 +307,7 @@ class MemberServiceTest {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "DELETED"
-        );
+        Member member = createDeletedMember();
 
         MemberUpdateRequest request = new MemberUpdateRequest(
                 "낄낄수정",
@@ -336,19 +321,15 @@ class MemberServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
+
     @Test
     @DisplayName("회원 탈퇴에 성공한다")
     void withdrawMyAccount_success() {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "ACTIVE"
-        );
+        Member member = createActiveMember();
+        member.updateProfile("낄낄", "https://example.com/profile.png");
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -357,6 +338,11 @@ class MemberServiceTest {
 
         // then
         assertThat(member.isDeleted()).isTrue();
+        assertThat(member.getEmail()).startsWith("deleted_email_");
+        assertThat(member.getEmail()).endsWith("@deleted.local");
+        assertThat(member.getEmail()).doesNotContain("test@example.com");
+        assertThat(member.getNickname()).startsWith("탈퇴회원_");
+        assertThat(member.getProfileImageUrl()).isNull();
     }
 
     @Test
@@ -379,13 +365,7 @@ class MemberServiceTest {
         // given
         Long memberId = 1L;
 
-        Member member = Member.create(
-                "test@example.com",
-                "encodedPassword",
-                "낄낄",
-                "USER",
-                "DELETED"
-        );
+        Member member = createDeletedMember();
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -393,5 +373,25 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.withdrawMyAccount(memberId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    private Member createActiveMember() {
+        return Member.create(
+                "test@example.com",
+                "encodedPassword",
+                "낄낄",
+                "USER",
+                "ACTIVE"
+        );
+    }
+
+    private Member createDeletedMember() {
+        return Member.create(
+                "deleted_email_12345678@deleted.local",
+                "encodedPassword",
+                "탈퇴회원_12345678",
+                "USER",
+                "DELETED"
+        );
     }
 }
