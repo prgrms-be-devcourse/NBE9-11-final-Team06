@@ -20,6 +20,7 @@ public class CourseController {
 
     private final CourseService courseService;
 
+    //코스 생성 (로그인 token 과 + json 필요)
     @PostMapping
     public ResponseEntity<ApiResponse<Long>> createCourse(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -37,7 +38,7 @@ public class CourseController {
         );
     }
 
-
+    //코스 단건 조회
     @GetMapping("/{courseId}")
     public ResponseEntity<ApiResponse<CourseDetailResponse>>
     getCourse(
@@ -52,6 +53,8 @@ public class CourseController {
         );
     }
 
+
+    //코스 다건 조회
     @GetMapping
     public ResponseEntity<ApiResponse<List<CourseListResponse>>>
     getCourses() {
@@ -64,6 +67,7 @@ public class CourseController {
         );
     }
 
+    //코스 삭제
     @DeleteMapping("/{courseId}")
     public ResponseEntity<ApiResponse<Void>>
     deleteCourse(
