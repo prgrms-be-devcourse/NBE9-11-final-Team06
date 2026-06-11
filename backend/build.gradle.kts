@@ -40,6 +40,10 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")
+
+    implementation("org.springframework.retry:spring-retry:2.0.5")
+    implementation("org.springframework.boot:spring-boot-starter-aop:3.5.13")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
 tasks.withType<Test> {

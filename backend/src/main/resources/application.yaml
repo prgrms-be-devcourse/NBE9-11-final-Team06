@@ -32,6 +32,10 @@ external:
     base-url: http://openapi.seoul.go.kr:8088
     api-key: ${SEOUL_API_KEY:dummy-key}
 
+seoul:
+  api:
+    key: ${SEOUL_API_KEY:dummy-key}
+
 recommendation:
   score:
     crowd:
