@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -109,5 +111,66 @@ class MemberServiceTest {
 
         verify(memberRepository, never()).save(any(Member.class));
         verify(passwordEncoder, never()).encode(anyString());
+    }
+    @Test
+    @DisplayName("내 회원 정보를 조회한다")
+    void getMyInfo_success() {
+        // given
+        Long memberId = 1L;
+
+        Member member = Member.create(
+                "test@example.com",
+                "encodedPassword",
+                "낄낄",
+                "USER",
+                "ACTIVE"
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        // when
+        MemberResponse response = memberService.getMyInfo(memberId);
+
+        // then
+        assertThat(response.email()).isEqualTo("test@example.com");
+        assertThat(response.nickname()).isEqualTo("낄낄");
+        assertThat(response.role()).isEqualTo("USER");
+        assertThat(response.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이면 내 정보 조회에 실패한다")
+    void getMyInfo_notFoundMember_fail() {
+        // given
+        Long memberId = 1L;
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> memberService.getMyInfo(memberId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("탈퇴 회원이면 내 정보 조회에 실패한다")
+    void getMyInfo_deletedMember_fail() {
+        // given
+        Long memberId = 1L;
+
+        Member member = Member.create(
+                "test@example.com",
+                "encodedPassword",
+                "낄낄",
+                "USER",
+                "DELETED"
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        // when & then
+        assertThatThrownBy(() -> memberService.getMyInfo(memberId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
 }
