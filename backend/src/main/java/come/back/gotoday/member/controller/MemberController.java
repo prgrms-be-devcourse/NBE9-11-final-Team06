@@ -4,6 +4,7 @@ import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import come.back.gotoday.member.dto.MemberCreateRequest;
 import come.back.gotoday.member.dto.MemberResponse;
+import come.back.gotoday.member.dto.MemberUpdateRequest;
 import come.back.gotoday.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,5 +38,15 @@ public class MemberController {
         MemberResponse response = memberService.getMyInfo(userDetails.getMemberId());
 
         return ResponseEntity.ok(ApiResponse.success(response, "회원 정보를 조회했습니다."));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<MemberResponse>> updateMyInfo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody @Valid MemberUpdateRequest request
+    ) {
+        MemberResponse response = memberService.updateMyInfo(userDetails.getMemberId(), request);
+
+        return ResponseEntity.ok(ApiResponse.success(response, "회원 정보를 수정했습니다."));
     }
 }
