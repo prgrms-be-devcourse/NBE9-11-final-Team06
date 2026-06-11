@@ -93,3 +93,9 @@ frontend/coverage/
 
 ### Docker local override ###
 docker-compose.override.yml
+
+### AWS / SSH ###
+*.pem
+.aws/
+credentials.csv
+accessKeys.csv
