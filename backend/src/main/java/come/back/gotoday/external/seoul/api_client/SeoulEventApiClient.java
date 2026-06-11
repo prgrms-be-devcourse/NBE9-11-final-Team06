@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
@@ -32,8 +33,8 @@ public class SeoulEventApiClient {
         this.objectMapper = objectMapper;
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(10000);
+        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(10));
 
         this.restClient = RestClient.builder()
                 .requestFactory(requestFactory)
@@ -59,9 +60,12 @@ public class SeoulEventApiClient {
                 throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
             }
 
-            // 3. 서울시 자체 에러 구조("RESULT") 처리
-            if (responseBody.contains("\"RESULT\"")) {
-                SeoulResultResponse errorResponse = objectMapper.readValue(responseBody, SeoulResultResponse.class);
+            // 1. JSON을 JsonNode 트리 구조로 한 번만 파싱
+            JsonNode rootNode = objectMapper.readTree(responseBody);
+
+            // 2. 서울시 자체 에러 구조("RESULT") 처리
+            if (rootNode.has("RESULT")) {
+                SeoulResultResponse errorResponse = objectMapper.treeToValue(rootNode, SeoulResultResponse.class);
 
                 if (errorResponse.isNoData()) {
                     log.warn("서울시 API - 조회된 데이터가 없습니다. (INFO-200)");
@@ -76,8 +80,8 @@ public class SeoulEventApiClient {
                 }
             }
 
-            // 4. 정상 DTO 파싱
-            return objectMapper.readValue(responseBody, SeoulEventResponse.class);
+            // 3. 정상 DTO 파싱 (이미 파싱된 rootNode를 재사용하므로 효율적)
+            return objectMapper.treeToValue(rootNode, SeoulEventResponse.class);
 
         } catch (ResourceAccessException e) {
             // 타임아웃 및 네트워크 연결 실패 (서버가 응답을 안 줄 때)
