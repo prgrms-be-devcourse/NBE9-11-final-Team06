@@ -40,7 +40,10 @@ WORKDIR /app
 # 빌드 스테이지에서 생성된 JAR 파일을 실행 스테이지로 복사
 COPY --from=builder /app/build/libs/*.jar app.jar
 
+# 기본 Spring Profile 설정
+# 컨테이너 실행 시 -e SPRING_PROFILES_ACTIVE=prod 처럼 외부에서 덮어쓸 수 있다.
+ENV SPRING_PROFILES_ACTIVE=dev
+
 # Spring Boot 애플리케이션 실행
-# 현재 Docker 실행 검증 단계에서는 H2 기반 dev profile로 실행한다.
-# 추후 EC2/RDS 운영 배포 시에는 prod profile과 환경변수를 사용하도록 변경할 수 있다.
-ENTRYPOINT ["java", "-Dspring.profiles.active=dev", "-jar", "app.jar"]
+# profile은 ENTRYPOINT에 하드코딩하지 않고 환경변수로 제어한다.
+ENTRYPOINT ["java", "-jar", "app.jar"]
