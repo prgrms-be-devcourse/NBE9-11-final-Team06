@@ -6,6 +6,7 @@ import come.back.gotoday.course.dto.CourseListResponse;
 import come.back.gotoday.course.service.CourseService;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +25,7 @@ public class CourseController {
     @PostMapping
     public ResponseEntity<ApiResponse<Long>> createCourse(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody CourseCreateRequest request
+            @Valid @RequestBody CourseCreateRequest request
     ) {
 
         Long courseId = courseService.createCourse(
