@@ -49,4 +49,13 @@ public class MemberController {
 
         return ResponseEntity.ok(ApiResponse.success(response, "회원 정보를 수정했습니다."));
     }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> withdrawMyAccount(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        memberService.withdrawMyAccount(userDetails.getMemberId());
+
+        return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다."));
+    }
 }

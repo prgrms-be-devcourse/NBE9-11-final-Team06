@@ -12,8 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Objects;
-
 @Service
 @RequiredArgsConstructor
 public class MemberService {
@@ -46,28 +44,44 @@ public class MemberService {
 
     @Transactional(readOnly = true)
     public MemberResponse getMyInfo(Long memberId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-
-        validateActiveMember(member);
+        Member member = findActiveMember(memberId);
 
         return MemberResponse.from(member);
     }
 
     @Transactional
     public MemberResponse updateMyInfo(Long memberId, MemberUpdateRequest request) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findActiveMember(memberId);
 
-        validateActiveMember(member);
         validateNicknameForUpdate(member, request.nickname());
 
-        String nickname = Objects.requireNonNullElse(request.nickname(), member.getNickname());
-        String profileImageUrl = Objects.requireNonNullElse(request.profileImageUrl(), member.getProfileImageUrl());
+        String nickname = request.nickname() != null
+                ? request.nickname()
+                : member.getNickname();
+
+        String profileImageUrl = request.profileImageUrl() != null
+                ? request.profileImageUrl()
+                : member.getProfileImageUrl();
 
         member.updateProfile(nickname, profileImageUrl);
 
         return MemberResponse.from(member);
+    }
+
+    @Transactional
+    public void withdrawMyAccount(Long memberId) {
+        Member member = findActiveMember(memberId);
+
+        member.withdraw();
+    }
+
+    private Member findActiveMember(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        validateActiveMember(member);
+
+        return member;
     }
 
     private void validateDuplicateEmail(String email) {
