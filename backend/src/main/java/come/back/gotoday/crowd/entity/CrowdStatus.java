@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
  * 혼잡도 메시지, 측정 시각을 저장해두고 이후 추천 점수 계산이나 캐싱에 활용할 수 있습니다.
  */
 @Entity
-@Table(name = "crowd_status")
+@Table(
+        name = "crowd_status",
+        indexes = {
+                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CrowdStatus {

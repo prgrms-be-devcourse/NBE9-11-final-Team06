@@ -7,11 +7,11 @@ import come.back.gotoday.crowd.repository.CrowdStatusRepository;
 import come.back.gotoday.external.seoul.SeoulCrowdClient;
 import come.back.gotoday.external.seoul.SeoulCrowdResponse;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 혼잡도 조회 비즈니스 로직을 담당하는 서비스입니다.
@@ -20,7 +20,6 @@ import java.util.List;
  * 우리 서비스에서 사용하는 CrowdResponse 형태로 변환합니다.
  */
 @Service
-@Transactional
 public class CrowdService {
 
     /** DB에 저장된 혼잡도 데이터를 재사용할 캐시 유효 시간입니다. */
@@ -55,10 +54,21 @@ public class CrowdService {
      * @return 클라이언트에 반환할 혼잡도 응답 DTO
      */
     public CrowdResponse getCrowdStatus(String areaName) {
-        return crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName)
-                .filter(this::isFresh)
-                .map(this::toResponse)
-                .orElseGet(() -> fetchAndSaveCrowdStatus(areaName));
+        Optional<CrowdStatus> cachedCrowdStatus = crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName);
+
+        if (cachedCrowdStatus.isPresent() && isFresh(cachedCrowdStatus.get())) {
+            return toResponse(cachedCrowdStatus.get());
+        }
+
+        try {
+            return fetchAndSaveCrowdStatus(areaName);
+        } catch (RuntimeException exception) {
+            if (cachedCrowdStatus.isPresent()) {
+                return toResponse(cachedCrowdStatus.get());
+            }
+
+            throw exception;
+        }
     }
 
     /**
