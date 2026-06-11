@@ -46,10 +46,10 @@ public class Event {
     @Column(length = 255)
     private String target;
 
-    @Column(name = "homepage_url", length = 500)
+    @Column(name = "homepage_url", length = 1000)
     private String homepageUrl;
 
-    @Column(name = "image_url", length = 500)
+    @Column(name = "image_url", length = 1000)
     private String imageUrl;
 
     @Column(columnDefinition = "TEXT")
