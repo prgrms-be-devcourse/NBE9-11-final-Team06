@@ -1,6 +1,7 @@
 package come.back.gotoday.event.entity;
 
 import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.event.enums.EventSource;
 import come.back.gotoday.place.entity.Place;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -89,7 +90,25 @@ public class Event {
     // [규칙 반영] 정적 팩토리 메서드
     public static Event create(Place place, Category category, String title, LocalDate startDate, LocalDate endDate,
                                String eventTime, String fee, String target, String homepageUrl, String imageUrl,
-                               String description, String source, String externalId) {
-        return new Event(place, category, title, startDate, endDate, eventTime, fee, target, homepageUrl, imageUrl, description, source, externalId);
+                               String description, EventSource source, String externalId) {
+        return new Event(place, category, title, startDate, endDate, eventTime, fee, target, homepageUrl, imageUrl, description, source.getCode(), externalId);
+    }
+
+    // 변경 감지용 메서드
+    public void updateInfo(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl) {
+        this.title = title;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.homepageUrl = homepageUrl;
+        this.imageUrl = imageUrl;
+    }
+
+    // 데이터 일치 확인용 메서드
+    public boolean isChanged(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl) {
+        return !this.title.equals(title) ||
+                !this.startDate.equals(startDate) ||
+                !this.endDate.equals(endDate) ||
+                !java.util.Objects.equals(this.homepageUrl, homepageUrl) ||
+                !java.util.Objects.equals(this.imageUrl, imageUrl);
     }
 }
