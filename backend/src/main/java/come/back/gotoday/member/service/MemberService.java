@@ -41,6 +41,16 @@ public class MemberService {
         return MemberResponse.from(savedMember);
     }
 
+    @Transactional(readOnly = true)
+    public MemberResponse getMyInfo(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        validateActiveMember(member);
+
+        return MemberResponse.from(member);
+    }
+
     private void validateDuplicateEmail(String email) {
         if (memberRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
@@ -50,6 +60,12 @@ public class MemberService {
     private void validateDuplicateNickname(String nickname) {
         if (memberRepository.existsByNickname(nickname)) {
             throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+    }
+
+    private void validateActiveMember(Member member) {
+        if (member.isDeleted()) {
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
     }
 }
