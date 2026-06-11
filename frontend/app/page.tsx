@@ -15,7 +15,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { PlaceCard } from "@/components/place-card"
 import { CrowdBadge } from "@/components/crowd-badge"
-import { CATEGORIES, PLACES, SEOUL_AREAS } from "@/lib/data"
+import { CATEGORIES, PLACES, SEOUL_AREAS, type CrowdLevel } from "@/lib/data"
 
 const STEPS = [
   {
@@ -53,7 +53,75 @@ const FEATURES = [
   },
 ]
 
-export default function HomePage() {
+type CrowdResponse = {
+  areaName: string
+  areaCode: string
+  congestionLevel: "RELAXED" | "NORMAL" | "CROWDED" | "VERY_CROWDED"
+  congestionText: string
+  message: string
+  populationMin: number | null
+  populationMax: number | null
+  measuredAt: string | null
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
+
+const AREA_NAME_MAP: Record<string, string> = {
+  성수: "성수카페거리",
+  연남동: "연남동",
+  익선동: "익선동",
+  삼청동: "북촌한옥마을",
+  여의도: "여의도한강공원",
+  잠실: "잠실 관광특구",
+  홍대: "홍대 관광특구",
+  이태원: "이태원 관광특구",
+}
+
+const CONGESTION_LEVEL_MAP: Record<CrowdResponse["congestionLevel"], CrowdLevel> = {
+  RELAXED: "여유",
+  NORMAL: "보통",
+  CROWDED: "혼잡",
+  VERY_CROWDED: "매우혼잡",
+}
+
+async function getCrowdStatus(areaName: string): Promise<CrowdResponse | null> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/crowds?areaName=${encodeURIComponent(areaName)}`,
+      {
+        next: { revalidate: 60 },
+      },
+    )
+
+    if (!response.ok) {
+      return null
+    }
+
+    return response.json()
+  } catch {
+    return null
+  }
+}
+
+async function getSeoulAreasWithCrowd() {
+  return Promise.all(
+    SEOUL_AREAS.map(async (area) => {
+      const apiAreaName = AREA_NAME_MAP[area.name] ?? area.name
+      const crowdStatus = await getCrowdStatus(apiAreaName)
+
+      return {
+        ...area,
+        crowd: crowdStatus ? CONGESTION_LEVEL_MAP[crowdStatus.congestionLevel] : area.crowd,
+        populationMin: crowdStatus?.populationMin ?? null,
+        populationMax: crowdStatus?.populationMax ?? null,
+      }
+    }),
+  )
+}
+
+export default async function HomePage() {
+  const seoulAreas = await getSeoulAreasWithCrowd()
+  const seongsuArea = seoulAreas.find((area) => area.name === "성수")
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -109,9 +177,15 @@ export default function HomePage() {
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
-              <Card className="absolute -bottom-5 -left-3 w-44 gap-1 p-4 shadow-lg sm:-left-6">
+              <Card className="absolute -bottom-5 -left-3 w-fit min-w-44 gap-1 p-4 shadow-lg sm:-left-6">
                 <span className="text-xs text-muted-foreground">지금 성수동은</span>
-                <CrowdBadge level="보통" showRange className="w-fit" />
+                <CrowdBadge
+                  level={seongsuArea?.crowd ?? "보통"}
+                  populationMin={seongsuArea?.populationMin}
+                  populationMax={seongsuArea?.populationMax}
+                  showRange
+                  className="w-fit"
+                />
               </Card>
               <Card className="absolute -right-3 top-6 flex-row items-center gap-2 p-3 shadow-lg sm:-right-6">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
@@ -129,7 +203,7 @@ export default function HomePage() {
         {/* Areas quick chips */}
         <section className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex flex-wrap gap-2">
-            {SEOUL_AREAS.map((a) => (
+            {seoulAreas.map((a) => (
               <Link
                 key={a.name}
                 href="/plan"
@@ -137,7 +211,13 @@ export default function HomePage() {
               >
                 <MapPin className="size-3.5 text-primary" />
                 {a.name}
-                <CrowdBadge level={a.crowd} className="px-1.5 py-0.5 text-[10px]" />
+                <CrowdBadge
+                  level={a.crowd}
+                  populationMin={a.populationMin}
+                  populationMax={a.populationMax}
+                  showRange
+                  className="px-1.5 py-0.5 text-[10px]"
+                />
               </Link>
             ))}
           </div>
