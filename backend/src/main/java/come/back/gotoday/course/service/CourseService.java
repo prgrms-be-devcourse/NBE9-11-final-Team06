@@ -107,17 +107,19 @@ public class CourseService {
 
     @Transactional
     public void deleteCourse(
+            Long memberId,
             Long courseId
     ) {
 
-        if (!courseRepository.existsById(courseId)) {
-            throw new IllegalArgumentException(
-                    "존재하지 않는 코스입니다."
-            );
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
+
+        if (!course.getMember().getId().equals(memberId)) {
+            throw new IllegalArgumentException("해당 코스를 삭제할 권한이 없습니다.");
         }
 
-        courseRepository.deleteById(courseId);
+        coursePlaceRepository.deleteByCourseId(courseId);
+        courseRepository.delete(course);
     }
-
 
 }

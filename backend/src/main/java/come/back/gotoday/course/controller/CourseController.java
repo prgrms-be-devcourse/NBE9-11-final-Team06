@@ -64,13 +64,15 @@ public class CourseController {
     // 코스 삭제
     @DeleteMapping("/{courseId}")
     public ResponseEntity<ApiResponse<Void>> deleteCourse(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long courseId
     ) {
 
-        courseService.deleteCourse(courseId);
+        courseService.deleteCourse(userDetails.getMemberId(), courseId);
 
         return ResponseEntity.ok(
                 ApiResponse.success(null, "코스 삭제에 성공했습니다.")
         );
     }
+
 }
