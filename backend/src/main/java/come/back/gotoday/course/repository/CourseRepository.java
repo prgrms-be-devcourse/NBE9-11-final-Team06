@@ -1,4 +1,7 @@
 package come.back.gotoday.course.repository;
 
-public interface CourseRepository {
+import come.back.gotoday.course.entity.Course;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CourseRepository extends JpaRepository<Course, Long> {
 }
