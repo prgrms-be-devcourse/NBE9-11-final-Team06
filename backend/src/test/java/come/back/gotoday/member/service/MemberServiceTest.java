@@ -336,4 +336,62 @@ class MemberServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
     }
+    @Test
+    @DisplayName("회원 탈퇴에 성공한다")
+    void withdrawMyAccount_success() {
+        // given
+        Long memberId = 1L;
+
+        Member member = Member.create(
+                "test@example.com",
+                "encodedPassword",
+                "낄낄",
+                "USER",
+                "ACTIVE"
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        // when
+        memberService.withdrawMyAccount(memberId);
+
+        // then
+        assertThat(member.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이면 회원 탈퇴에 실패한다")
+    void withdrawMyAccount_notFoundMember_fail() {
+        // given
+        Long memberId = 1L;
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> memberService.withdrawMyAccount(memberId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("이미 탈퇴한 회원이면 회원 탈퇴에 실패한다")
+    void withdrawMyAccount_deletedMember_fail() {
+        // given
+        Long memberId = 1L;
+
+        Member member = Member.create(
+                "test@example.com",
+                "encodedPassword",
+                "낄낄",
+                "USER",
+                "DELETED"
+        );
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        // when & then
+        assertThatThrownBy(() -> memberService.withdrawMyAccount(memberId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.MEMBER_NOT_FOUND.getMessage());
+    }
 }

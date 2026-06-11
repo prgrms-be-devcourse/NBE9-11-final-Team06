@@ -70,6 +70,16 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
+    @Transactional
+    public void withdrawMyAccount(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        validateActiveMember(member);
+
+        member.withdraw();
+    }
+
     private void validateDuplicateEmail(String email) {
         if (memberRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
