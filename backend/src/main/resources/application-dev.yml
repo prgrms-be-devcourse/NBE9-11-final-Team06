@@ -17,3 +17,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+external:
+  seoul:
+    base-url: http://openapi.seoul.go.kr:8088
+    api-key: ${SEOUL_API_KEY:dummy}
