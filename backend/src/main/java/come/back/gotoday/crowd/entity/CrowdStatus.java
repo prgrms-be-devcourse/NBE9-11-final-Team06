@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
  * 혼잡도 메시지, 측정 시각을 저장해두고 이후 추천 점수 계산이나 캐싱에 활용할 수 있습니다.
  */
 @Entity
-@Table(name = "crowd_status")
+@Table(
+        name = "crowd_status",
+        indexes = {
+                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CrowdStatus {
@@ -37,6 +42,10 @@ public class CrowdStatus {
     /** 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소명입니다. */
     @Column(name = "area_name", nullable = false, length = 100)
     private String areaName;
+
+    /** 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소 코드입니다. */
+    @Column(name = "area_code", length = 30)
+    private String areaCode;
 
     /** 서울시 API의 한글 혼잡도 값을 우리 서비스 enum으로 변환해 저장합니다. */
     @Enumerated(EnumType.STRING)
@@ -72,13 +81,14 @@ public class CrowdStatus {
     public static CrowdStatus create(
             Place place,
             String areaName,
+            String areaCode,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
             String message,
             LocalDateTime measuredAt
     ) {
-        return new CrowdStatus(place, areaName, congestionLevel, populationMin, populationMax, message, measuredAt);
+        return new CrowdStatus(place, areaName, areaCode, congestionLevel, populationMin, populationMax, message, measuredAt);
     }
 
     /**
@@ -90,6 +100,7 @@ public class CrowdStatus {
     private CrowdStatus(
             Place place,
             String areaName,
+            String areaCode,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
@@ -98,6 +109,7 @@ public class CrowdStatus {
     ) {
         this.place = place;
         this.areaName = areaName;
+        this.areaCode = areaCode;
         this.congestionLevel = congestionLevel;
         this.populationMin = populationMin;
         this.populationMax = populationMax;

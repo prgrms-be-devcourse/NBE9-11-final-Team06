@@ -89,7 +89,7 @@ async function getCrowdStatus(areaName: string): Promise<CrowdResponse | null> {
     const response = await fetch(
       `${API_BASE_URL}/api/crowds?areaName=${encodeURIComponent(areaName)}`,
       {
-        next: { revalidate: 60 },
+        next: { revalidate: 300 },
       },
     )
 

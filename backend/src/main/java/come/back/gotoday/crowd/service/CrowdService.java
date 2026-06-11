@@ -2,14 +2,16 @@ package come.back.gotoday.crowd.service;
 
 import come.back.gotoday.crowd.dto.CrowdResponse;
 import come.back.gotoday.crowd.entity.CongestionLevel;
+import come.back.gotoday.crowd.entity.CrowdStatus;
+import come.back.gotoday.crowd.repository.CrowdStatusRepository;
 import come.back.gotoday.external.seoul.SeoulCrowdClient;
 import come.back.gotoday.external.seoul.SeoulCrowdResponse;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 혼잡도 조회 비즈니스 로직을 담당하는 서비스입니다.
@@ -18,8 +20,10 @@ import java.util.List;
  * 우리 서비스에서 사용하는 CrowdResponse 형태로 변환합니다.
  */
 @Service
-@Transactional(readOnly = true)
 public class CrowdService {
+
+    /** DB에 저장된 혼잡도 데이터를 재사용할 캐시 유효 시간입니다. */
+    private static final long CACHE_TTL_MINUTES = 5;
 
     /** 서울시 API의 PPLTN_TIME 문자열 형식입니다. 예: 2026-06-10 15:10 */
     private static final DateTimeFormatter SEOUL_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -27,29 +31,63 @@ public class CrowdService {
     /** 서울시 실시간 도시데이터 API를 호출하는 외부 API 클라이언트입니다. */
     private final SeoulCrowdClient seoulCrowdClient;
 
+    /** 혼잡도 조회 결과를 저장하고 캐시 조회에 사용하는 Repository입니다. */
+    private final CrowdStatusRepository crowdStatusRepository;
+
     /**
      * SeoulCrowdClient를 생성자 주입 방식으로 주입받습니다.
      *
      * 생성자 주입을 사용하면 필수 의존성이 명확해지고 테스트 코드 작성이 쉬워집니다.
      */
-    public CrowdService(SeoulCrowdClient seoulCrowdClient) {
+    public CrowdService(SeoulCrowdClient seoulCrowdClient, CrowdStatusRepository crowdStatusRepository) {
         this.seoulCrowdClient = seoulCrowdClient;
+        this.crowdStatusRepository = crowdStatusRepository;
     }
 
     /**
      * 지역명 기준으로 현재 혼잡도 정보를 조회합니다.
      *
-     * 처리 흐름:
-     * 1. 서울시 API 호출
-     * 2. CITYDATA에서 장소명, 장소 코드, 실시간 인구현황 데이터 추출
-     * 3. 한글 혼잡도 값을 CongestionLevel enum으로 변환
-     * 4. 인구 범위와 측정 시각을 우리 서비스 타입에 맞게 변환
-     * 5. CrowdResponse로 반환
+     * DB에 저장된 혼잡도 데이터가 캐시 유효 시간 이내이면 DB 데이터를 사용하고,
+     * 그렇지 않으면 서울시 API에서 최신 데이터를 조회하여 DB에 저장 후 반환합니다.
      *
      * @param areaName 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소명
      * @return 클라이언트에 반환할 혼잡도 응답 DTO
      */
     public CrowdResponse getCrowdStatus(String areaName) {
+        Optional<CrowdStatus> cachedCrowdStatus = crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName);
+
+        if (cachedCrowdStatus.isPresent() && isFresh(cachedCrowdStatus.get())) {
+            return toResponse(cachedCrowdStatus.get());
+        }
+
+        try {
+            return fetchAndSaveCrowdStatus(areaName);
+        } catch (RuntimeException exception) {
+            if (cachedCrowdStatus.isPresent()) {
+                return toResponse(cachedCrowdStatus.get());
+            }
+
+            throw exception;
+        }
+    }
+
+    /**
+     * DB에 저장된 혼잡도 데이터가 캐시 유효 시간 이내인지 확인합니다.
+     *
+     * @param crowdStatus DB에 저장된 혼잡도 데이터
+     * @return 저장 시각 기준 5분 이내이면 true
+     */
+    private boolean isFresh(CrowdStatus crowdStatus) {
+        return crowdStatus.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(CACHE_TTL_MINUTES));
+    }
+
+    /**
+     * 서울시 API에서 최신 혼잡도 데이터를 조회하고 DB에 저장한 뒤 응답으로 변환합니다.
+     *
+     * @param areaName 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소명
+     * @return 클라이언트에 반환할 혼잡도 응답 DTO
+     */
+    private CrowdResponse fetchAndSaveCrowdStatus(String areaName) {
         SeoulCrowdResponse response = seoulCrowdClient.getCrowdStatus(areaName);
         SeoulCrowdResponse.CityData cityData = getCityData(response, areaName);
         SeoulCrowdResponse.LivePopulationStatus populationStatus = getLatestPopulationStatus(cityData.LIVE_PPLTN_STTS());
@@ -59,15 +97,40 @@ public class CrowdService {
         Integer populationMax = parseInteger(populationStatus.AREA_PPLTN_MAX());
         LocalDateTime measuredAt = parseDateTime(populationStatus.PPLTN_TIME());
 
-        return new CrowdResponse(
+        CrowdStatus crowdStatus = CrowdStatus.create(
+                null,
                 cityData.AREA_NM(),
                 cityData.AREA_CD(),
                 congestionLevel,
-                congestionLevel.getText(),
-                populationStatus.AREA_CONGEST_MSG(),
                 populationMin,
                 populationMax,
+                populationStatus.AREA_CONGEST_MSG(),
                 measuredAt
+        );
+
+        CrowdStatus savedCrowdStatus = crowdStatusRepository.save(crowdStatus);
+
+        return toResponse(savedCrowdStatus);
+    }
+
+    /**
+     * DB에 저장된 혼잡도 엔티티를 API 응답 DTO로 변환합니다.
+     *
+     * @param crowdStatus DB에 저장된 혼잡도 데이터
+     * @return 클라이언트에 반환할 혼잡도 응답 DTO
+     */
+    private CrowdResponse toResponse(CrowdStatus crowdStatus) {
+        CongestionLevel congestionLevel = crowdStatus.getCongestionLevel();
+
+        return new CrowdResponse(
+                crowdStatus.getAreaName(),
+                crowdStatus.getAreaCode(),
+                congestionLevel,
+                congestionLevel.getText(),
+                crowdStatus.getMessage(),
+                crowdStatus.getPopulationMin(),
+                crowdStatus.getPopulationMax(),
+                crowdStatus.getMeasuredAt()
         );
     }
 
