@@ -14,13 +14,13 @@ import java.util.Optional;
 public interface CrowdStatusRepository extends JpaRepository<CrowdStatus, Long> {
 
     /**
-     * 특정 핫스팟 장소명의 가장 최근 혼잡도 데이터를 조회합니다.
+     * 특정 핫스팟 장소명의 가장 최근 저장 데이터를 조회합니다.
      *
-     * 메서드 이름 규칙에 따라 Spring Data JPA가 자동으로 쿼리를 생성합니다.
-     * measuredAt 기준 내림차순으로 정렬한 뒤 가장 첫 번째 데이터만 가져옵니다.
+     * 캐시 유효 시간은 서울시 API의 측정 시각(measuredAt)이 아니라
+     * 우리 서버가 데이터를 저장한 시각(createdAt)을 기준으로 판단합니다.
      *
      * @param areaName 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소명
-     * @return 해당 장소의 최신 혼잡도 데이터가 있으면 Optional에 담아 반환
+     * @return 해당 장소의 가장 최근 저장 데이터가 있으면 Optional에 담아 반환
      */
-    Optional<CrowdStatus> findTopByAreaNameOrderByMeasuredAtDesc(String areaName);
+    Optional<CrowdStatus> findTopByAreaNameOrderByCreatedAtDesc(String areaName);
 }

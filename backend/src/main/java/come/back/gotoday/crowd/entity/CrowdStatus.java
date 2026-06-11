@@ -38,6 +38,10 @@ public class CrowdStatus {
     @Column(name = "area_name", nullable = false, length = 100)
     private String areaName;
 
+    /** 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소 코드입니다. */
+    @Column(name = "area_code", length = 30)
+    private String areaCode;
+
     /** 서울시 API의 한글 혼잡도 값을 우리 서비스 enum으로 변환해 저장합니다. */
     @Enumerated(EnumType.STRING)
     @Column(name = "congestion_level", nullable = false, length = 30)
@@ -72,13 +76,14 @@ public class CrowdStatus {
     public static CrowdStatus create(
             Place place,
             String areaName,
+            String areaCode,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
             String message,
             LocalDateTime measuredAt
     ) {
-        return new CrowdStatus(place, areaName, congestionLevel, populationMin, populationMax, message, measuredAt);
+        return new CrowdStatus(place, areaName, areaCode, congestionLevel, populationMin, populationMax, message, measuredAt);
     }
 
     /**
@@ -90,6 +95,7 @@ public class CrowdStatus {
     private CrowdStatus(
             Place place,
             String areaName,
+            String areaCode,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
@@ -98,6 +104,7 @@ public class CrowdStatus {
     ) {
         this.place = place;
         this.areaName = areaName;
+        this.areaCode = areaCode;
         this.congestionLevel = congestionLevel;
         this.populationMin = populationMin;
         this.populationMax = populationMax;
