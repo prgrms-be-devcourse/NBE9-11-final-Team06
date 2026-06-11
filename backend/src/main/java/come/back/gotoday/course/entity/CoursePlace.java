@@ -51,7 +51,7 @@ public class CoursePlace {
     private Integer moveMinutesFromPrev;
 
     @Column(name = "distance_from_prev")
-    private Integer distanceFromPrev;
+    private Double distanceFromPrev;
 
     @Column(name = "recommendation_reason", columnDefinition = "TEXT")
     private String recommendationReason;
@@ -61,7 +61,7 @@ public class CoursePlace {
 
     private CoursePlace(Course course, Place place, Event event, Integer visitOrder, LocalDate visitDate,
                         LocalTime startTime, LocalTime endTime, Integer stayMinutes, Integer moveMinutesFromPrev,
-                        Integer distanceFromPrev, String recommendationReason) {
+                        Double distanceFromPrev, String recommendationReason) {
         this.course = course;
         this.place = place;
         this.event = event;
@@ -79,7 +79,7 @@ public class CoursePlace {
     // [규칙 반영] 정적 팩토리 메서드
     public static CoursePlace create(Course course, Place place, Event event, Integer visitOrder, LocalDate visitDate,
                                      LocalTime startTime, LocalTime endTime, Integer stayMinutes, Integer moveMinutesFromPrev,
-                                     Integer distanceFromPrev, String recommendationReason) {
+                                     Double distanceFromPrev, String recommendationReason) {
         return new CoursePlace(course, place, event, visitOrder, visitDate, startTime, endTime, stayMinutes, moveMinutesFromPrev, distanceFromPrev, recommendationReason);
     }
 }
