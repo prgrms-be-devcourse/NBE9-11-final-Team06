@@ -1,25 +1,28 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { memberApi } from "@/lib/member-api"
 import { authStorage } from "@/lib/auth"
+import { memberApi } from "@/lib/member-api"
 
-export function LogoutButton() {
+export function useAuth() {
   const router = useRouter()
+  const pathname = usePathname()
 
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false)
 
   useEffect(() => {
     const accessToken = authStorage.getAccessToken()
-    setIsLoggedIn(Boolean(accessToken))
-  }, [])
 
-  async function handleLogout() {
-    setIsLoading(true)
+    setIsLoggedIn(Boolean(accessToken))
+    setIsAuthLoading(false)
+  }, [pathname])
+
+  async function logout() {
+    setIsLogoutLoading(true)
 
     try {
       const response = await memberApi.logout()
@@ -34,19 +37,16 @@ export function LogoutButton() {
     } finally {
       authStorage.removeAccessToken()
       setIsLoggedIn(false)
-      setIsLoading(false)
+      setIsLogoutLoading(false)
       router.push("/")
       router.refresh()
     }
   }
 
-  if (!isLoggedIn) {
-    return null
+  return {
+    isLoggedIn,
+    isAuthLoading,
+    isLogoutLoading,
+    logout,
   }
-
-  return (
-    <Button type="button" variant="outline" onClick={handleLogout} disabled={isLoading}>
-      {isLoading ? "로그아웃 중..." : "로그아웃"}
-    </Button>
-  )
 }
