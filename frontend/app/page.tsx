@@ -15,7 +15,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { PlaceCard } from "@/components/place-card"
 import { CrowdBadge } from "@/components/crowd-badge"
-import { CATEGORIES, PLACES, SEOUL_AREAS } from "@/lib/data"
+import { CATEGORIES, PLACES, SEOUL_AREAS, type CrowdLevel } from "@/lib/data"
 
 const STEPS = [
   {
@@ -77,12 +77,19 @@ const AREA_NAME_MAP: Record<string, string> = {
   이태원: "이태원 관광특구",
 }
 
+const CONGESTION_LEVEL_MAP: Record<CrowdResponse["congestionLevel"], CrowdLevel> = {
+  RELAXED: "여유",
+  NORMAL: "보통",
+  CROWDED: "혼잡",
+  VERY_CROWDED: "매우혼잡",
+}
+
 async function getCrowdStatus(areaName: string): Promise<CrowdResponse | null> {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/crowds?areaName=${encodeURIComponent(areaName)}`,
       {
-        cache: "no-store",
+        next: { revalidate: 60 },
       },
     )
 
@@ -104,7 +111,7 @@ async function getSeoulAreasWithCrowd() {
 
       return {
         ...area,
-        crowd: crowdStatus?.congestionText ?? area.crowd,
+        crowd: crowdStatus ? CONGESTION_LEVEL_MAP[crowdStatus.congestionLevel] : area.crowd,
         populationMin: crowdStatus?.populationMin ?? null,
         populationMax: crowdStatus?.populationMax ?? null,
       }

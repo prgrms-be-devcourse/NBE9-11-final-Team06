@@ -23,13 +23,13 @@ export function CrowdBadge({
   populationMax?: number | null
   className?: string
 }) {
-  const meta = CROWD_META[level]
+  const meta = CROWD_META[level] ?? CROWD_META["보통"]
   const populationRange = formatPopulationRange(populationMin, populationMax)
 
   return (
     <span
       className={cn(
-          "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
         meta.bg,
         meta.color,
         className,
