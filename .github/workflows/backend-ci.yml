@@ -53,4 +53,5 @@ jobs:
         env:
           SPRING_PROFILES_ACTIVE: test
           EXTERNAL_SEOUL_BASE_URL: http://openapi.seoul.go.kr:8088
+          EXTERNAL_SEOUL_API_KEY: test-key
           SEOUL_API_KEY: test-key
