@@ -7,4 +7,5 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SEOUL_API_KEY: ${SEOUL_API_KEY:-dummy}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     restart: unless-stopped
