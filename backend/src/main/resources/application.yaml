@@ -26,3 +26,16 @@ management:
 jwt:
   secret: ${JWT_SECRET:gotoday-local-jwt-secret-key-must-be-at-least-32-bytes}
   access-token-expiration: 3600000
+
+external:
+  seoul:
+    base-url: http://openapi.seoul.go.kr:8088
+    api-key: ${SEOUL_API_KEY:dummy-key}
+
+recommendation:
+  score:
+    crowd:
+      relaxed: 30
+      normal: 10
+      crowded: -10
+      very-crowded: -30
