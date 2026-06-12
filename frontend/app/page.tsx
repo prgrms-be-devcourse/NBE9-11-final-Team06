@@ -9,7 +9,6 @@ import {
   Activity,
   Route,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -144,15 +143,19 @@ export default async function HomePage() {
                 하루 코스를 만들어 드려요.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Button asChild size="lg" className="gap-2">
-                  <Link href="/plan">
-                    코스 추천받기
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link href="/explore">장소 둘러보기</Link>
-                </Button>
+                <Link
+                  href="/plan"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  코스 추천받기
+                  <ArrowRight className="size-4" />
+                </Link>
+                <Link
+                  href="/explore"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  장소 둘러보기
+                </Link>
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
@@ -290,12 +293,13 @@ export default async function HomePage() {
                 실시간 혼잡도와 함께 확인해보세요.
               </p>
             </div>
-            <Button asChild variant="ghost" className="gap-1">
-              <Link href="/explore">
-                전체보기
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+            <Link
+              href="/explore"
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            >
+              전체보기
+              <ArrowRight className="size-4" />
+            </Link>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {PLACES.slice(0, 3).map((p) => (
@@ -328,17 +332,13 @@ export default async function HomePage() {
             <p className="mx-auto mt-3 max-w-xl text-pretty leading-relaxed text-primary-foreground/85">
               지금 바로 조건을 골라 나만의 하루 코스를 추천받아 보세요.
             </p>
-            <Button
-              asChild
-              size="lg"
-              variant="secondary"
-              className="mt-6 gap-2"
+            <Link
+              href="/plan"
+              className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-secondary px-8 text-sm font-medium text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             >
-              <Link href="/plan">
-                무료로 코스 추천받기
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+              무료로 코스 추천받기
+              <ArrowRight className="size-4" />
+            </Link>
           </div>
         </section>
       </main>

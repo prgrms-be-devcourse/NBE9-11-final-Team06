@@ -23,20 +23,31 @@ import {
   type Companion,
 } from "@/lib/data"
 import { SiteHeader } from "@/components/site-header"
+import { NaverLocationPicker } from "@/components/naver-location-picker"
 
 const STEPS = ["날짜", "위치", "동행", "취향"]
+
+type SelectedLocation = {
+  name: string
+  address?: string
+  latitude?: number
+  longitude?: number
+  source: "preset" | "naver"
+}
 
 export function PlanWizard() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [area, setArea] = useState<string | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
+  const [locationKeyword, setLocationKeyword] = useState("")
   const [companion, setCompanion] = useState<Companion | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
 
   const canNext =
     (step === 0 && !!date) ||
-    (step === 1 && !!area) ||
+    (step === 1 && !!selectedLocation) ||
     (step === 2 && !!companion) ||
     step === 3
 
@@ -48,8 +59,20 @@ export function PlanWizard() {
 
   function submit() {
     const params = new URLSearchParams()
-    if (date) params.set("date", date.toISOString().slice(0, 10))
-    if (area) params.set("area", area)
+    if (date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, "0")
+      const day = String(date.getDate()).padStart(2, "0")
+      params.set("date", `${year}-${month}-${day}`)
+    }
+    if (selectedLocation) {
+      params.set("area", area ?? selectedLocation.name)
+      params.set("locationName", selectedLocation.name)
+      params.set("locationSource", selectedLocation.source)
+      if (selectedLocation.address) params.set("locationAddress", selectedLocation.address)
+      if (selectedLocation.latitude !== undefined) params.set("lat", String(selectedLocation.latitude))
+      if (selectedLocation.longitude !== undefined) params.set("lng", String(selectedLocation.longitude))
+    }
     if (companion) params.set("companion", companion)
     if (categories.length) params.set("cats", categories.join(","))
     router.push(`/recommend?${params.toString()}`)
@@ -124,31 +147,73 @@ export function PlanWizard() {
               <StepHeader
                 icon={MapPin}
                 title="어디로 가볼까요?"
-                desc="여행하고 싶은 서울 지역을 골라주세요."
+                desc="장소명이나 주소를 검색하거나, 기본 지역을 선택해 주세요."
               />
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {SEOUL_AREAS.map((a) => (
-                  <button
-                    key={a.name}
-                    type="button"
-                    onClick={() => setArea(a.name)}
-                    className={cn(
-                      "flex items-center gap-2 rounded-2xl border p-4 text-left transition-all",
-                      area === a.name
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "border-border hover:border-primary/50",
-                    )}
-                  >
-                    <MapPin
+              <NaverLocationPicker
+                initialKeyword={locationKeyword}
+                onSelect={(location) => {
+                  setArea(null)
+                  setLocationKeyword(location.name)
+                  setSelectedLocation(location)
+                }}
+              />
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-muted-foreground">또는 기본 지역 선택</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {SEOUL_AREAS.map((a) => (
+                    <button
+                      key={a.name}
+                      type="button"
+                      onClick={() => {
+                        setArea(a.name)
+                        setLocationKeyword("")
+                        setSelectedLocation({
+                          name: a.name,
+                          source: "preset",
+                        })
+                      }}
                       className={cn(
-                        "size-4",
-                        area === a.name ? "text-primary" : "text-muted-foreground",
+                        "flex items-center gap-2 rounded-2xl border p-4 text-left transition-all",
+                        area === a.name
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border hover:border-primary/50",
                       )}
-                    />
-                    <span className="font-semibold">{a.name}</span>
-                  </button>
-                ))}
+                    >
+                      <MapPin
+                        className={cn(
+                          "size-4",
+                          area === a.name ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
+                      <span className="font-semibold">{a.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {selectedLocation && (
+                <div className="rounded-2xl border bg-secondary/30 p-4">
+                  <p className="text-sm font-semibold text-muted-foreground">선택된 위치</p>
+                  <div className="mt-2 flex items-start gap-2">
+                    <MapPin className="mt-0.5 size-4 text-primary" />
+                    <div>
+                      <p className="font-semibold">{selectedLocation.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedLocation.source === "preset" ? "기본 지역 선택" : "네이버 지도 선택"}
+                      </p>
+                      {selectedLocation.address && (
+                        <p className="mt-1 text-sm text-muted-foreground">{selectedLocation.address}</p>
+                      )}
+                      {selectedLocation.latitude !== undefined && selectedLocation.longitude !== undefined && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          위도 {selectedLocation.latitude}, 경도 {selectedLocation.longitude}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

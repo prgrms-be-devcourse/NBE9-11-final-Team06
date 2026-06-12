@@ -30,6 +30,11 @@ export default async function RecommendPage({
 }) {
   const sp = await searchParams
   const area = sp.area ?? "성수"
+  const locationName = sp.locationName ?? area
+  const locationSource = sp.locationSource ?? "preset"
+  const locationAddress = sp.locationAddress
+  const latitude = sp.lat
+  const longitude = sp.lng
   const companion = sp.companion ?? "커플"
   const dateStr = sp.date
   const cats = sp.cats?.split(",").filter(Boolean) ?? []
@@ -55,7 +60,7 @@ export default async function RecommendPage({
           </Badge>
           <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
             <MapPin className="size-3.5" />
-            {area}
+            {locationName}
           </Badge>
           <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
             <Users className="size-3.5" />
@@ -72,8 +77,29 @@ export default async function RecommendPage({
         </div>
 
         <h1 className="mt-6 text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
-          {area}에서 즐기는 {companion} 하루 코스예요
+          {locationName}에서 즐기는 {companion} 하루 코스예요
         </h1>
+
+        <Card className="mt-6 flex-row flex-wrap items-start gap-4 bg-background p-5">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary shadow-sm">
+            <MapPin className="size-5" />
+          </span>
+          <div className="flex-1">
+            <p className="font-semibold">선택된 위치</p>
+            <p className="mt-1 text-lg font-bold">{locationName}</p>
+            <p className="text-sm text-muted-foreground">
+              {locationSource === "kakao" ? "카카오맵에서 선택한 위치" : "기본 지역 선택"}
+            </p>
+            {locationAddress && (
+              <p className="mt-2 text-sm text-muted-foreground">{locationAddress}</p>
+            )}
+            {latitude && longitude && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                위도 {latitude}, 경도 {longitude}
+              </p>
+            )}
+          </div>
+        </Card>
 
         {/* real-time crowd banner */}
         <Card className="mt-6 flex-row flex-wrap items-center gap-4 bg-secondary/40 p-5">
@@ -82,7 +108,7 @@ export default async function RecommendPage({
           </span>
           <div className="flex-1">
             <p className="font-semibold">
-              지금 {area}의 실시간 혼잡도는{" "}
+              지금 {locationName} 주변의 실시간 혼잡도는{" "}
               <span className="align-middle">
                 <CrowdBadge level={areaMeta.crowd} showRange />
               </span>
@@ -209,7 +235,7 @@ export default async function RecommendPage({
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {area} 주변 추천 장소
+                {locationName} 주변 추천 장소
               </h2>
               <p className="mt-1 text-muted-foreground">
                 혼잡도가 낮은 곳에 가산점을 부여해 정렬했어요.
