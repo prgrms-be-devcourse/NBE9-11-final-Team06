@@ -82,4 +82,8 @@ public class CoursePlace {
                                      Double distanceFromPrev, String recommendationReason) {
         return new CoursePlace(course, place, event, visitOrder, visitDate, startTime, endTime, stayMinutes, moveMinutesFromPrev, distanceFromPrev, recommendationReason);
     }
+
+    public void setCourse(Course course) {
+        this.course = course;
+    }
 }

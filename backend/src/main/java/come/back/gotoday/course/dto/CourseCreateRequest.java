@@ -11,6 +11,6 @@ public record CourseCreateRequest(
         LocalDate endDate,
         String baseArea,
         String companionType,
-        List<CoursePlaceRequest> places
+        List<Long> placeIds
 ) {
 }

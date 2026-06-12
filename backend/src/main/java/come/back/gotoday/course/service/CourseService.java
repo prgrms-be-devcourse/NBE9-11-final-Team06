@@ -1,15 +1,14 @@
 package come.back.gotoday.course.service;
 
-import come.back.gotoday.course.dto.CourseCreateRequest;
-import come.back.gotoday.course.dto.CourseDetailResponse;
-import come.back.gotoday.course.dto.CourseListResponse;
-import come.back.gotoday.course.dto.CoursePlaceResponse;
+import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CoursePlaceRepository;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
+import come.back.gotoday.place.entity.Place;
+import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,18 +23,14 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final MemberRepository memberRepository;
+    private final PlaceRepository placeRepository;
 
     //코스저장
     @Transactional
-    public Long createCourse(
-            Long memberId,
-            CourseCreateRequest request
-    ) {
+    public Long createCourse(Long memberId, CourseCreateRequest request) {
 
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(
-                        () -> new IllegalArgumentException("회원이 존재하지 않습니다.")
-                );
+                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
 
         Course course = Course.create(
                 member,
@@ -50,6 +45,34 @@ public class CourseService {
                 null,
                 null
         );
+
+        List<Place> places = placeRepository.findAllById(request.placeIds());
+        java.util.Map<Long, Place> placeMap = places.stream()
+                .collect(java.util.stream.Collectors.toMap(Place::getId, java.util.function.Function.identity()));
+
+        int order = 1;
+        for (Long placeId : request.placeIds()) {
+            Place place = placeMap.get(placeId);
+            if (place == null) {
+                throw new IllegalArgumentException("장소가 존재하지 않습니다.");
+            }
+
+            CoursePlace coursePlace = CoursePlace.create(
+                    course,
+                    place,
+                    null,
+                    order++,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+
+            course.addCoursePlace(coursePlace);
+        }
 
         courseRepository.save(course);
 
@@ -105,6 +128,7 @@ public class CourseService {
                 .toList();
     }
 
+    //코스 삭제
     @Transactional
     public void deleteCourse(
             Long memberId,

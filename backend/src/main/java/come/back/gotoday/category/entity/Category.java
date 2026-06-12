@@ -1,5 +1,6 @@
 package come.back.gotoday.category.entity;
 
+import come.back.gotoday.category.type.CategoryType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,7 +21,7 @@ public class Category {
     private String name;
 
     @Column(nullable = false, length = 30)
-    private String type;
+    private CategoryType type;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -28,7 +29,7 @@ public class Category {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    private Category(String name, String type) {
+    private Category(String name, CategoryType type) {
         this.name = name;
         this.type = type;
         this.createdAt = LocalDateTime.now();
@@ -36,7 +37,7 @@ public class Category {
     }
 
     // [규칙 반영] 정적 팩토리 메서드
-    public static Category create(String name, String type) {
+    public static Category create(String name, CategoryType type) {
         return new Category(name, type);
     }
 }
