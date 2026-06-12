@@ -9,6 +9,7 @@ import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,7 +46,9 @@ public class AuthService {
 
     @Transactional
     public TokenReissueResult reissue(String refreshToken) {
-        validateRefreshToken(refreshToken);
+        if (refreshToken == null) {
+            throw new BusinessException(ErrorCode.INVALID_LOGIN);
+        }
 
         RefreshToken savedRefreshToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_LOGIN));
@@ -55,13 +58,27 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
 
-        Member member = savedRefreshToken.getMember();
+        try {
+            Claims claims = jwtTokenProvider.parseAndValidateToken(refreshToken);
 
-        validateActiveMember(member);
+            if (!jwtTokenProvider.isRefreshToken(claims)) {
+                refreshTokenRepository.delete(savedRefreshToken);
+                throw new BusinessException(ErrorCode.INVALID_LOGIN);
+            }
 
-        String newAccessToken = jwtTokenProvider.createAccessToken(member);
+            Member member = savedRefreshToken.getMember();
 
-        return new TokenReissueResult(newAccessToken);
+            validateActiveMember(member);
+
+            String newAccessToken = jwtTokenProvider.createAccessToken(member);
+
+            return new TokenReissueResult(newAccessToken);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            refreshTokenRepository.delete(savedRefreshToken);
+            throw new BusinessException(ErrorCode.INVALID_LOGIN);
+        }
     }
 
     @Transactional
@@ -89,16 +106,6 @@ public class AuthService {
                                 )
                         )
                 );
-    }
-
-    private void validateRefreshToken(String refreshToken) {
-        if (refreshToken == null || !jwtTokenProvider.validateToken(refreshToken)) {
-            throw new BusinessException(ErrorCode.INVALID_LOGIN);
-        }
-
-        if (!jwtTokenProvider.isRefreshToken(refreshToken)) {
-            throw new BusinessException(ErrorCode.INVALID_LOGIN);
-        }
     }
 
     private void validateActiveMember(Member member) {

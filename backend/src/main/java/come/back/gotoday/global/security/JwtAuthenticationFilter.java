@@ -2,6 +2,7 @@ package come.back.gotoday.global.security;
 
 import come.back.gotoday.auth.jwt.JwtTokenProvider;
 import come.back.gotoday.auth.jwt.TokenCookieProvider;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,8 +36,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveToken(request);
 
-        if (token != null && jwtTokenProvider.validateToken(token) && jwtTokenProvider.isAccessToken(token)) {
-            Long memberId = jwtTokenProvider.getMemberId(token);
+        if (StringUtils.hasText(token)) {
+            authenticate(token, request);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private void authenticate(String token, HttpServletRequest request) {
+        try {
+            Claims claims = jwtTokenProvider.parseAndValidateToken(token);
+
+            if (!jwtTokenProvider.isAccessToken(claims)) {
+                return;
+            }
+
+            Long memberId = jwtTokenProvider.getMemberId(claims);
 
             CustomUserDetails userDetails =
                     (CustomUserDetails) customUserDetailsService.loadUserByMemberId(memberId);
@@ -50,9 +65,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (RuntimeException ignored) {
+            SecurityContextHolder.clearContext();
         }
-
-        filterChain.doFilter(request, response);
     }
 
     private String resolveToken(HttpServletRequest request) {

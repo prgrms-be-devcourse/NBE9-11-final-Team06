@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Date;
 
 @Component
@@ -44,25 +43,45 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String token) {
         try {
-            parseClaims(token);
+            parseAndValidateToken(token);
             return true;
         } catch (RuntimeException exception) {
             return false;
         }
     }
 
+    public Claims parseAndValidateToken(String token) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
     public boolean isAccessToken(String token) {
-        Claims claims = parseClaims(token);
+        Claims claims = parseAndValidateToken(token);
+        return isAccessToken(claims);
+    }
+
+    public boolean isAccessToken(Claims claims) {
         return ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     public boolean isRefreshToken(String token) {
-        Claims claims = parseClaims(token);
+        Claims claims = parseAndValidateToken(token);
+        return isRefreshToken(claims);
+    }
+
+    public boolean isRefreshToken(Claims claims) {
         return REFRESH_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     public Long getMemberId(String token) {
-        Claims claims = parseClaims(token);
+        Claims claims = parseAndValidateToken(token);
+        return getMemberId(claims);
+    }
+
+    public Long getMemberId(Claims claims) {
         return Long.valueOf(claims.getSubject());
     }
 
@@ -91,13 +110,5 @@ public class JwtTokenProvider {
                 .expiration(expiration)
                 .signWith(secretKey)
                 .compact();
-    }
-
-    private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
     }
 }
