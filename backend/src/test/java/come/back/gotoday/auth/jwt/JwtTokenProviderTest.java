@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtTokenProviderTest {
@@ -12,9 +14,13 @@ class JwtTokenProviderTest {
     private static final String SECRET =
             "gotoday-local-jwt-secret-key-must-be-at-least-32-bytes";
 
+    private static final long ACCESS_TOKEN_EXPIRATION = 3600000L;
+    private static final long REFRESH_TOKEN_EXPIRATION = 1209600000L;
+
     private final JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(
             SECRET,
-            3600000L
+            ACCESS_TOKEN_EXPIRATION,
+            REFRESH_TOKEN_EXPIRATION
     );
 
     @Test
@@ -31,8 +37,21 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    @DisplayName("유효한 토큰이면 검증에 성공한다")
-    void validateToken_success() {
+    @DisplayName("Refresh Token을 생성한다")
+    void createRefreshToken_success() {
+        // given
+        Member member = createMember();
+
+        // when
+        String refreshToken = jwtTokenProvider.createRefreshToken(member);
+
+        // then
+        assertThat(refreshToken).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("유효한 Access Token이면 검증에 성공한다")
+    void validateToken_accessToken_success() {
         // given
         Member member = createMember();
         String accessToken = jwtTokenProvider.createAccessToken(member);
@@ -42,6 +61,50 @@ class JwtTokenProviderTest {
 
         // then
         assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("유효한 Refresh Token이면 검증에 성공한다")
+    void validateToken_refreshToken_success() {
+        // given
+        Member member = createMember();
+        String refreshToken = jwtTokenProvider.createRefreshToken(member);
+
+        // when
+        boolean result = jwtTokenProvider.validateToken(refreshToken);
+
+        // then
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("Access Token 타입을 확인한다")
+    void isAccessToken_success() {
+        // given
+        Member member = createMember();
+        String accessToken = jwtTokenProvider.createAccessToken(member);
+
+        // when
+        boolean result = jwtTokenProvider.isAccessToken(accessToken);
+
+        // then
+        assertThat(result).isTrue();
+        assertThat(jwtTokenProvider.isRefreshToken(accessToken)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Refresh Token 타입을 확인한다")
+    void isRefreshToken_success() {
+        // given
+        Member member = createMember();
+        String refreshToken = jwtTokenProvider.createRefreshToken(member);
+
+        // when
+        boolean result = jwtTokenProvider.isRefreshToken(refreshToken);
+
+        // then
+        assertThat(result).isTrue();
+        assertThat(jwtTokenProvider.isAccessToken(refreshToken)).isFalse();
     }
 
     @Test
@@ -69,6 +132,36 @@ class JwtTokenProviderTest {
 
         // then
         assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("Access Token 만료 시간을 반환한다")
+    void getAccessTokenExpiration_success() {
+        // when
+        long expiration = jwtTokenProvider.getAccessTokenExpiration();
+
+        // then
+        assertThat(expiration).isEqualTo(ACCESS_TOKEN_EXPIRATION);
+    }
+
+    @Test
+    @DisplayName("Refresh Token 만료 시간을 반환한다")
+    void getRefreshTokenExpiration_success() {
+        // when
+        long expiration = jwtTokenProvider.getRefreshTokenExpiration();
+
+        // then
+        assertThat(expiration).isEqualTo(REFRESH_TOKEN_EXPIRATION);
+    }
+
+    @Test
+    @DisplayName("Refresh Token 만료 일시를 반환한다")
+    void getRefreshTokenExpiresAt_success() {
+        // when
+        LocalDateTime expiresAt = jwtTokenProvider.getRefreshTokenExpiresAt();
+
+        // then
+        assertThat(expiresAt).isAfter(LocalDateTime.now());
     }
 
     private Member createMember() {

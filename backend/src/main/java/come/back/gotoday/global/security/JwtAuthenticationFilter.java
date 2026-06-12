@@ -1,6 +1,8 @@
 package come.back.gotoday.global.security;
 
 import come.back.gotoday.auth.jwt.JwtTokenProvider;
+import come.back.gotoday.auth.jwt.TokenCookieProvider;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenCookieProvider tokenCookieProvider;
     private final CustomUserDetailsService customUserDetailsService;
 
     @Override
@@ -33,9 +36,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveToken(request);
 
-        if (token != null && jwtTokenProvider.validateToken(token)) {
-            Long memberId = jwtTokenProvider.getMemberId(token);
-            CustomUserDetails userDetails = (CustomUserDetails) customUserDetailsService.loadUserByMemberId(memberId);
+        if (StringUtils.hasText(token)) {
+            authenticate(token, request);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private void authenticate(String token, HttpServletRequest request) {
+        try {
+            Claims claims = jwtTokenProvider.parseAndValidateToken(token);
+
+            if (!jwtTokenProvider.isAccessToken(claims)) {
+                return;
+            }
+
+            Long memberId = jwtTokenProvider.getMemberId(claims);
+
+            CustomUserDetails userDetails =
+                    (CustomUserDetails) customUserDetailsService.loadUserByMemberId(memberId);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
@@ -46,12 +65,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (RuntimeException ignored) {
+            SecurityContextHolder.clearContext();
         }
-
-        filterChain.doFilter(request, response);
     }
 
     private String resolveToken(HttpServletRequest request) {
+        String cookieToken = tokenCookieProvider.resolveAccessToken(request);
+
+        if (StringUtils.hasText(cookieToken)) {
+            return cookieToken;
+        }
+
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
 
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {

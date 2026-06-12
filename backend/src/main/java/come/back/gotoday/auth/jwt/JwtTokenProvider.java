@@ -9,55 +9,106 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "type";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
+    private final long refreshTokenExpiration;
 
     public JwtTokenProvider(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.access-token-expiration}") long accessTokenExpiration
+            @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration
     ) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
+        this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
     public String createAccessToken(Member member) {
-        Date now = new Date();
-        Date expiration = new Date(now.getTime() + accessTokenExpiration);
+        return createToken(member, ACCESS_TOKEN_TYPE, accessTokenExpiration);
+    }
 
-        return Jwts.builder()
-                .subject(String.valueOf(member.getId()))
-                .claim("email", member.getEmail())
-                .claim("role", member.getRole())
-                .issuedAt(now)
-                .expiration(expiration)
-                .signWith(secretKey)
-                .compact();
+    public String createRefreshToken(Member member) {
+        return createToken(member, REFRESH_TOKEN_TYPE, refreshTokenExpiration);
     }
 
     public boolean validateToken(String token) {
         try {
-            parseClaims(token);
+            parseAndValidateToken(token);
             return true;
         } catch (RuntimeException exception) {
             return false;
         }
     }
 
-    public Long getMemberId(String token) {
-        Claims claims = parseClaims(token);
-        return Long.valueOf(claims.getSubject());
-    }
-
-    private Claims parseClaims(String token) {
+    public Claims parseAndValidateToken(String token) {
         return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public boolean isAccessToken(String token) {
+        Claims claims = parseAndValidateToken(token);
+        return isAccessToken(claims);
+    }
+
+    public boolean isAccessToken(Claims claims) {
+        return ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
+    }
+
+    public boolean isRefreshToken(String token) {
+        Claims claims = parseAndValidateToken(token);
+        return isRefreshToken(claims);
+    }
+
+    public boolean isRefreshToken(Claims claims) {
+        return REFRESH_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
+    }
+
+    public Long getMemberId(String token) {
+        Claims claims = parseAndValidateToken(token);
+        return getMemberId(claims);
+    }
+
+    public Long getMemberId(Claims claims) {
+        return Long.valueOf(claims.getSubject());
+    }
+
+    public LocalDateTime getRefreshTokenExpiresAt() {
+        return LocalDateTime.now().plusNanos(refreshTokenExpiration * 1_000_000);
+    }
+
+    public long getAccessTokenExpiration() {
+        return accessTokenExpiration;
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration;
+    }
+
+    private String createToken(Member member, String tokenType, long expirationMillis) {
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + expirationMillis);
+
+        return Jwts.builder()
+                .subject(String.valueOf(member.getId()))
+                .claim("email", member.getEmail())
+                .claim("role", member.getRole())
+                .claim(TOKEN_TYPE_CLAIM, tokenType)
+                .issuedAt(now)
+                .expiration(expiration)
+                .signWith(secretKey)
+                .compact();
     }
 }
