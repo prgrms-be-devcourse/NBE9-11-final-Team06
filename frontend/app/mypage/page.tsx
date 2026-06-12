@@ -10,7 +10,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
@@ -73,7 +73,7 @@ export default function MyPage() {
     try {
       const response = await memberApi.updateMyInfo({
         nickname: nickname.trim(),
-        profileImageUrl: profileImageUrl.trim() || undefined,
+        profileImageUrl: profileImageUrl.trim(),
       })
 
       if (!response.success || !response.data) {
@@ -114,7 +114,12 @@ export default function MyPage() {
         return
       }
 
-      await memberApi.logout()
+      
+      try {
+        await memberApi.logout()
+      } catch (error) {
+        console.error("회원 탈퇴 후 로그아웃 처리 중 오류 발생:", error)
+      }
 
       toast.success("회원 탈퇴가 완료되었습니다.")
       router.push("/")
