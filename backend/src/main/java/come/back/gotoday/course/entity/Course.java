@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "course")
@@ -81,5 +83,18 @@ public class Course {
                                 LocalDate endDate, String baseArea, String companionType, Integer totalDistance,
                                 Integer estimatedTime, String recommendationReason) {
         return new Course(member, title, description, courseType, startDate, endDate, baseArea, companionType, totalDistance, estimatedTime, recommendationReason);
+    }
+
+
+    @OneToMany(
+            mappedBy = "course",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<CoursePlace> coursePlaces = new ArrayList<>();
+
+    public void addCoursePlace(CoursePlace coursePlace) {
+        coursePlaces.add(coursePlace);
+        coursePlace.setCourse(this);
     }
 }
