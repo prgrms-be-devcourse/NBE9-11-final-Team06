@@ -46,26 +46,27 @@ public class CourseService {
                 null
         );
 
+        int order = 1;
 
-        for (CoursePlaceRequest req : request.places()) {
+        for (Long placeId : request.placeIds()) {
 
-            Place place = placeRepository.findById(req.placeId())
+            Place place = placeRepository.findById(placeId)
                     .orElseThrow(() -> new IllegalArgumentException("장소가 존재하지 않습니다."));
 
             CoursePlace coursePlace = CoursePlace.create(
-                    course,                 // course
-                    place,                  // place
-                    null,                   // event (지금 DTO에 없음 → 일단 null)
-                    req.visitOrder(),
-                    req.visitDate(),
-                    req.startTime(),
-                    req.endTime(),
-                    null,                   // stayMinutes (필요하면 계산)
-                    null,                   // moveMinutesFromPrev
-                    null,                   // distanceFromPrev
-                    req.recommendationReason()
+                    course,
+                    place,
+                    null,
+                    order++,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
             );
-            //코스 place 연결
+
             course.addCoursePlace(coursePlace);
         }
 
@@ -123,6 +124,7 @@ public class CourseService {
                 .toList();
     }
 
+    //코스 삭제
     @Transactional
     public void deleteCourse(
             Long memberId,
