@@ -46,4 +46,10 @@ export const memberApi = {
       body: request,
     })
   },
+
+  withdrawMyAccount() {
+    return apiRequest<void>("/api/members/me", {
+      method: "DELETE",
+    })
+  },
 }
