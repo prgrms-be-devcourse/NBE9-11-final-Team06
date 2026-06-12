@@ -89,7 +89,7 @@ EC2 접속이 필요한 팀원은 AWS 담당자에게 .pem 키를 개인적으�
 
 ```bash
 chmod 400 team06-key.pem
-ssh -i team06-test-key.pem ec2-user@EC2_PUBLIC_IP
+ssh -i team06-key.pem ec2-user@EC2_PUBLIC_IP
 ```
 
 접속 후 배포 디렉터리로 이동합니다.
