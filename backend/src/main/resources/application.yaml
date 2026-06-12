@@ -23,6 +23,13 @@ management:
     health:
       show-details: never
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    operations-sorter: method
+    tags-sorter: alpha
+
 jwt:
   secret: ${JWT_SECRET:gotoday-local-jwt-secret-key-must-be-at-least-32-bytes}
   access-token-expiration: 1800000
