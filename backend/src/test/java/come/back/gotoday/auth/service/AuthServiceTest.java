@@ -8,6 +8,7 @@ import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private Claims claims;
 
     @InjectMocks
     private AuthService authService;
@@ -195,9 +199,9 @@ class AuthServiceTest {
                 LocalDateTime.now().plusDays(14)
         );
 
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(savedRefreshToken));
+        when(jwtTokenProvider.parseAndValidateToken(refreshToken)).thenReturn(claims);
+        when(jwtTokenProvider.isRefreshToken(claims)).thenReturn(true);
         when(jwtTokenProvider.createAccessToken(member)).thenReturn(newAccessToken);
 
         // when
@@ -218,41 +222,8 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
 
-        verify(jwtTokenProvider, never()).validateToken(anyString());
         verify(refreshTokenRepository, never()).findByToken(anyString());
-    }
-
-    @Test
-    @DisplayName("유효하지 않은 Refresh Token이면 Access Token 재발급에 실패한다")
-    void reissue_invalidRefreshToken_fail() {
-        // given
-        String refreshToken = "invalid-refresh-token";
-
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(false);
-
-        // when & then
-        assertThatThrownBy(() -> authService.reissue(refreshToken))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
-
-        verify(refreshTokenRepository, never()).findByToken(anyString());
-    }
-
-    @Test
-    @DisplayName("Refresh Token 타입이 아니면 Access Token 재발급에 실패한다")
-    void reissue_notRefreshTokenType_fail() {
-        // given
-        String refreshToken = "access-token";
-
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(false);
-
-        // when & then
-        assertThatThrownBy(() -> authService.reissue(refreshToken))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
-
-        verify(refreshTokenRepository, never()).findByToken(anyString());
+        verify(jwtTokenProvider, never()).parseAndValidateToken(anyString());
     }
 
     @Test
@@ -261,14 +232,14 @@ class AuthServiceTest {
         // given
         String refreshToken = "refresh-token";
 
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> authService.reissue(refreshToken))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
+
+        verify(jwtTokenProvider, never()).parseAndValidateToken(anyString());
     }
 
     @Test
@@ -285,8 +256,6 @@ class AuthServiceTest {
                 LocalDateTime.now().minusDays(1)
         );
 
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(savedRefreshToken));
 
         // when & then
@@ -295,6 +264,83 @@ class AuthServiceTest {
                 .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
 
         verify(refreshTokenRepository).delete(savedRefreshToken);
+        verify(jwtTokenProvider, never()).parseAndValidateToken(anyString());
+    }
+
+    @Test
+    @DisplayName("JWT 파싱에 실패한 Refresh Token이면 삭제 후 Access Token 재발급에 실패한다")
+    void reissue_invalidRefreshToken_fail() {
+        // given
+        String refreshToken = "invalid-refresh-token";
+
+        Member member = createActiveMember();
+
+        RefreshToken savedRefreshToken = RefreshToken.create(
+                member,
+                refreshToken,
+                LocalDateTime.now().plusDays(14)
+        );
+
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(savedRefreshToken));
+        when(jwtTokenProvider.parseAndValidateToken(refreshToken))
+                .thenThrow(new RuntimeException("Invalid token"));
+
+        // when & then
+        assertThatThrownBy(() -> authService.reissue(refreshToken))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
+
+        verify(refreshTokenRepository).delete(savedRefreshToken);
+    }
+
+    @Test
+    @DisplayName("Refresh Token 타입이 아니면 삭제 후 Access Token 재발급에 실패한다")
+    void reissue_notRefreshTokenType_fail() {
+        // given
+        String refreshToken = "access-token";
+
+        Member member = createActiveMember();
+
+        RefreshToken savedRefreshToken = RefreshToken.create(
+                member,
+                refreshToken,
+                LocalDateTime.now().plusDays(14)
+        );
+
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(savedRefreshToken));
+        when(jwtTokenProvider.parseAndValidateToken(refreshToken)).thenReturn(claims);
+        when(jwtTokenProvider.isRefreshToken(claims)).thenReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> authService.reissue(refreshToken))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
+
+        verify(refreshTokenRepository).delete(savedRefreshToken);
+    }
+
+    @Test
+    @DisplayName("탈퇴 회원의 Refresh Token이면 Access Token 재발급에 실패한다")
+    void reissue_deletedMember_fail() {
+        // given
+        String refreshToken = "refresh-token";
+
+        Member member = createDeletedMember();
+
+        RefreshToken savedRefreshToken = RefreshToken.create(
+                member,
+                refreshToken,
+                LocalDateTime.now().plusDays(14)
+        );
+
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(savedRefreshToken));
+        when(jwtTokenProvider.parseAndValidateToken(refreshToken)).thenReturn(claims);
+        when(jwtTokenProvider.isRefreshToken(claims)).thenReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> authService.reissue(refreshToken))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.INVALID_LOGIN.getMessage());
     }
 
     @Test
