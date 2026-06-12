@@ -46,12 +46,16 @@ public class CourseService {
                 null
         );
 
+        List<Place> places = placeRepository.findAllById(request.placeIds());
+        java.util.Map<Long, Place> placeMap = places.stream()
+                .collect(java.util.stream.Collectors.toMap(Place::getId, java.util.function.Function.identity()));
+
         int order = 1;
-
         for (Long placeId : request.placeIds()) {
-
-            Place place = placeRepository.findById(placeId)
-                    .orElseThrow(() -> new IllegalArgumentException("장소가 존재하지 않습니다."));
+            Place place = placeMap.get(placeId);
+            if (place == null) {
+                throw new IllegalArgumentException("장소가 존재하지 않습니다.");
+            }
 
             CoursePlace coursePlace = CoursePlace.create(
                     course,
