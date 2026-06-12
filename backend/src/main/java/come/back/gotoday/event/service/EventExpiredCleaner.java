@@ -21,13 +21,13 @@ public class EventExpiredCleaner {
     @Transactional
     public void cleanExpiredEvents() {
         LocalDate today = LocalDate.now();
-        log.info(" [Clean-up] 만료된 과거 행사 데이터 청소 시작... 기준일: {}", today);
+        log.info("만료 행사 정리 시작: 기준일={}", today);
 
         try {
             int deletedCount = eventRepository.deleteExpiredEvents(today);
-            log.info("✅ [Clean-up] 청소 완료! 총 {}건의 만료된 행사가 DB에서 삭제되었습니다.", deletedCount);
+            log.info("만료 행사 정리 완료: deletedCount={}", deletedCount);
         } catch (Exception e) {
-            log.error("[Clean-up] 만료 데이터 청소 중 오류 발생: {}", e.getMessage(), e);
+            log.error("만료 행사 정리 중 오류 발생: 기준일={}, message={}", today, e.getMessage(), e);
             throw e; // 배치 전체 트랜잭션 롤백을 위해 예외를 상위로 던짐
         }
     }

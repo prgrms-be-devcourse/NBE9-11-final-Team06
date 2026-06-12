@@ -1,6 +1,7 @@
 package come.back.gotoday.crowd.service;
 
 import come.back.gotoday.crowd.entity.CongestionLevel;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
  * 혼잡도가 높은 장소는 추천 점수를 낮춰
  * 더 쾌적한 장소가 우선 추천되도록 합니다.
  */
+@Slf4j
 @Component
 public class CrowdScoreCalculator {
 
@@ -33,14 +35,18 @@ public class CrowdScoreCalculator {
 
     public int calculate(CongestionLevel congestionLevel) {
         if (congestionLevel == null) {
+            log.warn("혼잡도 점수 계산 스킵: congestionLevel=null");
             return 0;
         }
 
-        return switch (congestionLevel) {
+        int score = switch (congestionLevel) {
             case RELAXED -> relaxedScore;
             case NORMAL -> normalScore;
             case CROWDED -> crowdedScore;
             case VERY_CROWDED -> veryCrowdedScore;
         };
+
+        log.info("혼잡도 점수 계산 완료: congestionLevel={}, score={}", congestionLevel, score);
+        return score;
     }
 }

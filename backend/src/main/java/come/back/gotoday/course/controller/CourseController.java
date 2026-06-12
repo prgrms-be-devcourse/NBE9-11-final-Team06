@@ -8,12 +8,14 @@ import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/courses")
 @RequiredArgsConstructor
@@ -27,12 +29,12 @@ public class CourseController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody CourseCreateRequest request
     ) {
-
+        log.info("코스 생성 요청: memberId={}, title={}, placeCount={}", userDetails.getMemberId(), request.title(), request.placeIds().size());
         Long courseId = courseService.createCourse(
                 userDetails.getMemberId(),
                 request
         );
-
+        log.info("코스 생성 응답: memberId={}, courseId={}", userDetails.getMemberId(), courseId);
         return ResponseEntity.ok(
                 ApiResponse.success(courseId, "코스 생성에 성공했습니다.")
         );
@@ -43,9 +45,9 @@ public class CourseController {
     public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourse(
             @PathVariable Long courseId
     ) {
-
+        log.info("코스 단건 조회 요청: courseId={}", courseId);
         CourseDetailResponse response = courseService.getCourse(courseId);
-
+        log.info("코스 단건 조회 응답: courseId={}", courseId);
         return ResponseEntity.ok(
                 ApiResponse.success(response, "코스 조회에 성공했습니다.")
         );
@@ -54,9 +56,11 @@ public class CourseController {
     // 코스 다건 조회
     @GetMapping
     public ResponseEntity<ApiResponse<List<CourseListResponse>>> getCourses() {
+        log.info("코스 목록 조회 요청");
 
         List<CourseListResponse> response = courseService.getCourses();
 
+        log.info("코스 목록 조회 응답: resultCount={}", response.size());
         return ResponseEntity.ok(
                 ApiResponse.success(response, "코스 목록 조회에 성공했습니다.")
         );
@@ -68,9 +72,9 @@ public class CourseController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long courseId
     ) {
-
+        log.info("코스 삭제 요청: memberId={}, courseId={}", userDetails.getMemberId(), courseId);
         courseService.deleteCourse(userDetails.getMemberId(), courseId);
-
+        log.info("코스 삭제 응답: memberId={}, courseId={}", userDetails.getMemberId(), courseId);
         return ResponseEntity.ok(
                 ApiResponse.success(null, "코스 삭제에 성공했습니다.")
         );

@@ -26,14 +26,23 @@ public class EventChunkProcessor {
     public void saveOrUpdateChunk(List<SeoulEventResponse.EventRow> rows,
                                   Map<String, Category> categoryMap,
                                   Category defaultCategory) {
-        if (rows == null || rows.isEmpty()) return;
+        if (rows == null || rows.isEmpty()) {
+            log.info("행사 청크 저장 스킵: 처리할 데이터가 없습니다.");
+            return;
+        }
+
+        log.info("행사 청크 저장 시작: rowCount={}", rows.size());
 
         // 1. 청크(1000개)에 포함된 모든 externalId를 리스트로 모읍니다.
         List<String> extIds = rows.stream()
                 .map(SeoulEventResponse.EventRow::externalId)
                 .toList();
 
+        log.info("행사 청크 externalId 수집 완료: externalIdCount={}", extIds.size());
+
         List<Event> existingEvents = eventRepository.findByExternalIdIn(extIds);
+
+        log.info("기존 행사 조회 완료: existingEventCount={}", existingEvents.size());
 
         Map<String, Event> eventMap = existingEvents.stream()
                 .collect(Collectors.toMap(Event::getExternalId, event -> event));
@@ -41,12 +50,18 @@ public class EventChunkProcessor {
         // 기준이 되는 당일 날짜 구하기
         LocalDate today = LocalDate.now();
 
+        int insertCount = 0;
+        int updateCount = 0;
+        int skipCount = 0;
+        int errorCount = 0;
+
         for (SeoulEventResponse.EventRow row : rows) {
             try {
                 // 1. 필수값 검증 및 externalId 추출
                 String extId = row.externalId();
                 if (extId.replace("_", "").isBlank() || row.title() == null) {
-                    log.warn("필수 데이터 누락으로 스킵: TITLE={}", row.title());
+                    skipCount++;
+                    log.warn("필수 데이터 누락으로 행사 저장 스킵: title={}", row.title());
                     continue;
                 }
 
@@ -55,13 +70,15 @@ public class EventChunkProcessor {
                 LocalDate endDate = parseDate(row.endDate());
 
                 if (startDate == null || endDate == null) {
-                    log.warn("필수 날짜 데이터 누락 또는 파싱 실패로 스킵: TITLE={}, START={}, END={}", row.title(), row.startDate(), row.endDate());
+                    skipCount++;
+                    log.warn("필수 날짜 데이터 누락 또는 파싱 실패로 행사 저장 스킵: title={}, startDate={}, endDate={}", row.title(), row.startDate(), row.endDate());
                     continue;
                 }
 
                 if (endDate.isBefore(today)) {
                     // 행사 종료일이 오늘보다 이전이면 DB 조회도 하지 않고 바로 스킵 (성능 최적화)
-                    log.debug("지난 이벤트 스킵: TITLE={}, END_DATE={}", row.title(), endDate);
+                    skipCount++;
+                    log.debug("지난 행사 저장 스킵: title={}, endDate={}", row.title(), endDate);
                     continue;
                 }
 
@@ -79,13 +96,19 @@ public class EventChunkProcessor {
                                 row.orgLink(),
                                 row.mainImg()
                         );
-                        log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}", row.title());
+                        updateCount++;
+                        log.info("행사 정보 변경 감지로 업데이트 수행: eventId={}, title={}", existingEvent.getId(), row.title());
                     } else {
-                        log.debug("행사 정보 일치 - 업데이트 스킵: TITLE={}", row.title());
+                        skipCount++;
+                        log.debug("행사 정보 일치로 업데이트 스킵: eventId={}, title={}", existingEvent.getId(), row.title());
                     }
                 } else {
                     // Insert
                     Category targetCategory = categoryMap.getOrDefault(row.codeName(), defaultCategory);
+
+                    if (!categoryMap.containsKey(row.codeName())) {
+                        log.debug("행사 카테고리 매핑 실패로 기본 카테고리 사용: codeName={}, defaultCategory={}", row.codeName(), defaultCategory.getName());
+                    }
 
                     //todo 카카오맵 api가 연동되면 행사의 위치를 카카오 맵에서 찾아서 place객체를 만들고 event에 넣어주는 작업 필요
 //                    // 1. API가 준 장소 이름(예: 세종문화회관)을 가져옴
@@ -132,11 +155,23 @@ public class EventChunkProcessor {
                     );
 
                     eventRepository.save(newEvent);
+                    insertCount++;
+                    log.debug("신규 행사 저장 완료: title={}, externalId={}", row.title(), extId);
                 }
             } catch (Exception e) {
-                log.error("행사 데이터 저장 중 오류 스킵 (제목: {}): {}", row.title(), e.getMessage());
+                errorCount++;
+                log.error("행사 데이터 저장 중 오류 발생으로 스킵: title={}, message={}", row.title(), e.getMessage(), e);
             }
         }
+
+        log.info(
+                "행사 청크 저장 완료: rowCount={}, insertCount={}, updateCount={}, skipCount={}, errorCount={}",
+                rows.size(),
+                insertCount,
+                updateCount,
+                skipCount,
+                errorCount
+        );
     }
 
     private LocalDate parseDate(String dateStr) {

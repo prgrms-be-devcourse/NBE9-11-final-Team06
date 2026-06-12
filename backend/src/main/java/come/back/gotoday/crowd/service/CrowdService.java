@@ -6,6 +6,7 @@ import come.back.gotoday.crowd.entity.CrowdStatus;
 import come.back.gotoday.crowd.repository.CrowdStatusRepository;
 import come.back.gotoday.external.seoul.SeoulCrowdClient;
 import come.back.gotoday.external.seoul.SeoulCrowdResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.Optional;
  * 서울시 실시간 도시데이터 API를 호출해 원본 응답을 받고,
  * 우리 서비스에서 사용하는 CrowdResponse 형태로 변환합니다.
  */
+@Slf4j
 @Service
 public class CrowdService {
 
@@ -54,19 +56,28 @@ public class CrowdService {
      * @return 클라이언트에 반환할 혼잡도 응답 DTO
      */
     public CrowdResponse getCrowdStatus(String areaName) {
+        log.info("혼잡도 조회 처리 시작: areaName={}", areaName);
         Optional<CrowdStatus> cachedCrowdStatus = crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName);
 
         if (cachedCrowdStatus.isPresent() && isFresh(cachedCrowdStatus.get())) {
+            log.info("혼잡도 캐시 사용: areaName={}, crowdStatusId={}", areaName, cachedCrowdStatus.get().getId());
             return toResponse(cachedCrowdStatus.get());
         }
 
         try {
-            return fetchAndSaveCrowdStatus(areaName);
+            log.info("혼잡도 최신 데이터 조회 시도: areaName={}", areaName);
+            CrowdResponse response = fetchAndSaveCrowdStatus(areaName);
+            log.info("혼잡도 최신 데이터 조회 완료: areaName={}", areaName);
+            return response;
         } catch (RuntimeException exception) {
+            log.warn("혼잡도 최신 데이터 조회 실패: areaName={}, message={}", areaName, exception.getMessage());
+
             if (cachedCrowdStatus.isPresent()) {
+                log.info("혼잡도 최신 데이터 조회 실패로 기존 캐시 반환: areaName={}, crowdStatusId={}", areaName, cachedCrowdStatus.get().getId());
                 return toResponse(cachedCrowdStatus.get());
             }
 
+            log.error("혼잡도 조회 실패: 사용 가능한 캐시가 없습니다. areaName={}", areaName, exception);
             throw exception;
         }
     }
@@ -88,11 +99,14 @@ public class CrowdService {
      * @return 클라이언트에 반환할 혼잡도 응답 DTO
      */
     private CrowdResponse fetchAndSaveCrowdStatus(String areaName) {
+        log.info("서울시 혼잡도 API 조회 시작: areaName={}", areaName);
         SeoulCrowdResponse response = seoulCrowdClient.getCrowdStatus(areaName);
+        log.info("서울시 혼잡도 API 조회 완료: areaName={}", areaName);
         SeoulCrowdResponse.CityData cityData = getCityData(response, areaName);
         SeoulCrowdResponse.LivePopulationStatus populationStatus = getLatestPopulationStatus(cityData.LIVE_PPLTN_STTS());
 
         CongestionLevel congestionLevel = CongestionLevel.from(populationStatus.AREA_CONGEST_LVL());
+        log.info("혼잡도 등급 변환 완료: areaName={}, congestionLevel={}", areaName, congestionLevel);
         Integer populationMin = parseInteger(populationStatus.AREA_PPLTN_MIN());
         Integer populationMax = parseInteger(populationStatus.AREA_PPLTN_MAX());
         LocalDateTime measuredAt = parseDateTime(populationStatus.PPLTN_TIME());
@@ -109,6 +123,7 @@ public class CrowdService {
         );
 
         CrowdStatus savedCrowdStatus = crowdStatusRepository.save(crowdStatus);
+        log.info("혼잡도 데이터 저장 완료: crowdStatusId={}, areaName={}, measuredAt={}", savedCrowdStatus.getId(), savedCrowdStatus.getAreaName(), savedCrowdStatus.getMeasuredAt());
 
         return toResponse(savedCrowdStatus);
     }
@@ -146,6 +161,7 @@ public class CrowdService {
      */
     private SeoulCrowdResponse.CityData getCityData(SeoulCrowdResponse response, String areaName) {
         if (response == null || response.CITYDATA() == null) {
+            log.warn("서울시 혼잡도 API 응답에 CITYDATA가 없습니다. areaName={}", areaName);
             throw new IllegalArgumentException("해당 지역의 혼잡도 정보를 조회할 수 없습니다: " + areaName);
         }
 
@@ -165,6 +181,7 @@ public class CrowdService {
             List<SeoulCrowdResponse.LivePopulationStatus> populationStatuses
     ) {
         if (populationStatuses == null || populationStatuses.isEmpty()) {
+            log.warn("서울시 실시간 인구현황 데이터가 없습니다.");
             throw new IllegalStateException("서울시 실시간 인구현황 데이터가 없습니다.");
         }
 
@@ -182,6 +199,7 @@ public class CrowdService {
      */
     private Integer parseInteger(String value) {
         if (value == null || value.isBlank()) {
+            log.debug("혼잡도 인구 수 파싱 스킵: value={}", value);
             return null;
         }
 
@@ -198,6 +216,7 @@ public class CrowdService {
      */
     private LocalDateTime parseDateTime(String value) {
         if (value == null || value.isBlank()) {
+            log.debug("혼잡도 측정 시각 파싱 스킵: value={}", value);
             return null;
         }
 
