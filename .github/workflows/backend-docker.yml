@@ -7,6 +7,7 @@ on:
     paths:
       - 'backend/**'
       - 'docker-compose.yml'
+      - 'deploy/**'
       - '.github/workflows/backend-docker.yml'
 
   push:
@@ -15,6 +16,7 @@ on:
     paths:
       - 'backend/**'
       - 'docker-compose.yml'
+      - 'deploy/**'
       - '.github/workflows/backend-docker.yml'
 
 permissions:
@@ -72,6 +74,29 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare EC2 upload directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            rm -rf ~/gotoday-upload
+            mkdir -p ~/gotoday-upload
+            mkdir -p ~/gotoday/nginx
+
+      - name: Copy deploy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/docker-compose.ec2.yml,deploy/nginx/default.conf"
+          target: "~/gotoday-upload"
+
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -79,6 +104,10 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            cp ~/gotoday-upload/deploy/docker-compose.ec2.yml ~/gotoday/docker-compose.yml
+            cp ~/gotoday-upload/deploy/nginx/default.conf ~/gotoday/nginx/default.conf
+            rm -rf ~/gotoday-upload
+
             cd ~/gotoday
 
             docker pull ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
@@ -86,7 +115,7 @@ jobs:
             docker compose up -d
 
             for i in {1..12}; do
-              if curl -f http://localhost:8081/actuator/health; then
+              if curl -f http://localhost/actuator/health; then
                 echo "Health check succeeded"
                 exit 0
               fi
@@ -96,5 +125,7 @@ jobs:
             done
 
             echo "Health check failed after retries"
+            docker compose ps
             docker logs --tail=100 gotoday-backend
+            docker logs --tail=100 gotoday-nginx
             exit 1
