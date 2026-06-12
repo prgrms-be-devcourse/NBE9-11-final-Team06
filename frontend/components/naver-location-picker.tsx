@@ -15,6 +15,13 @@ type NaverLocationPickerProps = {
   onSelect: (location: NaverSelectedLocation) => void
 }
 
+type SampleLocation = {
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+}
+
 declare global {
   interface Window {
     naver?: {
@@ -69,7 +76,7 @@ const DEFAULT_CENTER = {
   longitude: 126.978,
 }
 
-const SAMPLE_LOCATIONS = [
+const SAMPLE_LOCATIONS: SampleLocation[] = [
   {
     name: "성수역",
     address: "서울 성동구 아차산로 100",
@@ -109,6 +116,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   const infoWindowRef = useRef<NaverInfoWindow | null>(null)
 
   const [keyword, setKeyword] = useState(initialKeyword)
+  const [selectedLocationName, setSelectedLocationName] = useState<string | null>(initialKeyword || null)
   const [isMapReady, setIsMapReady] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [results, setResults] = useState(SAMPLE_LOCATIONS)
@@ -116,32 +124,68 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   const naverMapClientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID
 
   useEffect(() => {
+    setKeyword(initialKeyword)
+
+    if (initialKeyword) {
+      setSelectedLocationName(initialKeyword)
+    }
+  }, [initialKeyword])
+
+  useEffect(() => {
+    let isMounted = true
+
     if (!naverMapClientId) {
       setErrorMessage("네이버 지도 Client ID가 설정되어 있지 않습니다.")
-      return
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const handleLoad = () => {
+      if (isMounted) {
+        initializeMap()
+      }
+    }
+
+    const handleError = () => {
+      if (isMounted) {
+        setErrorMessage("네이버 지도 SDK를 불러오지 못했습니다.")
+      }
     }
 
     if (window.naver?.maps) {
-      initializeMap()
-      return
+      handleLoad()
+      return () => {
+        isMounted = false
+      }
     }
 
     const existingScript = document.querySelector<HTMLScriptElement>("script[data-naver-map-script]")
 
     if (existingScript) {
-      existingScript.addEventListener("load", initializeMap, {
-        once: true,
-      })
-      return
+      existingScript.addEventListener("load", handleLoad)
+      existingScript.addEventListener("error", handleError)
+
+      return () => {
+        isMounted = false
+        existingScript.removeEventListener("load", handleLoad)
+        existingScript.removeEventListener("error", handleError)
+      }
     }
 
     const script = document.createElement("script")
     script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${naverMapClientId}`
     script.async = true
     script.dataset.naverMapScript = "true"
-    script.onload = initializeMap
-    script.onerror = () => setErrorMessage("네이버 지도 SDK를 불러오지 못했습니다.")
+    script.addEventListener("load", handleLoad)
+    script.addEventListener("error", handleError)
     document.head.appendChild(script)
+
+    return () => {
+      isMounted = false
+      script.removeEventListener("load", handleLoad)
+      script.removeEventListener("error", handleError)
+    }
   }, [naverMapClientId])
 
   function initializeMap() {
@@ -156,6 +200,23 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     mapRef.current = map
     setIsMapReady(true)
     setErrorMessage(null)
+
+    const trimmedKeyword = initialKeyword.trim()
+
+    if (trimmedKeyword) {
+      const filteredResults = filterLocations(trimmedKeyword)
+
+      if (filteredResults.length > 0) {
+        setResults(filteredResults)
+        selectLocation(filteredResults[0], map)
+      }
+    }
+  }
+
+  function filterLocations(searchKeyword: string) {
+    return SAMPLE_LOCATIONS.filter((location) =>
+      `${location.name} ${location.address}`.includes(searchKeyword),
+    )
   }
 
   function searchLocations() {
@@ -163,15 +224,16 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
     if (!trimmedKeyword) {
       setResults(SAMPLE_LOCATIONS)
+      setSelectedLocationName(null)
+      setErrorMessage(null)
       return
     }
 
-    const filteredResults = SAMPLE_LOCATIONS.filter((location) =>
-      `${location.name} ${location.address}`.includes(trimmedKeyword),
-    )
+    const filteredResults = filterLocations(trimmedKeyword)
 
     if (filteredResults.length === 0) {
       setResults([])
+      setSelectedLocationName(null)
       setErrorMessage("임시 검색 결과가 없습니다. 기본 지역을 선택하거나 다른 키워드로 검색해 주세요.")
       return
     }
@@ -181,15 +243,17 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     selectLocation(filteredResults[0])
   }
 
-  function selectLocation(location: (typeof SAMPLE_LOCATIONS)[number]) {
-    if (!window.naver?.maps || !mapRef.current) return
+  function selectLocation(location: SampleLocation, targetMap?: NaverMap) {
+    const map = targetMap ?? mapRef.current
+
+    if (!window.naver?.maps || !map) return
 
     markerRef.current?.setMap(null)
     infoWindowRef.current?.close()
 
     const position = new window.naver.maps.LatLng(location.latitude, location.longitude)
     const marker = new window.naver.maps.Marker({
-      map: mapRef.current,
+      map,
       position,
     })
     const infoWindow = new window.naver.maps.InfoWindow({
@@ -199,11 +263,12 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     markerRef.current = marker
     infoWindowRef.current = infoWindow
 
-    mapRef.current.setCenter(position)
-    infoWindow.open(mapRef.current, marker)
+    map.setCenter(position)
+    infoWindow.open(map, marker)
+    setSelectedLocationName(location.name)
 
     window.naver.maps.Event.addListener(marker, "click", () => {
-      infoWindow.open(mapRef.current as NaverMap, marker)
+      infoWindow.open(map, marker)
     })
 
     onSelect({
@@ -253,17 +318,25 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
         <div className="mt-4 space-y-2">
           <p className="text-sm font-semibold text-muted-foreground">선택 가능한 장소</p>
           <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
-            {results.slice(0, 5).map((location) => (
-              <button
-                key={`${location.name}-${location.latitude}-${location.longitude}`}
-                type="button"
-                onClick={() => selectLocation(location)}
-                className="w-full rounded-xl border bg-background p-3 text-left transition-colors hover:border-primary/60 hover:bg-primary/5"
-              >
-                <p className="font-semibold">{location.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{location.address}</p>
-              </button>
-            ))}
+            {results.slice(0, 5).map((location) => {
+              const isSelected = selectedLocationName === location.name
+
+              return (
+                <button
+                  key={`${location.name}-${location.latitude}-${location.longitude}`}
+                  type="button"
+                  onClick={() => selectLocation(location)}
+                  className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                    isSelected
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "bg-background hover:border-primary/60 hover:bg-primary/5"
+                  }`}
+                >
+                  <p className="font-semibold">{location.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{location.address}</p>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
