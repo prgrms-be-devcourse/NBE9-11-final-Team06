@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { authStorage } from "@/lib/auth"
 import { memberApi } from "@/lib/member-api"
 
 export function useAuth() {
@@ -15,10 +14,31 @@ export function useAuth() {
   const [isLogoutLoading, setIsLogoutLoading] = useState(false)
 
   useEffect(() => {
-    const accessToken = authStorage.getAccessToken()
+    let ignore = false
 
-    setIsLoggedIn(Boolean(accessToken))
-    setIsAuthLoading(false)
+    async function checkAuth() {
+      try {
+        const response = await memberApi.getMyInfo()
+
+        if (!ignore) {
+          setIsLoggedIn(response.success && Boolean(response.data))
+        }
+      } catch {
+        if (!ignore) {
+          setIsLoggedIn(false)
+        }
+      } finally {
+        if (!ignore) {
+          setIsAuthLoading(false)
+        }
+      }
+    }
+
+    checkAuth()
+
+    return () => {
+      ignore = true
+    }
   }, [pathname])
 
   async function logout() {
@@ -35,7 +55,6 @@ export function useAuth() {
     } catch {
       toast.error("서버와 통신 중 오류가 발생했습니다.")
     } finally {
-      authStorage.removeAccessToken()
       setIsLoggedIn(false)
       setIsLogoutLoading(false)
       router.push("/")

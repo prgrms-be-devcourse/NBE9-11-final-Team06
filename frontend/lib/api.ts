@@ -1,50 +1,78 @@
-import { authStorage } from './auth'
-import type { ApiResponse } from './types'
+import type { ApiResponse } from "./types"
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
-type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
 interface ApiRequestOptions {
   method: HttpMethod
   body?: unknown
-  withAuth?: boolean
 }
 
 export async function apiRequest<T>(
   path: string,
-  options: ApiRequestOptions
+  options: ApiRequestOptions,
 ): Promise<ApiResponse<T>> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+  const requestInit = createRequestInit(options)
 
-  if (options.withAuth) {
-    const accessToken = authStorage.getAccessToken()
+  let response = await fetch(`${API_BASE_URL}${path}`, requestInit)
 
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`
+  if (response.status === 401 && shouldTryReissue(path)) {
+    const reissueSuccess = await reissueAccessToken()
+
+    if (reissueSuccess) {
+      response = await fetch(`${API_BASE_URL}${path}`, requestInit)
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  return parseResponse<T>(response)
+}
+
+function createRequestInit(options: ApiRequestOptions): RequestInit {
+  return {
     method: options.method,
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: options.body ? JSON.stringify(options.body) : undefined,
-  })
+    credentials: "include",
+  }
+}
 
-  const contentType = response.headers.get('content-type')
+function shouldTryReissue(path: string): boolean {
+  return path !== "/api/auth/login" && path !== "/api/auth/reissue"
+}
 
-  if (!contentType?.includes('application/json')) {
+async function reissueAccessToken(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reissue`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    })
+
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+async function parseResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  const contentType = response.headers.get("content-type")
+
+  if (!contentType?.includes("application/json")) {
     return {
       success: false,
       code: String(response.status),
-      message: response.status === 401 ? '인증이 필요합니다.' : '요청 처리 중 오류가 발생했습니다.',
+      message:
+        response.status === 401
+          ? "인증이 필요합니다."
+          : "요청 처리 중 오류가 발생했습니다.",
     }
   }
 
-  const data = (await response.json()) as ApiResponse<T>
-
-  return data
+  return (await response.json()) as ApiResponse<T>
 }

@@ -13,7 +13,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORIES, COMPANIONS } from "@/lib/data"
 import { memberApi } from "@/lib/member-api"
-import { authStorage } from "@/lib/auth"
 import { toast } from "sonner"
 import { MapPin } from "lucide-react"
 
@@ -37,7 +36,7 @@ export function AuthForm() {
 
   function toggleInterest(id: string) {
     setSelectedInterests((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     )
   }
 
@@ -57,10 +56,9 @@ export function AuthForm() {
         return
       }
 
-      authStorage.setAccessToken(response.data.accessToken)
-
       toast.success("로그인되었습니다. 환영해요!")
       router.push("/")
+      router.refresh()
     } catch {
       toast.error("서버와 통신 중 오류가 발생했습니다.")
     } finally {
