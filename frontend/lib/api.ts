@@ -12,19 +12,55 @@ interface ApiRequestOptions {
 
 export async function apiRequest<T>(
   path: string,
-  options: ApiRequestOptions
+  options: ApiRequestOptions,
 ): Promise<ApiResponse<T>> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
+  const requestInit = createRequestInit(options)
+
+  let response = await fetch(`${API_BASE_URL}${path}`, requestInit)
+
+  if (response.status === 401 && shouldTryReissue(path)) {
+    const reissueSuccess = await reissueAccessToken()
+
+    if (reissueSuccess) {
+      response = await fetch(`${API_BASE_URL}${path}`, requestInit)
+    }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  return parseResponse<T>(response)
+}
+
+function createRequestInit(options: ApiRequestOptions): RequestInit {
+  return {
     method: options.method,
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: options.body ? JSON.stringify(options.body) : undefined,
     credentials: "include",
-  })
+  }
+}
 
+function shouldTryReissue(path: string): boolean {
+  return path !== "/api/auth/login" && path !== "/api/auth/reissue"
+}
+
+async function reissueAccessToken(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reissue`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    })
+
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+async function parseResponse<T>(response: Response): Promise<ApiResponse<T>> {
   const contentType = response.headers.get("content-type")
 
   if (!contentType?.includes("application/json")) {

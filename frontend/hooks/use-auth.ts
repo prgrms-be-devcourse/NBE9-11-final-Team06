@@ -17,8 +17,6 @@ export function useAuth() {
     let ignore = false
 
     async function checkAuth() {
-      setIsAuthLoading(true)
-
       try {
         const response = await memberApi.getMyInfo()
 
