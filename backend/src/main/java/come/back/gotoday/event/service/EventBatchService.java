@@ -85,8 +85,9 @@ public class EventBatchService {
     }
 
     private Category getDefaultCategory(Map<String, Category> categoryMap) {
-        return categoryMap.values().stream()
-                .findFirst()
+        return java.util.Optional.ofNullable(categoryMap.get("기타"))
+                .or(() -> java.util.Optional.ofNullable(categoryMap.get("미분류")))
+                .or(() -> categoryMap.values().stream().findFirst())
                 .orElseThrow(() -> new IllegalStateException("기본 카테고리가 데이터베이스에 존재하지 않습니다."));
     }
 

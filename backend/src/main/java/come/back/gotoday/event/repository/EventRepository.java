@@ -7,6 +7,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -21,4 +23,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Modifying
     @Query("DELETE FROM Event e WHERE e.endDate < :today")
     int deleteExpiredEvents(@Param("today") LocalDate today);
+
+    List<Event> findByExternalIdIn(Collection<String> externalIds);
 }

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +28,17 @@ public class EventChunkProcessor {
                                   Category defaultCategory) {
         if (rows == null || rows.isEmpty()) return;
 
-        // ✨ 기준이 되는 당일 날짜 구하기
+        // 1. 청크(1000개)에 포함된 모든 externalId를 리스트로 모읍니다.
+        List<String> extIds = rows.stream()
+                .map(SeoulEventResponse.EventRow::externalId)
+                .toList();
+
+        List<Event> existingEvents = eventRepository.findByExternalIdIn(extIds);
+
+        Map<String, Event> eventMap = existingEvents.stream()
+                .collect(Collectors.toMap(Event::getExternalId, event -> event));
+
+        // 기준이 되는 당일 날짜 구하기
         LocalDate today = LocalDate.now();
 
         for (SeoulEventResponse.EventRow row : rows) {
@@ -40,8 +50,15 @@ public class EventChunkProcessor {
                     continue;
                 }
 
-                // ✨ 2. 과거 이벤트 필터링 로직 추가
+                // 2. 과거 이벤트 필터링 로직 추가
+                LocalDate startDate = parseDate(row.startDate());
                 LocalDate endDate = parseDate(row.endDate());
+
+                if (startDate == null || endDate == null) {
+                    log.warn("필수 날짜 데이터 누락 또는 파싱 실패로 스킵: TITLE={}, START={}, END={}", row.title(), row.startDate(), row.endDate());
+                    continue;
+                }
+
                 if (endDate.isBefore(today)) {
                     // 행사 종료일이 오늘보다 이전이면 DB 조회도 하지 않고 바로 스킵 (성능 최적화)
                     log.debug("지난 이벤트 스킵: TITLE={}, END_DATE={}", row.title(), endDate);
@@ -49,15 +66,13 @@ public class EventChunkProcessor {
                 }
 
                 // 3. 기존 행사 조회 (여기서부터는 오늘 포함 미래에 진행할 행사만 도달함)
-                Optional<Event> existingEvent = eventRepository.findByExternalId(extId);
+                Event existingEvent = eventMap.get(extId);
 
-                if (existingEvent.isPresent()) {
+                if (existingEvent!=null) {
                     // Update
-                    Event event = existingEvent.get();
-                    LocalDate startDate = parseDate(row.startDate());
 
-                    if (event.isChanged(row.title(), startDate, endDate, row.orgLink(), row.mainImg())) {
-                        event.updateInfo(
+                    if (existingEvent.isChanged(row.title(), startDate, endDate, row.orgLink(), row.mainImg())) {
+                        existingEvent.updateInfo(
                                 row.title(),
                                 startDate,
                                 endDate,
@@ -70,7 +85,6 @@ public class EventChunkProcessor {
                     }
                 } else {
                     // Insert
-                    LocalDate startDate = parseDate(row.startDate());
                     Category targetCategory = categoryMap.getOrDefault(row.codeName(), defaultCategory);
 
                     //todo 카카오맵 api가 연동되면 행사의 위치를 카카오 맵에서 찾아서 place객체를 만들고 event에 넣어주는 작업 필요
@@ -127,11 +141,11 @@ public class EventChunkProcessor {
 
     private LocalDate parseDate(String dateStr) {
         try {
-            if (dateStr == null || dateStr.isBlank()) return LocalDate.now();
-            return LocalDate.parse(dateStr.substring(0, 10));
+            if (dateStr == null || dateStr.isBlank()) return null;
+            return LocalDate.parse(dateStr.split(" ")[0]);
         } catch (Exception e) {
-            log.warn("날짜 파싱 실패 [{}], 오늘 날짜로 대체합니다.", dateStr);
-            return LocalDate.now(); // 파싱 에러 시 오늘 날짜로 대입하여 일단 필터링을 통과하도록 유도
+            log.warn("날짜 파싱 실패 [{}]: {}", dateStr, e.getMessage());
+            return null;
         }
     }
 }
