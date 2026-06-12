@@ -66,7 +66,7 @@ public class AuthService {
                 });
 
         if (savedRefreshToken.isExpired()) {
-            log.warn("Access Token 재발급 실패: 만료된 Refresh Token입니다. memberId={}", savedRefreshToken.getMember().getId());
+            log.warn("Access Token 재발급 실패: 만료된 Refresh Token입니다. memberId={}", resolveMemberIdSafely(savedRefreshToken));
             refreshTokenRepository.delete(savedRefreshToken);
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
@@ -75,7 +75,7 @@ public class AuthService {
             Claims claims = jwtTokenProvider.parseAndValidateToken(refreshToken);
 
             if (!jwtTokenProvider.isRefreshToken(claims)) {
-                log.warn("Access Token 재발급 실패: Refresh Token 타입이 아닙니다. memberId={}", savedRefreshToken.getMember().getId());
+                log.warn("Access Token 재발급 실패: Refresh Token 타입이 아닙니다. memberId={}", resolveMemberIdSafely(savedRefreshToken));
                 refreshTokenRepository.delete(savedRefreshToken);
                 throw new BusinessException(ErrorCode.INVALID_LOGIN);
             }
@@ -91,7 +91,7 @@ public class AuthService {
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            log.warn("Access Token 재발급 실패: Refresh Token 검증 중 오류가 발생했습니다. memberId={}, message={}", savedRefreshToken.getMember().getId(), exception.getMessage());
+            log.warn("Access Token 재발급 실패: Refresh Token 검증 중 오류가 발생했습니다. memberId={}, message={}", resolveMemberIdSafely(savedRefreshToken), exception.getMessage());
             refreshTokenRepository.delete(savedRefreshToken);
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
@@ -134,6 +134,18 @@ public class AuthService {
                             log.info("신규 Refresh Token 저장 완료: memberId={}", member.getId());
                         }
                 );
+    }
+
+    private Long resolveMemberIdSafely(RefreshToken refreshToken) {
+        try {
+            if (refreshToken == null || refreshToken.getMember() == null) {
+                return null;
+            }
+            return refreshToken.getMember().getId();
+        } catch (RuntimeException exception) {
+            log.warn("Refresh Token 회원 ID 조회 실패: message={}", exception.getMessage());
+            return null;
+        }
     }
 
     private void validateActiveMember(Member member) {

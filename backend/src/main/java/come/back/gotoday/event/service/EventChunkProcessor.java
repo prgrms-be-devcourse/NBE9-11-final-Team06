@@ -36,6 +36,7 @@ public class EventChunkProcessor {
         // 1. 청크(1000개)에 포함된 모든 externalId를 리스트로 모읍니다.
         List<String> extIds = rows.stream()
                 .map(SeoulEventResponse.EventRow::externalId)
+                .filter(externalId -> externalId != null && !externalId.replace("_", "").isBlank())
                 .toList();
 
         log.info("행사 청크 externalId 수집 완료: externalIdCount={}", extIds.size());
@@ -45,10 +46,14 @@ public class EventChunkProcessor {
         log.info("기존 행사 조회 완료: existingEventCount={}", existingEvents.size());
 
         Map<String, Event> eventMap = existingEvents.stream()
-                .collect(Collectors.toMap(Event::getExternalId, event -> event));
+                .collect(Collectors.toMap(
+                        Event::getExternalId,
+                        event -> event,
+                        (existing, replacement) -> existing
+                ));
 
         // 기준이 되는 당일 날짜 구하기
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
 
         int insertCount = 0;
         int updateCount = 0;
@@ -59,9 +64,9 @@ public class EventChunkProcessor {
             try {
                 // 1. 필수값 검증 및 externalId 추출
                 String extId = row.externalId();
-                if (extId.replace("_", "").isBlank() || row.title() == null) {
+                if (extId == null || extId.replace("_", "").isBlank() || row.title() == null) {
                     skipCount++;
-                    log.warn("필수 데이터 누락으로 행사 저장 스킵: title={}", row.title());
+                    log.warn("필수 데이터 누락으로 행사 저장 스킵: externalId={}, title={}", extId, row.title());
                     continue;
                 }
 

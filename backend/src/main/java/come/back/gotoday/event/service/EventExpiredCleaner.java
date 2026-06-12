@@ -20,7 +20,7 @@ public class EventExpiredCleaner {
      */
     @Transactional
     public void cleanExpiredEvents() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         log.info("만료 행사 정리 시작: 기준일={}", today);
 
         try {

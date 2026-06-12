@@ -17,9 +17,9 @@ public class RefreshTokenCleanupScheduler {
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
     public void deleteExpiredRefreshTokens() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
         log.info("만료 Refresh Token 정리 스케줄러 시작: 기준시각={}", now);
 
         try {
