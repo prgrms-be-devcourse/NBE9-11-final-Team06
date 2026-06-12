@@ -1,5 +1,7 @@
 package come.back.gotoday.place.service;
 
+import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.entity.Place;
@@ -81,4 +83,4 @@ public class PlaceService {
 
         placeRepository.delete(place);
     }
-}}
+}
