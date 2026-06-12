@@ -26,7 +26,8 @@ public record SeoulEventResponse(
             @JsonProperty("USE_TRGT") String useTrgt,
             @JsonProperty("USE_FEE") String useFee,
             @JsonProperty("LAT") Double lat,
-            @JsonProperty("LOT") Double lot
+            @JsonProperty("LOT") Double lot,
+            @JsonProperty("PRO_TIME") String eventTime
     ) {
         /**
          * 제목과 시작일을 조합하여 고유한 external_id를 생성합니다.
