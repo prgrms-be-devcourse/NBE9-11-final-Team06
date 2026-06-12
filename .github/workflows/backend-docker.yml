@@ -85,5 +85,16 @@ jobs:
             docker compose down
             docker compose up -d
 
-            sleep 15
-            curl -f http://localhost:8081/actuator/health
+            for i in {1..12}; do
+              if curl -f http://localhost:8081/actuator/health; then
+                echo "Health check succeeded"
+                exit 0
+              fi
+
+              echo "Health check failed. Retrying in 5 seconds..."
+              sleep 5
+            done
+
+            echo "Health check failed after retries"
+            docker logs --tail=100 gotoday-backend
+            exit 1
