@@ -2,120 +2,113 @@
 
 ## 배포 구조
 
-현재 백엔드는 Docker 기반으로 빌드하고, GitHub Actions를 통해 EC2에 자동 배포합니다.
+백엔드는 Docker 이미지로 빌드되며, GitHub Actions를 통해 EC2에 자동 배포됩니다.
 
-전체 흐름은 다음과 같습니다.
 ```text
 dev 브랜치 merge
 → GitHub Actions 실행
-→ 백엔드 Docker 이미지 build
-→ GHCR에 latest 및 commit SHA 태그로 push
-→ GitHub Actions가 EC2에 SSH 접속
-→ EC2에서 최신 이미지 pull
-→ Docker Compose로 백엔드 컨테이너 재실행
-→ /actuator/health Health Check
+→ Docker 이미지 build
+→ GHCR push
+→ EC2 SSH 접속
+→ 최신 이미지 pull
+→ Docker Compose 재실행
+→ Health Check
 ```
 
 ## 구성 요소
 
 | 구성 요소 | 역할 |
 |---|---|
-| Dockerfile | Spring Boot 백엔드 애플리케이션을 Docker 이미지로 빌드 |
-| GHCR | GitHub Actions에서 빌드한 백엔드 Docker 이미지 저장 |
-| EC2 | 백엔드 컨테이너 실행 서버 |
-| Docker Compose | EC2에서 백엔드 컨테이너 실행 관리 |
-| GitHub Actions | Docker 이미지 빌드, GHCR push, EC2 자동 배포 수행 |
+| Dockerfile | Spring Boot 백엔드 Docker 이미지 빌드 |
+| GHCR | Docker 이미지 저장소 |
+| EC2 | Nginx, Backend, MySQL 컨테이너 실행 서버 |
+| Docker Compose | EC2 컨테이너 실행 및 의존성 관리 |
+| MySQL | 배포 환경 데이터베이스 |
+| Nginx | 외부 요청을 백엔드 컨테이너로 전달하는 Reverse Proxy |
+| GitHub Actions | Docker 이미지 빌드 및 EC2 자동 배포 |
+
+## 배포 파일 구조
+
+Git 기준 배포 파일은 아래 경로에서 관리합니다.
+
+```text
+deploy/
+├── docker-compose.ec2.yml
+├── nginx/
+│   └── default.conf
+└── README.md
+```
+
+EC2 서버에서는 아래 구조로 배포 파일을 관리합니다.
+
+```text
+~/gotoday/
+├── docker-compose.yml
+├── .env
+└── nginx/
+    └── default.conf
+```
+
+현재 자동 배포는 EC2의 `~/gotoday/docker-compose.yml`을 기준으로 실행됩니다.
+
+따라서 `deploy/docker-compose.ec2.yml`, `deploy/nginx/default.conf`를 수정한 경우 EC2 서버에도 동일하게 반영해야 합니다.
 
 ## 배포 이미지
 
-EC2 서버는 아래 GHCR 이미지를 pull하여 실행합니다.
+EC2 서버는 아래 GHCR 이미지를 pull하여 백엔드 컨테이너를 실행합니다.
+
 ```text
-ghcr.io/prgrms-be-devcourse/gotoday-backend:latest 
+ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
 ```
 
-## EC2 수동 배포 명령어
+## 수동 배포 명령어
 
-자동 배포가 실패하거나 수동으로 재배포가 필요한 경우 EC2에서 아래 명령어를 실행합니다.
+자동 배포가 실패하거나 수동 재배포가 필요한 경우 EC2에서 아래 명령어를 실행합니다.
+
 ```bash
 cd ~/gotoday
 docker pull ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
 docker compose down
-docker compose up -d 
+docker compose up -d
 ```
+
+MySQL 데이터를 유지해야 하므로 일반 재배포 시 아래 명령어는 사용하지 않습니다.
+
+```bash
+docker compose down -v
+```
+
+`-v` 옵션은 Docker volume까지 삭제하므로 MySQL 데이터가 함께 삭제될 수 있습니다.
 
 ## Health Check
 
-배포 후 백엔드 상태는 아래 명령어로 확인합니다.
+EC2 내부에서 확인:
+
+```bash
+curl http://localhost/actuator/health
+```
+
+백엔드 직접 접근 확인:
+
 ```bash
 curl http://localhost:8081/actuator/health
 ```
 
-정상 응답 예시는 다음과 같습니다.
+외부에서 확인:
+
+```text
+http://EC2_PUBLIC_IP/actuator/health
+```
+
+정상 응답 예시:
 
 ```json
 {"groups":["liveness","readiness"],"status":"UP"}
 ```
 
-외부에서는 아래 주소로 확인할 수 있습니다.
-```text
-http://EC2_PUBLIC_IP:8081/actuator/health
-```
-
-## 자동 배포 확인 방법
-
-dev 브랜치에 PR이 merge되면 GitHub Actions의 Backend Docker Build and Push workflow가 실행됩니다.
-
-정상적으로 자동 배포가 완료되면 아래 job이 모두 성공해야 합니다.
-
-```text
-docker
-deploy
-```
-
-deploy job에서는 다음 작업을 수행합니다.
-
-```text
-EC2 SSH 접속
-→ 최신 Docker 이미지 pull
-→ Docker Compose 재실행
-→ /actuator/health 재시도 확인
-```
-
-## 팀원 EC2 접속 및 확인 방법
-
-EC2 접속이 필요한 팀원은 AWS 담당자에게 .pem 키를 개인적으로 요청하면 됩니다.
-
-.pem 키는 GitHub, Notion, Slack 공개 채널 등에 업로드하지 않습니다.
-
-```bash
-chmod 400 team06-key.pem
-ssh -i team06-key.pem ec2-user@EC2_PUBLIC_IP
-```
-
-접속 후 배포 디렉터리로 이동합니다.
-
-```bash
-cd ~/gotoday
-```
-
-컨테이너 상태를 확인합니다.
-
-```bash
-docker ps
-docker compose ps
-```
-
-Health Check를 확인합니다.
-
-```bash
-curl http://localhost:8081/actuator/health
-```
-
 ## Secret 관리
 
-백엔드 실행에 필요한 민감 정보는 Git에 포함하지 않습니다.
-
-현재 EC2에서는 아래 파일을 통해 환경변수를 관리합니다.
+민감 정보는 Git에 포함하지 않고 EC2의 `.env` 파일에서 관리합니다.
 
 ```text
 ~/gotoday/.env
@@ -124,10 +117,16 @@ curl http://localhost:8081/actuator/health
 예시:
 
 ```env
-JWT_SECRET=실제_JWT_SECRET SEOUL_API_KEY=dummy
+JWT_SECRET=실제_JWT_SECRET
+SEOUL_API_KEY=dummy
+
+MYSQL_DATABASE=gotoday
+MYSQL_USER=gotoday_user
+MYSQL_PASSWORD=실제_DB_비밀번호
+MYSQL_ROOT_PASSWORD=실제_DB_ROOT_비밀번호
 ```
 
-주의사항:
+아래 값들은 GitHub에 커밋하지 않습니다.
 
 ```text
 .env
@@ -138,25 +137,108 @@ DB 비밀번호
 실제 API Key
 ```
 
-위 값들은 GitHub에 커밋하지 않습니다.
-
-## 현재 보안 설정 참고
-
-현재 테스트 편의를 위해 SSH 22번 포트는 임시로 전체 허용 상태입니다.
-
-실제 운영 환경 또는 주요 secret 적용 이후에는 필요한 IP만 허용하도록 변경할 예정입니다.
-
 ## MySQL 구성
 
 EC2 배포 환경에서는 Docker Compose로 MySQL 컨테이너를 함께 실행합니다.
 
-백엔드 컨테이너는 같은 Docker Compose 네트워크 안에서 MySQL 컨테이너에 접근합니다.
+백엔드 컨테이너는 Docker Compose 내부 네트워크에서 MySQL에 접근합니다.
 
 ```text
 backend → mysql:3306
 ```
+
 MySQL 3306 포트는 외부에 공개하지 않습니다.
 
-DB 계정과 비밀번호는 EC2의 .env 파일에서 관리합니다.
+MySQL 데이터는 Docker volume으로 유지합니다.
 
-현재 EC2 배포 환경에서는 초기 스키마 생성을 위해 `ddl-auto=update`를 임시 적용했습니다. 운영 환경에서는 예기치 않은 스키마 변경 위험이 있으므로, 추후 Flyway 도입 또는 초기 스키마 생성 후 `validate`로 전환할 예정입니다.
+```yaml
+volumes:
+  mysql_data:
+```
+
+MySQL이 실제로 연결 가능한 상태가 된 후 백엔드가 실행되도록 healthcheck와 `depends_on.condition`을 사용합니다.
+
+```yaml
+depends_on:
+  mysql:
+    condition: service_healthy
+```
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+  interval: 10s
+  timeout: 5s
+  retries: 10
+```
+
+## JPA ddl-auto 설정
+
+현재 EC2 배포 환경에서는 초기 스키마 생성을 위해 아래 설정을 임시 적용합니다.
+
+```yaml
+SPRING_JPA_HIBERNATE_DDL_AUTO: update
+```
+
+`ddl-auto=update`는 엔티티 기준으로 DB 스키마를 자동 변경할 수 있으므로 운영 환경에서는 위험할 수 있습니다.
+
+현재는 중간 제출 전 초기 테이블 생성을 위한 임시 설정이며, 추후 Flyway 도입 또는 초기 스키마 생성 후 `validate`로 전환할 예정입니다.
+
+## Nginx Reverse Proxy 구성
+
+EC2 배포 환경에서는 Nginx가 외부 요청을 백엔드 컨테이너로 전달합니다.
+
+```text
+Client
+→ EC2 80번 포트
+→ Nginx 컨테이너
+→ Backend 컨테이너 8080 포트
+```
+
+Nginx 설정 파일:
+
+```text
+deploy/nginx/default.conf
+```
+
+EC2 서버 설정 파일:
+
+```text
+~/gotoday/nginx/default.conf
+```
+
+Nginx는 Docker Compose 내부 네트워크에서 백엔드를 아래 주소로 호출합니다.
+
+```text
+http://backend:8080
+```
+
+현재는 검증 편의를 위해 백엔드 8081 포트도 함께 노출하고 있습니다.
+
+```text
+http://EC2_PUBLIC_IP:8081/actuator/health
+```
+
+추후 Nginx 경유 접근이 안정화되면 백엔드 8081 포트는 외부에 공개하지 않을 예정입니다.
+
+## 로컬 Compose 설정 검증
+
+로컬에서 `deploy/docker-compose.ec2.yml` 문법을 검증할 수 있습니다.
+
+```bash
+MYSQL_DATABASE=gotoday \
+MYSQL_USER=gotoday_user \
+MYSQL_PASSWORD=dummy \
+MYSQL_ROOT_PASSWORD=dummy \
+JWT_SECRET=dummy \
+SEOUL_API_KEY=dummy \
+docker compose -f deploy/docker-compose.ec2.yml config
+```
+
+또는 로컬 임시 `.env` 파일을 사용해 검증할 수 있습니다.
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.ec2.yml config
+```
+
+단, 로컬 검증용 `.env` 파일은 Git에 커밋하지 않습니다.
