@@ -1,6 +1,7 @@
 package come.back.gotoday.external.seoul;
 
 import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -12,6 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * 서울시 API 요청 URL을 생성하고 RestClient로 호출한 뒤
  * SeoulCrowdResponse 형태로 응답을 반환합니다.
  */
+@Slf4j
 @Component
 public class SeoulCrowdClient {
 
@@ -58,6 +60,7 @@ public class SeoulCrowdClient {
      * @return 서울시 API 원본 응답을 매핑한 DTO
      */
     public SeoulCrowdResponse getCrowdStatus(String areaName) {
+        log.info("서울시 실시간 도시데이터 API 요청 URL 생성 시작: areaName={}, startIndex={}, endIndex={}", areaName, START_INDEX, END_INDEX);
         String url = UriComponentsBuilder.fromUriString(seoulApiProperties.baseUrl())
                 .pathSegment(
                         seoulApiProperties.apiKey(),
@@ -70,10 +73,20 @@ public class SeoulCrowdClient {
                 .build()
                 .encode()
                 .toUriString();
+        log.info("서울시 실시간 도시데이터 API 요청 URL 생성 완료: areaName={}", areaName);
 
-        return restClient.get()
-                .uri(url)
-                .retrieve()
-                .body(SeoulCrowdResponse.class);
+        try {
+            log.info("서울시 실시간 도시데이터 API 호출 시작: areaName={}", areaName);
+            SeoulCrowdResponse response = restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(SeoulCrowdResponse.class);
+
+            log.info("서울시 실시간 도시데이터 API 호출 완료: areaName={}, hasCityData={}", areaName, response != null && response.CITYDATA() != null);
+            return response;
+        } catch (RuntimeException exception) {
+            log.error("서울시 실시간 도시데이터 API 호출 실패: areaName={}, message={}", areaName, exception.getMessage(), exception);
+            throw exception;
+        }
     }
 }

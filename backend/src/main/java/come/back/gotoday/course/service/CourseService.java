@@ -10,11 +10,13 @@ import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,9 +30,13 @@ public class CourseService {
     //코스저장
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
+        log.info("코스 생성 처리 시작: memberId={}, title={}, placeCount={}", memberId, request.title(), request.placeIds().size());
 
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+                .orElseThrow(() -> {
+                    log.warn("코스 생성 실패: 존재하지 않는 회원입니다. memberId={}", memberId);
+                    return new IllegalArgumentException("회원이 존재하지 않습니다.");
+                });
 
         Course course = Course.create(
                 member,
@@ -50,10 +56,13 @@ public class CourseService {
         java.util.Map<Long, Place> placeMap = places.stream()
                 .collect(java.util.stream.Collectors.toMap(Place::getId, java.util.function.Function.identity()));
 
+        log.info("코스 생성 장소 조회 완료: requestedPlaceCount={}, foundPlaceCount={}", request.placeIds().size(), places.size());
+
         int order = 1;
         for (Long placeId : request.placeIds()) {
             Place place = placeMap.get(placeId);
             if (place == null) {
+                log.warn("코스 생성 실패: 존재하지 않는 장소입니다. memberId={}, placeId={}", memberId, placeId);
                 throw new IllegalArgumentException("장소가 존재하지 않습니다.");
             }
 
@@ -76,15 +85,21 @@ public class CourseService {
 
         courseRepository.save(course);
 
+        log.info("코스 생성 처리 완료: memberId={}, courseId={}, placeCount={}", memberId, course.getId(), request.placeIds().size());
+
         return course.getId();
     }
 
     //코스 상세조회 - 조회만 하기 때문에 readOnly
     @Transactional(readOnly = true)
     public CourseDetailResponse getCourse(Long courseId) {
+        log.info("코스 단건 조회 처리 시작: courseId={}", courseId);
 
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
+                .orElseThrow(() -> {
+                    log.warn("코스 단건 조회 실패: 존재하지 않는 코스입니다. courseId={}", courseId);
+                    return new IllegalArgumentException("존재하지 않는 코스입니다.");
+                });
 
         List<CoursePlaceResponse> places =
                 coursePlaceRepository.findDetailByCourseId(courseId)
@@ -97,7 +112,9 @@ public class CourseService {
                         ))
                         .toList();
 
-        return new CourseDetailResponse(
+        log.info("코스 장소 상세 조회 완료: courseId={}, placeCount={}", courseId, places.size());
+
+        CourseDetailResponse response = new CourseDetailResponse(
                 course.getId(),
                 course.getTitle(),
                 course.getDescription(),
@@ -110,13 +127,17 @@ public class CourseService {
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
         );
+
+        log.info("코스 단건 조회 처리 완료: courseId={}", courseId);
+        return response;
     }
 
     // 코스 목록 조회
     @Transactional(readOnly = true)
     public List<CourseListResponse> getCourses() {
+        log.info("코스 목록 조회 처리 시작");
 
-        return courseRepository.findAll()
+        List<CourseListResponse> courses = courseRepository.findAll()
                 .stream()
                 .map(course -> new CourseListResponse(
                         course.getId(),
@@ -126,6 +147,9 @@ public class CourseService {
                         course.getStartDate()
                 ))
                 .toList();
+
+        log.info("코스 목록 조회 처리 완료: resultCount={}", courses.size());
+        return courses;
     }
 
     //코스 삭제
@@ -134,16 +158,24 @@ public class CourseService {
             Long memberId,
             Long courseId
     ) {
+        log.info("코스 삭제 처리 시작: memberId={}, courseId={}", memberId, courseId);
 
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
+                .orElseThrow(() -> {
+                    log.warn("코스 삭제 실패: 존재하지 않는 코스입니다. memberId={}, courseId={}", memberId, courseId);
+                    return new IllegalArgumentException("존재하지 않는 코스입니다.");
+                });
 
         if (!course.getMember().getId().equals(memberId)) {
+            log.warn("코스 삭제 실패: 권한이 없습니다. requestMemberId={}, courseOwnerId={}, courseId={}", memberId, course.getMember().getId(), courseId);
             throw new IllegalArgumentException("해당 코스를 삭제할 권한이 없습니다.");
         }
 
         coursePlaceRepository.deleteByCourseId(courseId);
+        log.info("코스 장소 연결 삭제 완료: courseId={}", courseId);
+
         courseRepository.delete(course);
+        log.info("코스 삭제 처리 완료: memberId={}, courseId={}", memberId, courseId);
     }
 
 }

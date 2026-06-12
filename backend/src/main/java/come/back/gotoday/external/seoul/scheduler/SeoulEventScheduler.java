@@ -20,13 +20,13 @@ public class SeoulEventScheduler {
      */
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void runSeoulEventSync() {
-        log.info("🕒 [스케줄러] 서울시 문화행사 배치 동기화 시작");
+        log.info("서울시 문화행사 배치 동기화 스케줄러 시작");
 
         try {
             eventBatchService.syncSeoulEvents();
-            log.info("[스케줄러] 서울시 문화행사 배치 동기화 성공적으로 완료");
+            log.info("서울시 문화행사 배치 동기화 스케줄러 완료");
         } catch (Exception e) {
-            log.error("[스케줄러] 배치 동기화 중 예외 발생: ", e);
+            log.error("서울시 문화행사 배치 동기화 스케줄러 실패: message={}", e.getMessage(), e);
         }
     }
 }

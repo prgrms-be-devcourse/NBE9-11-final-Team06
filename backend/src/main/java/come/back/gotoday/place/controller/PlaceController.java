@@ -6,11 +6,12 @@ import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.service.PlaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
+@Slf4j
 @RestController
 @RequestMapping("/api/places")
 @RequiredArgsConstructor
@@ -23,8 +24,9 @@ public class PlaceController {
     public ResponseEntity<ApiResponse<Long>> createPlace(
             @Valid @RequestBody PlaceCreateRequest request
     ) {
+        log.info("장소 생성 요청: name={}", request.name());
         Long placeId = placeService.createPlace(request);
-
+        log.info("장소 생성 응답: placeId={}", placeId);
         return ResponseEntity.ok(
                 ApiResponse.success(placeId, "장소 생성 성공")
         );
@@ -35,8 +37,9 @@ public class PlaceController {
     public ResponseEntity<ApiResponse<PlaceResponse>> getPlace(
             @PathVariable Long placeId
     ) {
+        log.info("장소 단건 조회 요청: placeId={}", placeId);
         PlaceResponse response = placeService.getPlace(placeId);
-
+        log.info("장소 단건 조회 응답: placeId={}", placeId);
         return ResponseEntity.ok(
                 ApiResponse.success(response, "장소 조회 성공")
         );
@@ -45,9 +48,11 @@ public class PlaceController {
     // 장소 전체 조회
     @GetMapping
     public ResponseEntity<ApiResponse<List<PlaceResponse>>> getPlaces() {
+        log.info("장소 목록 조회 요청");
 
         List<PlaceResponse> response = placeService.getPlaces();
 
+        log.info("장소 목록 조회 응답: resultCount={}", response.size());
         return ResponseEntity.ok(
                 ApiResponse.success(response, "장소 목록 조회 성공")
         );
@@ -58,8 +63,9 @@ public class PlaceController {
     public ResponseEntity<ApiResponse<Void>> deletePlace(
             @PathVariable Long placeId
     ) {
+        log.info("장소 삭제 요청: placeId={}", placeId);
         placeService.deletePlace(placeId);
-
+        log.info("장소 삭제 응답: placeId={}", placeId);
         return ResponseEntity.ok(
                 ApiResponse.success(null, "장소 삭제 성공")
         );
