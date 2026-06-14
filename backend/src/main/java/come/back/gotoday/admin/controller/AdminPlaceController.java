@@ -32,7 +32,7 @@ public class AdminPlaceController {
         );
     }
 
-    @PatchMapping("/{placeId}")
+    @PutMapping("/{placeId}")
     public ResponseEntity<ApiResponse<AdminPlaceResponse>> updatePlace(
             @PathVariable Long placeId,
             @Valid @RequestBody AdminPlaceUpdateRequest request

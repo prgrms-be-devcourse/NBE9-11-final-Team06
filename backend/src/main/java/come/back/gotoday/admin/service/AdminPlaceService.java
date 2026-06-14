@@ -60,6 +60,8 @@ public class AdminPlaceService {
         Place place = getPlace(placeId);
         Category category = getCategory(request.categoryId());
 
+        validateDuplicatePlaceForUpdate(request.name(), request.address(), placeId);
+
         place.update(
                 category,
                 request.name(),
@@ -107,6 +109,13 @@ public class AdminPlaceService {
     private void validateDuplicatePlace(String name, String address) {
         if (placeRepository.existsByNameAndAddressAndIsActiveTrue(name, address)) {
             log.warn("관리자 장소 등록 실패: 중복 장소 name={}, address={}", name, address);
+            throw new IllegalArgumentException("이미 등록된 장소입니다.");
+        }
+    }
+
+    private void validateDuplicatePlaceForUpdate(String name, String address, Long placeId) {
+        if (placeRepository.existsByNameAndAddressAndIsActiveTrueAndIdNot(name, address, placeId)) {
+            log.warn("관리자 장소 수정 실패: 중복 장소 name={}, address={}, placeId={}", name, address, placeId);
             throw new IllegalArgumentException("이미 등록된 장소입니다.");
         }
     }

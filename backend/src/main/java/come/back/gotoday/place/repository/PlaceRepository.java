@@ -9,5 +9,11 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     boolean existsByNameAndAddressAndIsActiveTrue(String name, String address);
 
+    boolean existsByNameAndAddressAndIsActiveTrueAndIdNot(
+            String name,
+            String address,
+            Long id
+    );
+
     Optional<Place> findByIdAndIsActiveTrue(Long id);
 }

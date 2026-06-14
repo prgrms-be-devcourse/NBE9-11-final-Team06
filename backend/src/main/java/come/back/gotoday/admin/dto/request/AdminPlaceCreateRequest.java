@@ -13,6 +13,7 @@ public record AdminPlaceCreateRequest(
         @NotBlank(message = "장소 이름은 필수입니다.")
         String name,
 
+        @NotBlank(message = "주소는 필수입니다.")
         String address,
 
         String roadAddress,
