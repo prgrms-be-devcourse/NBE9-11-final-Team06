@@ -86,4 +86,34 @@ public class Place {
                                String externalId, Boolean isActive) {
         return new Place(category, name, address, roadAddress, latitude, longitude, phone, placeUrl, description, source, externalId, isActive);
     }
+
+    public void update(
+            Category category,
+            String name,
+            String address,
+            String roadAddress,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            String phone,
+            String placeUrl,
+            String description,
+            String externalId
+    ) {
+        this.category = category;
+        this.name = name;
+        this.address = address;
+        this.roadAddress = roadAddress;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.phone = phone;
+        this.placeUrl = placeUrl;
+        this.description = description;
+        this.externalId = externalId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
