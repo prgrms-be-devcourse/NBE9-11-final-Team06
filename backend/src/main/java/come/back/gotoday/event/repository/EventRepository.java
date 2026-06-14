@@ -29,20 +29,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e JOIN FETCH e.category") // Event 엔티티 내에 Category 연관관계가 설정되어 있어야 합니다.
     List<Event> findAllWithCategory();
 
-    @Query(value = "SELECT e.* FROM event e " +
-            "INNER JOIN category c ON e.category_id = c.id " +
-            "WHERE e.embedding_vector IS NOT NULL",
-            nativeQuery = true)
-    List<Event> findAllReadyEventsWithCategory();
 
-    @Query("SELECT e FROM Event e " +
-            "LEFT JOIN FETCH e.category " +
-            "LEFT JOIN FETCH e.place " +
-            "WHERE e.id IN :ids")
-    List<Event> findAllByIdsWithCategoryAndPlace(@Param("ids") List<Long> ids);
 
     // [추가] 지역, 기간, 카테고리까지 완벽 일치하는 행사를 찾을 때 사용 (1단계)
-    @Query("SELECT e FROM Event e WHERE e.area = :area " +
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.area = :area " +
             "AND e.endDate >= :startDate " +
             "AND e.startDate <= :endDate " +
             "AND e.category.name IN :categories")
@@ -54,7 +44,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     );
 
     // [기존 유지] 카테고리 상관없이 지역/기간만 맞으면 가져옴 (2단계/Fallback용)
-    @Query("SELECT e FROM Event e WHERE e.area = :area " +
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.area = :area " +
             "AND e.endDate >= :startDate " +
             "AND e.startDate <= :endDate")
     List<Event> findRecommendedEvents(
@@ -64,7 +54,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     );
 
     // [기존 유지] 전체 검색
-    @Query("SELECT e FROM Event e WHERE e.endDate >= :start AND e.startDate <= :end")
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.endDate >= :start AND e.startDate <= :end")
     List<Event> findAllEventsByDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
 //
 //    //지워도 됨 이 아래로는 가중치 설정하기 위해 임시로 추가한 것=============

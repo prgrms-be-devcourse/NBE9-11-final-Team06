@@ -78,6 +78,9 @@ public class SearchUtils {
 
     // 3. 코사인 유사도 계산 알고리즘
     public double cosineSimilarity(float[] vectorA, float[] vectorB) {
+        if (vectorA == null || vectorB == null || vectorA.length != vectorB.length || vectorA.length == 0) {
+            return 0.0;
+        }
         double dotProduct = 0.0;
         double normA = 0.0;
         double normB = 0.0;

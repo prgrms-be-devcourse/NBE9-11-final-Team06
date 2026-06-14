@@ -24,8 +24,9 @@ public class EventChunkProcessor {
 
     private final EventRepository eventRepository;
     private final VectorEmbeddingEngine vectorEngine;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
-    @Transactional
+
     public void saveOrUpdateChunk(List<SeoulEventResponse.EventRow> rows,
                                   Map<String, Category> categoryMap,
                                   Category defaultCategory) {
@@ -89,37 +90,40 @@ public class EventChunkProcessor {
         // 수집된 문장 리스트가 있다면 허깅페이스 API를 단 1번만 호출하여 대량으로 벡터를 가져옵니다.
         List<float[]> batchVectors = vectorEngine.getEmbeddings(textsToEmbed);
 
-        // 가져온 벡터들을 순서대로 매핑하며 실제 DB DB 작업을 처리합니다. (순서가 정확히 일치하므로 index로 매핑 가능)
-        for (int i = 0; i < validRows.size(); i++) {
-            try {
-                SeoulEventResponse.EventRow row = validRows.get(i);
-                float[] embeddingVector = batchVectors.get(i); // 매핑된 벡터 꺼내기
+        // 실제 DB 저장/수정 작업만 트랜잭션 내부에서 처리
+        transactionTemplate.executeWithoutResult(status -> {
+            // 가져온 벡터들을 순서대로 매핑하며 실제 DB DB 작업을 처리합니다. (순서가 정확히 일치하므로 index로 매핑 가능)
+            for (int i = 0; i < validRows.size(); i++) {
+                try {
+                    SeoulEventResponse.EventRow row = validRows.get(i);
+                    float[] embeddingVector = batchVectors.get(i); // 매핑된 벡터 꺼내기
 
-                String extId = row.externalId();
-                LocalDate startDate = parseDate(row.startDate());
-                LocalDate endDate = parseDate(row.endDate());
-                Event existingEvent = eventMap.get(extId);
+                    String extId = row.externalId();
+                    LocalDate startDate = parseDate(row.startDate());
+                    LocalDate endDate = parseDate(row.endDate());
+                    Event existingEvent = eventMap.get(extId);
 
-                if (existingEvent != null) {
-                    // 진짜 업데이트 수행
-                    existingEvent.updateInfo(row.title(), startDate, endDate, row.orgLink(), row.mainImg());
-                    existingEvent.setEmbeddingVector(embeddingVector);
-                    log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}", row.title());
-                } else {
-                    // 진짜 인서트 수행
-                    //todo 카카오맵 api가 연동되면 행사의 위치를 카카오 맵에서 찾아서 place객체를 만들고 event에 넣어주는 작업 필요
-                    Category targetCategory = categoryMap.getOrDefault(row.codeName(), defaultCategory);
-                    Event newEvent = Event.create(
-                            null, targetCategory, row.title(), startDate, endDate,
-                            row.eventTime(), row.useFee(), row.useTrgt(), row.orgLink(), row.mainImg(),
-                            null, EventSource.SEOUL_API, extId, embeddingVector,row.guName()
-                    );
-                    eventRepository.save(newEvent);
+                    if (existingEvent != null) {
+                        // 진짜 업데이트 수행
+                        existingEvent.updateInfo(row.title(), startDate, endDate, row.orgLink(), row.mainImg());
+                        existingEvent.setEmbeddingVector(embeddingVector);
+                        log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}", row.title());
+                    } else {
+                        // 진짜 인서트 수행
+                        //todo 카카오맵 api가 연동되면 행사의 위치를 카카오 맵에서 찾아서 place객체를 만들고 event에 넣어주는 작업 필요
+                        Category targetCategory = categoryMap.getOrDefault(row.codeName(), defaultCategory);
+                        Event newEvent = Event.create(
+                                null, targetCategory, row.title(), startDate, endDate,
+                                row.eventTime(), row.useFee(), row.useTrgt(), row.orgLink(), row.mainImg(),
+                                null, EventSource.SEOUL_API, extId, embeddingVector, row.guName()
+                        );
+                        eventRepository.save(newEvent);
+                    }
+                } catch (Exception e) {
+                    log.error("행사 데이터 처리 중 오류 스킵: {}", e.getMessage());
                 }
-            } catch (Exception e) {
-                log.error("행사 데이터 처리 중 오류 스킵: {}", e.getMessage());
             }
-        }
+        });
     }
 
     private LocalDate parseDate(String dateStr) {

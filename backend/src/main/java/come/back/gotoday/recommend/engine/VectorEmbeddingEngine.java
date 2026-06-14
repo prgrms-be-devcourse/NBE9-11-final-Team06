@@ -16,6 +16,7 @@ public class VectorEmbeddingEngine {
     private static final String HUGGING_FACE_URL = "https://ccodeer-vectorai.hf.space";
 
     public VectorEmbeddingEngine() {
+        //배치할때는 타임아웃이 길게 잡혀야 하고 사용자 요청의 경우는 짧게 잡혀야한다.
         this.restClient = RestClient.builder()
                 .baseUrl(HUGGING_FACE_URL)
                 .build();
