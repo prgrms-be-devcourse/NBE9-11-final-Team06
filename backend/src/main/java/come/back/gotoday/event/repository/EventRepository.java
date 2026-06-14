@@ -63,9 +63,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("endDate") LocalDate endDate
     );
 
-//    // [기존 유지] 전체 검색
-//    @Query("SELECT e FROM Event e WHERE e.endDate >= :start AND e.startDate <= :end")
-//    List<Event> findAllEventsByDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
+    // [기존 유지] 전체 검색
+    @Query("SELECT e FROM Event e WHERE e.endDate >= :start AND e.startDate <= :end")
+    List<Event> findAllEventsByDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
 //
 //    //지워도 됨 이 아래로는 가중치 설정하기 위해 임시로 추가한 것=============
 //    // 과거 30개의 데이터 (Train Set - 학습 및 가중치 탐색용)
