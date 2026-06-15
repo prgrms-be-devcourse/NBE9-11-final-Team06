@@ -3,6 +3,7 @@ package come.back.gotoday.place.service;
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
+import come.back.gotoday.external.naver.dto.NaverLocalSearchResponse;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.dto.PlaceSearchResponse;
@@ -100,8 +101,18 @@ public class PlaceService {
     public List<PlaceSearchResponse> searchPlaces(String query) {
         log.info("장소 검색 처리 시작: query={}", query);
 
-        List<PlaceSearchResponse> places = naverLocalSearchClient.search(query, 5, 1)
-                .items()
+        if (query == null || query.isBlank()) {
+            log.warn("장소 검색 실패: 검색어가 비어 있습니다.");
+            return List.of();
+        }
+
+        NaverLocalSearchResponse response = naverLocalSearchClient.search(query, 5, 1);
+        if (response == null || response.items() == null) {
+            log.warn("장소 검색 실패: 네이버 지역 검색 API 응답이 비어 있습니다. query={}", query);
+            return List.of();
+        }
+
+        List<PlaceSearchResponse> places = response.items()
                 .stream()
                 .map(PlaceSearchResponse::from)
                 .toList();

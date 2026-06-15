@@ -58,6 +58,6 @@ recommendation:
 
 naver:
   search:
-    client-id: ${NAVER_SEARCH_CLIENT_ID}
-    client-secret: ${NAVER_SEARCH_CLIENT_SECRET}
+    client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
+    client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
