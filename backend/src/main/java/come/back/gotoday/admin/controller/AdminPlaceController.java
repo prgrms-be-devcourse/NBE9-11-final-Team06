@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.GetMapping;
 
 @Slf4j
 @RestController
@@ -57,5 +60,10 @@ public class AdminPlaceController {
         return ResponseEntity.ok(
                 ApiResponse.success(null, "관리자 장소 비활성화 성공")
         );
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<AdminPlaceResponse>> getPlaces(Pageable pageable) {
+        return ResponseEntity.ok(adminPlaceService.getPlaces(pageable));
     }
 }
