@@ -26,6 +26,9 @@ import { SiteHeader } from "@/components/site-header"
 import { NaverLocationPicker } from "@/components/naver-location-picker"
 
 const STEPS = ["날짜", "위치", "동행", "취향"]
+const PREFERENCE_CATEGORIES = CATEGORIES.filter(
+  (category) => category.label !== "식당" && category.label !== "카페",
+)
 
 type SelectedLocation = {
   name: string
@@ -253,7 +256,7 @@ export function PlanWizard() {
                 desc="원하는 카테고리를 모두 골라주세요. (선택 안 하면 전체 추천)"
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {CATEGORIES.map((c) => {
+                {PREFERENCE_CATEGORIES.map((c) => {
                   const active = categories.includes(c.value)
                   return (
                     <button
