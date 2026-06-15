@@ -29,6 +29,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e JOIN FETCH e.category") // Event 엔티티 내에 Category 연관관계가 설정되어 있어야 합니다.
     List<Event> findAllWithCategory();
 
+    @Query("SELECT e FROM Event e " +
+            "LEFT JOIN FETCH e.category " +
+            "LEFT JOIN FETCH e.place " +
+            "WHERE e.id IN :ids")
+    List<Event> findAllByIdsWithCategoryAndPlace(@Param("ids") List<Long> ids);
 
 
     // [추가] 지역, 기간, 카테고리까지 완벽 일치하는 행사를 찾을 때 사용 (1단계)
