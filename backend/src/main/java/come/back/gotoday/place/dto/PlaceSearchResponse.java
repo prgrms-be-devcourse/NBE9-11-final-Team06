@@ -11,8 +11,8 @@ public record PlaceSearchResponse(
         String roadAddress,
         String phone,
         String placeUrl,
-        BigDecimal latitude,
-        BigDecimal longitude,
+        BigDecimal mapy,
+        BigDecimal mapx,
         String source
 ) {
 
@@ -36,7 +36,7 @@ public record PlaceSearchResponse(
         if (coordinate == null || coordinate.isBlank()) {
             return null;
         }
-        return BigDecimal.valueOf(Long.parseLong(coordinate), 7);
+        return new BigDecimal(coordinate);
     }
 
     private static String removeHtmlTags(String value) {

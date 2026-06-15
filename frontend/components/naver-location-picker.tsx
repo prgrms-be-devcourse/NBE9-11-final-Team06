@@ -22,8 +22,8 @@ type PlaceSearchResult = {
   roadAddress?: string
   phone?: string
   placeUrl?: string
-  latitude?: number
-  longitude?: number
+  mapy?: number
+  mapx?: number
   source: string
 }
 
@@ -53,6 +53,7 @@ type NaverLatLng = {
   lat: () => number
   lng: () => number
 }
+
 
 type NaverMapOptions = {
   center: NaverLatLng
@@ -86,6 +87,8 @@ const DEFAULT_CENTER = {
   latitude: 37.5665,
   longitude: 126.978,
 }
+
+const NAVER_LOCAL_COORDINATE_SCALE = 10_000_000
 
 
 export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLocationPickerProps) {
@@ -190,6 +193,8 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   }
 
   async function searchLocations(searchKeyword = keyword, targetMap?: NaverMap) {
+    if (isSearching) return
+
     const trimmedKeyword = searchKeyword.trim()
 
     if (!trimmedKeyword) {
@@ -215,7 +220,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
       const body = (await response.json()) as PlaceSearchApiResponse
       const searchedResults = body.data ?? []
       const mappableResults = searchedResults.filter(
-        (location) => typeof location.latitude === "number" && typeof location.longitude === "number",
+        (location) => typeof location.mapx === "number" && typeof location.mapy === "number",
       )
 
       if (mappableResults.length === 0) {
@@ -241,7 +246,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     const map = targetMap ?? mapRef.current
 
     if (!window.naver?.maps || !map) return
-    if (typeof location.latitude !== "number" || typeof location.longitude !== "number") {
+    if (typeof location.mapx !== "number" || typeof location.mapy !== "number") {
       setErrorMessage("선택한 장소의 좌표 정보가 없습니다.")
       return
     }
@@ -249,7 +254,10 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     markerRef.current?.setMap(null)
     infoWindowRef.current?.close()
 
-    const position = new window.naver.maps.LatLng(location.latitude, location.longitude)
+    const latitude = location.mapy / NAVER_LOCAL_COORDINATE_SCALE
+    const longitude = location.mapx / NAVER_LOCAL_COORDINATE_SCALE
+    const position = new window.naver.maps.LatLng(latitude, longitude)
+
     const marker = new window.naver.maps.Marker({
       map,
       position,
@@ -273,8 +281,8 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     onSelect({
       name: location.name,
       address: location.roadAddress || location.address,
-      latitude: location.latitude,
-      longitude: location.longitude,
+      latitude: position.lat(),
+      longitude: position.lng(),
       source: "naver",
     })
   }
@@ -322,7 +330,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
               return (
                 <button
-                  key={`${location.name}-${location.latitude}-${location.longitude}-${location.address ?? location.roadAddress ?? ""}`}
+                  key={`${location.name}-${location.mapy}-${location.mapx}-${location.address ?? location.roadAddress ?? ""}`}
                   type="button"
                   onClick={() => selectLocation(location)}
                   className={`w-full rounded-xl border p-3 text-left transition-colors ${
