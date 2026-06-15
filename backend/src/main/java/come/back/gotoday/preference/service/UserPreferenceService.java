@@ -9,6 +9,8 @@ import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.preference.dto.UserPreferenceCreateRequest;
 import come.back.gotoday.preference.dto.UserPreferenceResponse;
 import come.back.gotoday.preference.dto.UserPreferenceUpdateRequest;
+import come.back.gotoday.preference.entity.CompanionType;
+import come.back.gotoday.preference.entity.MobilityLevel;
 import come.back.gotoday.preference.entity.UserPreference;
 import come.back.gotoday.preference.entity.UserPreferenceCategory;
 import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
@@ -16,6 +18,7 @@ import come.back.gotoday.preference.repository.UserPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -74,19 +77,37 @@ public class UserPreferenceService {
             UserPreferenceUpdateRequest request
     ) {
         findActiveMember(memberId);
+        validateUpdateRequest(request);
 
         UserPreference userPreference = findPreferenceByMemberId(memberId);
-        List<Category> categories = findCategories(request.categoryIds());
+
+        String preferredArea = StringUtils.hasText(request.preferredArea())
+                ? request.preferredArea()
+                : userPreference.getPreferredArea();
+
+        CompanionType companionType = request.companionType() != null
+                ? request.companionType()
+                : userPreference.getCompanionType();
+
+        MobilityLevel mobilityLevel = request.mobilityLevel() != null
+                ? request.mobilityLevel()
+                : userPreference.getMobilityLevel();
+
+        Boolean avoidCrowded = request.avoidCrowded() != null
+                ? request.avoidCrowded()
+                : userPreference.getAvoidCrowded();
 
         userPreference.update(
-                request.preferredArea(),
-                request.companionType(),
-                request.mobilityLevel(),
-                request.avoidCrowded()
+                preferredArea,
+                companionType,
+                mobilityLevel,
+                avoidCrowded
         );
 
-        userPreferenceCategoryRepository.deleteByUserPreferenceId(userPreference.getId());
-        savePreferenceCategories(userPreference, categories);
+        List<Category> categories = updatePreferenceCategoriesIfRequested(
+                userPreference,
+                request.categoryIds()
+        );
 
         return UserPreferenceResponse.of(userPreference, categories);
     }
@@ -123,6 +144,46 @@ public class UserPreferenceService {
         }
     }
 
+    private void validateUpdateRequest(UserPreferenceUpdateRequest request) {
+        boolean hasPreferredArea = request.preferredArea() != null;
+        boolean hasCategoryIds = request.categoryIds() != null;
+        boolean hasCompanionType = request.companionType() != null;
+        boolean hasMobilityLevel = request.mobilityLevel() != null;
+        boolean hasAvoidCrowded = request.avoidCrowded() != null;
+
+        if (!hasPreferredArea
+                && !hasCategoryIds
+                && !hasCompanionType
+                && !hasMobilityLevel
+                && !hasAvoidCrowded) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+
+        if (request.preferredArea() != null && !StringUtils.hasText(request.preferredArea())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+
+        if (request.categoryIds() != null && request.categoryIds().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private List<Category> updatePreferenceCategoriesIfRequested(
+            UserPreference userPreference,
+            List<Long> categoryIds
+    ) {
+        if (categoryIds == null) {
+            return findCategoriesByPreference(userPreference.getId());
+        }
+
+        List<Category> categories = findCategories(categoryIds);
+
+        userPreferenceCategoryRepository.deleteByUserPreferenceId(userPreference.getId());
+        savePreferenceCategories(userPreference, categories);
+
+        return categories;
+    }
+
     private List<Category> findCategories(List<Long> categoryIds) {
         List<Long> distinctCategoryIds = categoryIds.stream()
                 .distinct()
@@ -138,7 +199,7 @@ public class UserPreferenceService {
     }
 
     private List<Category> findCategoriesByPreference(Long userPreferenceId) {
-        return userPreferenceCategoryRepository.findByUserPreferenceId(userPreferenceId)
+        return userPreferenceCategoryRepository.findByUserPreferenceIdWithCategory(userPreferenceId)
                 .stream()
                 .map(UserPreferenceCategory::getCategory)
                 .toList();
