@@ -3,6 +3,7 @@ package come.back.gotoday.place.controller;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
+import come.back.gotoday.place.dto.PlaceSearchResponse;
 import come.back.gotoday.place.service.PlaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,21 @@ public class PlaceController {
         log.info("장소 목록 조회 응답: resultCount={}", response.size());
         return ResponseEntity.ok(
                 ApiResponse.success(response, "장소 목록 조회 성공")
+        );
+    }
+
+    // 장소 검색
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<PlaceSearchResponse>>> searchPlaces(
+            @RequestParam String query
+    ) {
+        log.info("장소 검색 요청: query={}", query);
+
+        List<PlaceSearchResponse> response = placeService.searchPlaces(query);
+
+        log.info("장소 검색 응답: query={}, resultCount={}", query, response.size());
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "장소 검색 성공")
         );
     }
 
