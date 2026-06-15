@@ -55,3 +55,9 @@ recommendation:
       normal: 10
       crowded: -10
       very-crowded: -30
+
+naver:
+  search:
+    client-id: ${NAVER_SEARCH_CLIENT_ID}
+    client-secret: ${NAVER_SEARCH_CLIENT_SECRET}
+    base-url: https://openapi.naver.com
