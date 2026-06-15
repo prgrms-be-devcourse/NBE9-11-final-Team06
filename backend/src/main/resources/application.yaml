@@ -81,7 +81,7 @@ cors:
 
 seoul:
   api:
-    key: ${SEOUL_API_KEY:dummy-key}
+    key: ${SEOUL_API_KEY:56434c4d566a6f77393252437a436e}
 
 recommendation:
   score:

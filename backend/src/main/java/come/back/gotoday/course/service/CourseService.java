@@ -40,14 +40,15 @@ public class CourseService {
         log.info("코스 생성 처리 시작: memberId={}, title={}, placeCount={}", memberId, request.title(), request.placeIds().size());
 
         // 해당 방법으로 추천된 행사 아이디를 가져올 수 있습니다. getRecommendedEventIds 끝에 숫자는 추천하는 행사의 개수입니다.
-//        String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(),  request.companionType());
-//
-//        //  AI 추천 엔진 호출 (획득한 queryText 전달)
-//        List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
-//                memberId, queryText, request.startDate(), request.endDate(), 3
-//        );
-//        log.info("출력된 이벤트 아이디:  {}", recommendedEventIds);
-//
+        String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(),  request.companionType());
+
+        log.info("queryText={}", queryText);
+        //  AI 추천 엔진 호출 (획득한 queryText 전달)
+        List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
+                memberId, queryText, request.startDate(), request.endDate(), 3
+       );
+        log.info("출력된 이벤트 아이디:  {}", recommendedEventIds);
+
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> {
                     log.warn("코스 생성 실패: 존재하지 않는 회원입니다. memberId={}", memberId);

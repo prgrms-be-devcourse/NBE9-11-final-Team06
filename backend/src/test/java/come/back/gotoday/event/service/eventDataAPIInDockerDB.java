@@ -11,7 +11,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("dev")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@org.junit.jupiter.api.Disabled("로컬에서 도커에 직접 값을 넣을 때 사용하는 테스트 코드/ 배치를 강제로 실행")
+//@org.junit.jupiter.api.Disabled("로컬에서 도커에 직접 값을 넣을 때 사용하는 테스트 코드/ 배치를 강제로 실행")
 class eventDataAPIInDockerDB {
 
     @Autowired
