@@ -7,6 +7,12 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface UserPreferenceRepository  extends JpaRepository<UserPreference, Long> {
+public interface UserPreferenceRepository extends JpaRepository<UserPreference, Long> {
+
     Optional<UserPreference> findByMemberId(Long memberId);
+
+    boolean existsByMemberId(Long memberId);
+
+    void deleteByMemberId(Long memberId);
 }
+
