@@ -27,7 +27,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 
@@ -35,13 +34,14 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
+    // @Retryable, @Recover, @Backoff 사용
+    implementation("org.springframework.retry:spring-retry:2.0.5")
+
     runtimeOnly("com.h2database:h2")
     runtimeOnly("com.mysql:mysql-connector-j")
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
-
-    implementation("org.springframework.retry:spring-retry:2.0.5")
 
     // 딥러닝 & 자연어 처리 (ONNX, Tokenizer, Komoran)
     implementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")
