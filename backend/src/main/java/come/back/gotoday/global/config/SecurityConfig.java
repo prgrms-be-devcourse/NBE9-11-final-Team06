@@ -1,6 +1,7 @@
 package come.back.gotoday.global.config;
 
 import come.back.gotoday.auth.oauth.CustomOAuth2UserService;
+import come.back.gotoday.auth.oauth.OAuth2RedirectProperties;
 import come.back.gotoday.global.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -20,12 +21,16 @@ import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({
+        CorsProperties.class,
+        OAuth2RedirectProperties.class
+})
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsProperties corsProperties;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2RedirectProperties oAuth2RedirectProperties;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -69,10 +74,10 @@ public class SecurityConfig {
                                 .userService(customOAuth2UserService)
                         )
                         .successHandler((request, response, authentication) ->
-                                response.sendRedirect("http://localhost:3000")
+                                response.sendRedirect(oAuth2RedirectProperties.successUrl())
                         )
                         .failureHandler((request, response, exception) ->
-                                response.sendRedirect("http://localhost:3000/login?error=oauth")
+                                response.sendRedirect(oAuth2RedirectProperties.failureUrl())
                         )
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

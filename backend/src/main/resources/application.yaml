@@ -5,9 +5,6 @@ spring:
   profiles:
     active: dev
 
-  config:
-    import: optional:classpath:application-secret.yml
-
   jpa:
     open-in-view: false
 
@@ -90,3 +87,9 @@ naver:
     client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
+
+app:
+  oauth2:
+    redirect:
+      success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:3000}
+      failure-url: ${OAUTH2_FAILURE_REDIRECT_URL:http://localhost:3000/login?error=oauth}

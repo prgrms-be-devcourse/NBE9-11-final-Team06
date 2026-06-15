@@ -99,7 +99,13 @@ public class Member {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public static Member create(String email, String password, String nickname, String role, String status) {
+    public static Member create(
+            String email,
+            String password,
+            String nickname,
+            String role,
+            String status
+    ) {
         return new Member(email, password, nickname, role, status);
     }
 
