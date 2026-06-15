@@ -1,7 +1,6 @@
 package come.back.gotoday.external.seoul.api_client;
 
 import come.back.gotoday.external.seoul.dto.SeoulEventResponse;
-import come.back.gotoday.external.seoul.service.SeoulEventAnalyzeService;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;

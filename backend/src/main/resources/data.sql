@@ -65,7 +65,7 @@ WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '뮤지컬/오페라')
 
 -- 14. 콘서트
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT 'concert', 'EVENT', NOW(), NOW() FROM DUAL
+SELECT '콘서트', 'EVENT', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '콘서트');
 
 -- 15. 축제-시민화합
@@ -86,64 +86,82 @@ WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '전시/미술');
 -- 1. 기초 인프라 데이터 (회원, 선호도, 카테고리 선호, 장소) 삽입
 -- =================================================================================
 
--- 회원 (Member) 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
-VALUES (1, 'seoul_culture_lover@gotoday.com', 'hashed_pass_456', '영등포마포러버', 'http://example.com/profile.jpg', 'USER', 'ACTIVE', NOW(), NOW());
+SELECT 1, 'seoul_culture_lover@gotoday.com', 'hashed_pass_456', '영등포마포러버', 'http://example.com/profile.jpg', 'USER', 'ACTIVE', NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 1);
 
--- 유저 선호 데이터 (User Preference)
+-- 유저 선호 데이터 (User Preference) - 유저 1번
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
-VALUES (1, 1, '영등포', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW());
+SELECT 1, 1, '영등포', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 1);
 
--- 유저 선호 카테고리 매핑 (16번: 클래식/콘서트 계열, 13번: 뮤지컬/공연 계열, 14번: 연극/기타)
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (1, 1, 16);
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (2, 1, 13);
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (3, 1, 14);
+-- 유저 선호 카테고리 매핑 - 유저 1번
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 1, 1, 16 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 1);
 
--- 유저 2번 생성 (전시/미술 매니아)
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 2, 1, 13 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 2);
+
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 3, 1, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 3);
+
+
+-- 유저 2번 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
-VALUES (2, 'gallery_lover@gotoday.com', 'pass', '혼자하는전시', 'http://example.com/p2.jpg', 'USER', 'ACTIVE', NOW(), NOW());
-
-INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
-VALUES (2, 2, '종로', 'SOLO', 'NORMAL', TRUE, NOW(), NOW());
-
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (4, 2, 17); -- 전시/미술
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (5, 2, 6);  -- 영화
-
-
--- 유저 3번 생성 (페스티벌/락스타 매니아)
-INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
-VALUES (3, 'festival_goer@gotoday.com', 'pass', '페스티벌크루', 'http://example.com/p3.jpg', 'USER', 'ACTIVE', NOW(), NOW());
+SELECT 2, 'gallery_lover@gotoday.com', 'pass', '혼자하는전시', 'http://example.com/p2.jpg', 'USER', 'ACTIVE', NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 2);
 
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
-VALUES (3, 3, '홍대', 'FRIEND', 'NORMAL', FALSE, NOW(), NOW());
+SELECT 2, 2, '종로', 'SOLO', 'NORMAL', TRUE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 2);
 
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (6, 3, 9);  -- 축제-문화/예술
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (7, 3, 14); -- 콘서트
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 4, 2, 17 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 4);
 
--- =================================================================================
--- 시나리오 테스트용 교차 추천 검증 데이터 추가 (유저 1번과 유사한 성향의 유저 4번 생성)
--- =================================================================================
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 5, 2, 6 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 5);
 
--- 유저 4번 생성 (마포구에 사는 또 다른 가족 단위 관람객)
+
+-- 유저 3번 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
-VALUES (4, 'mapo_family@gotoday.com', 'pass', '마포가족나들이', 'http://example.com/p4.jpg', 'USER', 'ACTIVE', NOW(), NOW());
+SELECT 3, 'festival_goer@gotoday.com', 'pass', '페스티벌크루', 'http://example.com/p3.jpg', 'USER', 'ACTIVE', NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 3);
 
--- 유저 1번(영등포구)과 인접한 '마포구'를 선호하고, 동반자 형태도 '가족'으로 동일하게 설정
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
-VALUES (4, 4, '마포구', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW());
+SELECT 3, 3, '홍대', 'FRIEND', 'NORMAL', FALSE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 3);
 
--- 유저 1번은 16(클래식), 13(뮤지컬/오페라)을 선호함.
--- 유저 4번은 14(콘서트), 5(교육/체험)를 선호하도록 설정하여 카테고리 텍스트에 약간의 변주를 줌.
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (8, 4, 14); -- 콘서트
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`) VALUES (9, 4, 5);  -- 교육/체험
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 6, 3, 9 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 6);
+
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 7, 3, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 7);
 
 
--- 장소 (Place) 생성 (행사들이 열리는 핵심 공연장 ID 미리 확보)
+-- 유저 4번 생성
+INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
+SELECT 4, 'mapo_family@gotoday.com', 'pass', '마포가족나들이', 'http://example.com/p4.jpg', 'USER', 'ACTIVE', NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 4);
+
+INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
+SELECT 4, 4, '마포구', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 4);
+
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 8, 4, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 8);
+
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 9, 4, 5 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 9);
+
+
+-- 장소 (Place) 생성
 INSERT INTO `place` (`id`, `category_id`, `name`, `address`, `road_address`, `latitude`, `longitude`, `phone`, `place_url`, `description`, `source`, `external_id`, `is_active`, `created_at`, `updated_at`)
-VALUES (100, 16, '영등포아트홀', '서울시 영등포구 국회대로53길 20', '서울시 영등포구 국회대로53길 20', 37.5261234, 126.9011234, '02-2670-3131', 'https://www.ydpcf.or.kr', '영등포 문화재단 핵심 아트홀', 'SEOUL_API', 'P_YDP_ART', TRUE, NOW(), NOW());
+SELECT 100, 16, '영등포아트홀', '서울시 영등포구 국회대로53길 20', '서울시 영등포구 국회대로53길 20', 37.5261234, 126.9011234, '02-2670-3131', 'https://www.ydpcf.or.kr', '영등포 문화재단 핵심 아트홀', 'SEOUL_API', 'P_YDP_ART', TRUE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `place` WHERE `id` = 100);
 
 INSERT INTO `place` (`id`, `category_id`, `name`, `address`, `road_address`, `latitude`, `longitude`, `phone`, `place_url`, `description`, `source`, `external_id`, `is_active`, `created_at`, `updated_at`)
-VALUES (101, 16, '마포아트센터 대흥홀', '서울시 마포구 대흥로20길 28', '서울시 마포구 대흥로20길 28', 37.5501234, 126.9421234, '02-3274-8600', 'https://www.mfac.or.kr', '마포 문화공연의 중심지', 'SEOUL_API', 'P_MAPO_ART', TRUE, NOW(), NOW());
+SELECT 101, 16, '마포아트센터 대흥홀', '서울시 마포구 대흥로20길 28', '서울시 마포구 대흥로20길 28', 37.5501234, 126.9421234, '02-3274-8600', 'https://www.mfac.or.kr', '마포 문화공연의 중심지', 'SEOUL_API', 'P_MAPO_ART', TRUE, NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM `place` WHERE `id` = 101);
 
 -- 2. 실제 API 원본 기반 Event 테이블 41개 전체 인서트 (embedding_vector는 NULL로 시작)
 -- =================================================================================
