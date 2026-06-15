@@ -12,7 +12,7 @@ public class KakaoLocalService {
 
     private final RestClient restClient;
 
-    @Value("${external.kakao.api-key}")
+    @Value("${external.kakao.api-key:dummy-key}")
     private String apiKey;
 
     public KakaoPlaceResponse searchCafe(
