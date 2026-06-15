@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @Service
@@ -120,5 +122,10 @@ public class AdminPlaceService {
             log.warn("관리자 장소 수정 실패: 중복 장소 name={}, address={}, placeId={}", name, address, placeId);
             throw new BusinessException(ErrorCode.PLACE_ALREADY_EXISTS);
         }
+    }
+
+    public Page<AdminPlaceResponse> getPlaces(Pageable pageable) {
+        return placeRepository.findAll(pageable)
+                .map(AdminPlaceResponse::from);
     }
 }
