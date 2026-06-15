@@ -70,10 +70,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return switch (registrationId.toLowerCase()) {
             case "google" -> OAuthProvider.GOOGLE;
             case "kakao" -> OAuthProvider.KAKAO;
-            default -> throw oauthException(
-                    "unsupported_oauth_provider",
-                    "지원하지 않는 OAuth Provider입니다."
-            );
+            default -> throw new OAuth2AuthenticationException(new
+                    org.springframework.security.oauth2.core.OAuth2Error("invalid_provider"), "지원하지 않는 OAuth provider입니다.");
         };
     }
 
