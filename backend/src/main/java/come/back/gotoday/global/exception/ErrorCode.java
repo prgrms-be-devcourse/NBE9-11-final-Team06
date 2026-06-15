@@ -12,9 +12,13 @@ public enum ErrorCode {
 
     INVALID_LOGIN(HttpStatus.UNAUTHORIZED, "INVALID_LOGIN", "이메일 또는 비밀번호가 올바르지 않습니다."),
 
-    // 외부 API 관련 에러 추가
+    DUPLICATE_PREFERENCE(HttpStatus.CONFLICT, "DUPLICATE_PREFERENCE", "이미 등록된 선호 정보가 있습니다."),
+    PREFERENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "PREFERENCE_NOT_FOUND", "등록된 선호 정보가 없습니다."),
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_NOT_FOUND", "존재하지 않는 카테고리가 포함되어 있습니다."),
+
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "EXTERNAL_API_ERROR", "외부 API 서버와의 통신 중 오류가 발생했습니다."),
     EXTERNAL_API_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "EXTERNAL_API_TIMEOUT", "외부 API 서버 응답 시간이 초과되었습니다.");
+
     private final HttpStatus status;
     private final String code;
     private final String message;
