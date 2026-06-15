@@ -5,6 +5,8 @@ import come.back.gotoday.admin.dto.request.AdminPlaceUpdateRequest;
 import come.back.gotoday.admin.dto.response.AdminPlaceResponse;
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -94,7 +96,7 @@ public class AdminPlaceService {
         return placeRepository.findByIdAndIsActiveTrue(placeId)
                 .orElseThrow(() -> {
                     log.warn("관리자 장소 처리 실패: 존재하지 않거나 비활성화된 장소 placeId={}", placeId);
-                    return new IllegalArgumentException("장소가 존재하지 않습니다.");
+                    return new BusinessException(ErrorCode.PLACE_NOT_FOUND);
                 });
     }
 
@@ -102,21 +104,21 @@ public class AdminPlaceService {
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> {
                     log.warn("관리자 장소 처리 실패: 존재하지 않는 카테고리 categoryId={}", categoryId);
-                    return new IllegalArgumentException("카테고리가 존재하지 않습니다.");
+                    return new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
                 });
     }
 
     private void validateDuplicatePlace(String name, String address) {
         if (placeRepository.existsByNameAndAddressAndIsActiveTrue(name, address)) {
             log.warn("관리자 장소 등록 실패: 중복 장소 name={}, address={}", name, address);
-            throw new IllegalArgumentException("이미 등록된 장소입니다.");
+            throw new BusinessException(ErrorCode.PLACE_ALREADY_EXISTS);
         }
     }
 
     private void validateDuplicatePlaceForUpdate(String name, String address, Long placeId) {
         if (placeRepository.existsByNameAndAddressAndIsActiveTrueAndIdNot(name, address, placeId)) {
             log.warn("관리자 장소 수정 실패: 중복 장소 name={}, address={}, placeId={}", name, address, placeId);
-            throw new IllegalArgumentException("이미 등록된 장소입니다.");
+            throw new BusinessException(ErrorCode.PLACE_ALREADY_EXISTS);
         }
     }
 }
