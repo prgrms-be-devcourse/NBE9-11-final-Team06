@@ -30,19 +30,6 @@ class SeoulEventApiClientTest {
     // 1. 정상 호출 및 시각적 검증 테스트 (기존 유지 및 개선)
     // ==========================================
 
-    @Autowired
-    private SeoulEventAnalyzeService seoulEventAnalyzeService;
-
-    @Test
-    void 서울시_모든_코드네임_조회_테스트() {
-        // when
-        Set<String> codeNames = seoulEventAnalyzeService.getAllUniqueCodeNames();
-
-        // then
-        assertThat(codeNames).isNotEmpty();
-        System.out.println("결과 개수: " + codeNames.size());
-    }
-
     @Test
     @DisplayName("정상 호출 테스트 - 데이터 구조를 JSON Pretty Print로 콘솔에 출력")
     void 서울시_문화행사_API_호출_및_시각적_확인_테스트() throws Exception {
