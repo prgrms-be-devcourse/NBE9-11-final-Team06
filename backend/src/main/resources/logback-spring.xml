@@ -28,12 +28,14 @@
 
     <logger name="come.back.gotoday" level="INFO"/>
 
-    <logger name="org.hibernate.SQL" level="OFF"/>
-    <logger name="org.hibernate.orm.jdbc.bind" level="OFF"/>
-    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="OFF"/>
+    <springProfile name="prod">
+        <logger name="org.hibernate.SQL" level="OFF"/>
+        <logger name="org.hibernate.orm.jdbc.bind" level="OFF"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="OFF"/>
 
-    <logger name="come.back.gotoday.crowd" level="WARN"/>
-    <logger name="come.back.gotoday.external.seoul.SeoulCrowdClient" level="WARN"/>
+        <logger name="come.back.gotoday.crowd" level="WARN"/>
+        <logger name="come.back.gotoday.external.seoul.SeoulCrowdClient" level="WARN"/>
+    </springProfile>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
