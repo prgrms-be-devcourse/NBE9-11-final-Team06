@@ -8,8 +8,14 @@ spring:
   config:
     import: optional:classpath:application-secret.yml
 
+  sql:
+    init:
+      mode: always
+
   jpa:
     open-in-view: false
+    defer-datasource-initialization: true # Hibernate가 테이블을 다 만든 '후'에 data.sql이 돌도록 보장한다.
+
 
 server:
   port: 8080
