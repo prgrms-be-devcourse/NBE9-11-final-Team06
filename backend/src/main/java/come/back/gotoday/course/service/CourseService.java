@@ -5,10 +5,15 @@ import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CoursePlaceRepository;
 import come.back.gotoday.course.repository.CourseRepository;
+import come.back.gotoday.event.entity.Event;
+import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
+import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
+import come.back.gotoday.preference.repository.UserPreferenceRepository;
+import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,11 +32,22 @@ public class CourseService {
     private final MemberRepository memberRepository;
     private final PlaceRepository placeRepository;
 
+    private final RecommendationService recommendationService;
+
     //코스저장
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         log.info("코스 생성 처리 시작: memberId={}, title={}, placeCount={}", memberId, request.title(), request.placeIds().size());
 
+        // 해당 방법으로 추천된 행사 아이디를 가져올 수 있습니다. getRecommendedEventIds 끝에 숫자는 추천하는 행사의 개수입니다.
+//        String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(),  request.companionType());
+//
+//        //  AI 추천 엔진 호출 (획득한 queryText 전달)
+//        List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
+//                memberId, queryText, request.startDate(), request.endDate(), 3
+//        );
+//        log.info("출력된 이벤트 아이디:  {}", recommendedEventIds);
+//
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> {
                     log.warn("코스 생성 실패: 존재하지 않는 회원입니다. memberId={}", memberId);

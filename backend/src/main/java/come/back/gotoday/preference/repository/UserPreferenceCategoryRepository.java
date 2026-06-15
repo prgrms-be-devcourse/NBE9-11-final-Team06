@@ -5,9 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+@Repository
 public interface UserPreferenceCategoryRepository extends JpaRepository<UserPreferenceCategory, Long> {
 
     @Query("""
@@ -26,4 +28,12 @@ public interface UserPreferenceCategoryRepository extends JpaRepository<UserPref
             where upc.userPreference.id = :userPreferenceId
             """)
     void deleteByUserPreferenceId(@Param("userPreferenceId") Long userPreferenceId);
+
+    @Query("""
+            select c.name
+            from UserPreferenceCategory upc
+            join upc.category c
+            where upc.userPreference.id = :preferenceId
+            """)
+    List<String> findCategoryNamesByPreferenceId(@Param("preferenceId") Long preferenceId);
 }

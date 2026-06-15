@@ -16,6 +16,7 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -43,6 +44,11 @@ dependencies {
     implementation("org.springframework.retry:spring-retry:2.0.5")
     implementation("org.springframework.boot:spring-boot-starter-aop:3.5.13")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+    // 딥러닝 & 자연어 처리 (ONNX, Tokenizer, Komoran)
+    implementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")
+    implementation("ai.djl.huggingface:tokenizers:0.28.0")
+    implementation("com.github.shin285:KOMORAN:3.3.4")
 }
 
 tasks.withType<Test> {

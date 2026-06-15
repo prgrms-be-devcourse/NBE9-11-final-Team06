@@ -25,4 +25,50 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     int deleteExpiredEvents(@Param("today") LocalDate today);
 
     List<Event> findByExternalIdIn(Collection<String> externalIds);
+
+    @Query("SELECT e FROM Event e JOIN FETCH e.category") // Event 엔티티 내에 Category 연관관계가 설정되어 있어야 합니다.
+    List<Event> findAllWithCategory();
+
+
+
+    // [추가] 지역, 기간, 카테고리까지 완벽 일치하는 행사를 찾을 때 사용 (1단계)
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.area = :area " +
+            "AND e.endDate >= :startDate " +
+            "AND e.startDate <= :endDate " +
+            "AND e.category.name IN :categories")
+    List<Event> findRecommendedEventsWithCategory(
+            @Param("area") String area,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("categories") List<String> categories
+    );
+
+    // [기존 유지] 카테고리 상관없이 지역/기간만 맞으면 가져옴 (2단계/Fallback용)
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.area = :area " +
+            "AND e.endDate >= :startDate " +
+            "AND e.startDate <= :endDate")
+    List<Event> findRecommendedEvents(
+            @Param("area") String area,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    // [기존 유지] 전체 검색
+    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.endDate >= :start AND e.startDate <= :end")
+    List<Event> findAllEventsByDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
+//
+//    //지워도 됨 이 아래로는 가중치 설정하기 위해 임시로 추가한 것=============
+//    // 과거 30개의 데이터 (Train Set - 학습 및 가중치 탐색용)
+//    @Query(value = "SELECT * FROM event ORDER BY created_at ASC, id ASC LIMIT 30", nativeQuery = true)
+//    List<Event> findTrainSet();
+//
+//    // 최근 11개의 데이터 (Test Set - 검증용)
+//    @Query(value = "SELECT * FROM event ORDER BY created_at ASC, id ASC LIMIT 11 OFFSET 30", nativeQuery = true)
+//    List<Event> findTestSet();
+//    // EventRepository.java
+//    @Query("SELECT e FROM Event e WHERE e.area = :area AND e.category.name IN :categories")
+//    List<Event> findByAreaAndCategories(String area, List<String> categories);
+//
+//    @Query("SELECT e FROM Event e WHERE e.area = :area")
+//    List<Event> findByArea(String area);
 }
