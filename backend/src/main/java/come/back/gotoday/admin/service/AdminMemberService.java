@@ -1,6 +1,9 @@
 package come.back.gotoday.admin.service;
 
 import come.back.gotoday.admin.dto.response.AdminMemberResponse;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
+import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,5 +21,17 @@ public class AdminMemberService {
     public Page<AdminMemberResponse> getMembers(Pageable pageable) {
         return memberRepository.findAll(pageable)
                 .map(AdminMemberResponse::from);
+    }
+
+    @Transactional
+    public void deleteMember(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        if (member.isDeleted()) {
+            return;
+        }
+
+        member.withdraw();
     }
 }
