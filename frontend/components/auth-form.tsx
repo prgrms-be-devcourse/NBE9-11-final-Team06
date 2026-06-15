@@ -146,6 +146,7 @@ export function AuthForm() {
         setMode("login")
         setLoginEmail(signupEmail)
         setLoginPassword("")
+        resetSignupForm()
         return
       }
 
@@ -158,7 +159,15 @@ export function AuthForm() {
       })
 
       if (!preferenceResponse.success) {
-        toast.error(preferenceResponse.message ?? "선호 정보 등록에 실패했습니다.")
+        toast.warning(
+          preferenceResponse.message ??
+            "회원가입은 완료되었지만 선호 정보 등록에 실패했습니다. 마이페이지에서 다시 등록해주세요.",
+        )
+
+        resetSignupForm()
+
+        router.push("/mypage")
+        router.refresh()
         return
       }
 
@@ -192,6 +201,7 @@ export function AuthForm() {
         <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
           <MapPin className="size-6" />
         </div>
+
         <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight">하루서울</h1>
         <p className="mt-1 text-sm text-muted-foreground">서울의 하루를 가장 나답게</p>
       </div>
@@ -286,6 +296,7 @@ export function AuthForm() {
 
                 <div className="flex flex-col gap-2">
                   <Label>관심사</Label>
+
                   <div className="flex flex-wrap gap-2">
                     {CATEGORY_OPTIONS.map((category) => {
                       const active = selectedCategoryIds.includes(category.id)
@@ -310,6 +321,7 @@ export function AuthForm() {
 
                 <div className="flex flex-col gap-2">
                   <Label>주로 함께하는 동행</Label>
+
                   <div className="flex flex-wrap gap-2">
                     {COMPANION_OPTIONS.map((option) => {
                       const active = selectedCompanion === option.value
@@ -334,6 +346,7 @@ export function AuthForm() {
 
                 <div className="flex flex-col gap-2">
                   <Label>이동 강도</Label>
+
                   <div className="flex flex-wrap gap-2">
                     {MOBILITY_OPTIONS.map((option) => {
                       const active = selectedMobilityLevel === option.value
@@ -358,6 +371,7 @@ export function AuthForm() {
 
                 <div className="flex flex-col gap-2">
                   <Label>혼잡도 선호</Label>
+
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
