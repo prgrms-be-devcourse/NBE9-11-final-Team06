@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
@@ -10,45 +12,86 @@ import { SiteFooter } from "@/components/site-footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { SAVED_COURSES, CATEGORIES, COMPANIONS } from "@/lib/data"
+import { SAVED_COURSES } from "@/lib/data"
 import { memberApi } from "@/lib/member-api"
-import type { Member } from "@/lib/types"
+import { preferenceApi } from "@/lib/preference-api"
+import type {
+  CompanionType,
+  Member,
+  MobilityLevel,
+  UserPreference,
+} from "@/lib/types"
 import { MapPin, Clock, Route, Heart, Settings, Bookmark } from "lucide-react"
 
-const myInterests = ["전시", "카페", "산책"]
-const myCompanion = "커플"
+const CATEGORY_OPTIONS = [
+  { id: 1, label: "전시" },
+  { id: 2, label: "카페" },
+  { id: 3, label: "산책" },
+  { id: 4, label: "맛집" },
+  { id: 5, label: "공연" },
+]
+
+const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
+  { value: "SOLO", label: "혼자" },
+  { value: "COUPLE", label: "커플" },
+  { value: "FRIEND", label: "친구" },
+  { value: "FAMILY", label: "가족" },
+  { value: "PARENT", label: "부모님" },
+]
+
+const MOBILITY_OPTIONS: { value: MobilityLevel; label: string }[] = [
+  { value: "LOW", label: "낮음" },
+  { value: "NORMAL", label: "보통" },
+  { value: "HIGH", label: "높음" },
+]
 
 export default function MyPage() {
   const router = useRouter()
 
   const [activeTab, setActiveTab] = useState("saved")
   const [member, setMember] = useState<Member | null>(null)
+  const [preference, setPreference] = useState<UserPreference | null>(null)
+
   const [nickname, setNickname] = useState("")
   const [profileImageUrl, setProfileImageUrl] = useState("")
+
+  const [preferredArea, setPreferredArea] = useState("")
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
+  const [companionType, setCompanionType] = useState<CompanionType | null>(null)
+  const [mobilityLevel, setMobilityLevel] = useState<MobilityLevel | null>(null)
+  const [avoidCrowded, setAvoidCrowded] = useState<boolean | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const [isPreferenceSaving, setIsPreferenceSaving] = useState(false)
+  const [isPreferenceDeleting, setIsPreferenceDeleting] = useState(false)
 
   useEffect(() => {
-    async function fetchMyInfo() {
+    async function fetchInitialData() {
       try {
-        const response = await memberApi.getMyInfo()
+        const memberResponse = await memberApi.getMyInfo()
 
-        if (!response.success || !response.data) {
-          toast.error(response.message ?? "로그인이 필요합니다.")
+        if (!memberResponse.success || !memberResponse.data) {
+          toast.error(memberResponse.message ?? "로그인이 필요합니다.")
           router.push("/login")
           return
         }
 
-        setMember(response.data)
-        setNickname(response.data.nickname)
-        setProfileImageUrl(response.data.profileImageUrl ?? "")
+        setMember(memberResponse.data)
+        setNickname(memberResponse.data.nickname)
+        setProfileImageUrl(memberResponse.data.profileImageUrl ?? "")
+
+        const preferenceResponse = await preferenceApi.getMyPreference()
+
+        if (preferenceResponse.success && preferenceResponse.data) {
+          applyPreference(preferenceResponse.data)
+        }
       } catch {
         toast.error("회원 정보를 불러오는 중 오류가 발생했습니다.")
         router.push("/login")
@@ -57,8 +100,34 @@ export default function MyPage() {
       }
     }
 
-    fetchMyInfo()
+    fetchInitialData()
   }, [router])
+
+  function applyPreference(nextPreference: UserPreference) {
+    setPreference(nextPreference)
+    setPreferredArea(nextPreference.preferredArea)
+    setSelectedCategoryIds(nextPreference.categories.map((category) => category.id))
+    setCompanionType(nextPreference.companionType)
+    setMobilityLevel(nextPreference.mobilityLevel)
+    setAvoidCrowded(nextPreference.avoidCrowded)
+  }
+
+  function resetPreferenceForm() {
+    setPreference(null)
+    setPreferredArea("")
+    setSelectedCategoryIds([])
+    setCompanionType(null)
+    setMobilityLevel(null)
+    setAvoidCrowded(null)
+  }
+
+  function toggleCategory(categoryId: number) {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId],
+    )
+  }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -73,7 +142,7 @@ export default function MyPage() {
     try {
       const response = await memberApi.updateMyInfo({
         nickname: nickname.trim(),
-        profileImageUrl: profileImageUrl.trim(),
+        profileImageUrl: profileImageUrl.trim() || undefined,
       })
 
       if (!response.success || !response.data) {
@@ -92,6 +161,89 @@ export default function MyPage() {
       toast.error("회원 정보 수정 중 오류가 발생했습니다.")
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  async function handleSavePreference(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+
+    if (!preferredArea.trim()) {
+      toast.error("선호 지역을 입력해주세요.")
+      return
+    }
+
+    if (selectedCategoryIds.length === 0) {
+      toast.error("선호 카테고리를 1개 이상 선택해주세요.")
+      return
+    }
+
+    if (!companionType) {
+      toast.error("동행 유형을 선택해주세요.")
+      return
+    }
+
+    if (!mobilityLevel) {
+      toast.error("이동 강도를 선택해주세요.")
+      return
+    }
+
+    if (avoidCrowded === null) {
+      toast.error("혼잡도 선호를 선택해주세요.")
+      return
+    }
+
+    setIsPreferenceSaving(true)
+
+    try {
+      const request = {
+        preferredArea: preferredArea.trim(),
+        categoryIds: selectedCategoryIds,
+        companionType,
+        mobilityLevel,
+        avoidCrowded,
+      }
+
+      const response = preference
+        ? await preferenceApi.updateMyPreference(request)
+        : await preferenceApi.createMyPreference(request)
+
+      if (!response.success || !response.data) {
+        toast.error(response.message ?? "선호 정보 저장에 실패했습니다.")
+        return
+      }
+
+      applyPreference(response.data)
+      toast.success(preference ? "선호 정보가 수정되었습니다." : "선호 정보가 등록되었습니다.")
+    } catch {
+      toast.error("선호 정보 저장 중 오류가 발생했습니다.")
+    } finally {
+      setIsPreferenceSaving(false)
+    }
+  }
+
+  async function handleDeletePreference() {
+    const confirmed = window.confirm("저장된 선호 정보를 삭제하시겠습니까?")
+
+    if (!confirmed) {
+      return
+    }
+
+    setIsPreferenceDeleting(true)
+
+    try {
+      const response = await preferenceApi.deleteMyPreference()
+
+      if (!response.success) {
+        toast.error(response.message ?? "선호 정보 삭제에 실패했습니다.")
+        return
+      }
+
+      resetPreferenceForm()
+      toast.success("선호 정보가 삭제되었습니다.")
+    } catch {
+      toast.error("선호 정보 삭제 중 오류가 발생했습니다.")
+    } finally {
+      setIsPreferenceDeleting(false)
     }
   }
 
@@ -114,12 +266,7 @@ export default function MyPage() {
         return
       }
 
-      
-      try {
-        await memberApi.logout()
-      } catch (error) {
-        console.error("회원 탈퇴 후 로그아웃 처리 중 오류 발생:", error)
-      }
+      await memberApi.logout()
 
       toast.success("회원 탈퇴가 완료되었습니다.")
       router.push("/")
@@ -160,7 +307,6 @@ export default function MyPage() {
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
-        {/* Profile header */}
         <div className="flex flex-col gap-5 rounded-3xl border border-border/60 bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="size-16 overflow-hidden">
@@ -303,55 +449,145 @@ export default function MyPage() {
 
                 <Separator />
 
-                <div>
-                  <p className="mb-3 text-sm font-medium">관심 카테고리</p>
+                <form onSubmit={handleSavePreference} className="flex flex-col gap-6">
+                  <div>
+                    <p className="mb-3 text-sm font-medium">선호 지역</p>
+                    <Input
+                      value={preferredArea}
+                      onChange={(e) => setPreferredArea(e.target.value)}
+                      placeholder="예: 홍대, 성수, 강남"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="mb-3 text-sm font-medium">관심 카테고리</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {CATEGORY_OPTIONS.map((category) => {
+                        const active = selectedCategoryIds.includes(category.id)
+
+                        return (
+                          <button
+                            key={category.id}
+                            type="button"
+                            onClick={() => toggleCategory(category.id)}
+                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {category.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <p className="mb-3 text-sm font-medium">주 동행 유형</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {COMPANION_OPTIONS.map((option) => {
+                        const active = companionType === option.value
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setCompanionType(option.value)}
+                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                              active
+                                ? "border-accent bg-accent text-accent-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-3 text-sm font-medium">이동 강도</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {MOBILITY_OPTIONS.map((option) => {
+                        const active = mobilityLevel === option.value
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setMobilityLevel(option.value)}
+                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-3 text-sm font-medium">혼잡도 선호</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAvoidCrowded(true)}
+                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                          avoidCrowded === true
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        혼잡한 곳 피하기
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAvoidCrowded(false)}
+                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                          avoidCrowded === false
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        상관없음
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {CATEGORIES.map((c) => {
-                      const active = myInterests.includes(c.value)
+                    <Button type="submit" className="w-fit" disabled={isPreferenceSaving}>
+                      {isPreferenceSaving
+                        ? "저장 중..."
+                        : preference
+                          ? "선호 정보 수정"
+                          : "선호 정보 등록"}
+                    </Button>
 
-                      return (
-                        <span
-                          key={c.value}
-                          className={`rounded-full border px-3 py-1.5 text-sm ${
-                            active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          {c.label}
-                        </span>
-                      )
-                    })}
+                    {preference && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-fit bg-transparent"
+                        onClick={handleDeletePreference}
+                        disabled={isPreferenceDeleting}
+                      >
+                        {isPreferenceDeleting ? "삭제 중..." : "선호 정보 삭제"}
+                      </Button>
+                    )}
                   </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <p className="mb-3 text-sm font-medium">주 동행 유형</p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {COMPANIONS.map((c) => {
-                      const active = myCompanion === c.value
-
-                      return (
-                        <span
-                          key={c.value}
-                          className={`rounded-full border px-3 py-1.5 text-sm ${
-                            active
-                              ? "border-accent bg-accent text-accent-foreground"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          {c.value}
-                        </span>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <Button className="w-fit">선호 정보 수정</Button>
+                </form>
 
                 <Separator />
 
