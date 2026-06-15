@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,18 +18,21 @@ public class UserPreference {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
+    // 사용자 1명당 선호 정보 1개
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false, unique = true)
     private Member member;
 
-    @Column(name = "preferred_area", length = 100)
+    @Column(name = "preferred_area", nullable = false, length = 100)
     private String preferredArea;
 
-    @Column(name = "companion_type", length = 30)
-    private String companionType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "companion_type", nullable = false, length = 30)
+    private CompanionType companionType;
 
-    @Column(name = "mobility_level", length = 30)
-    private String mobilityLevel;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mobility_level", nullable = false, length = 30)
+    private MobilityLevel mobilityLevel;
 
     @Column(name = "avoid_crowded", nullable = false)
     private Boolean avoidCrowded;
@@ -39,7 +43,13 @@ public class UserPreference {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    private UserPreference(Member member, String preferredArea, String companionType, String mobilityLevel, Boolean avoidCrowded) {
+    private UserPreference(
+            Member member,
+            String preferredArea,
+            CompanionType companionType,
+            MobilityLevel mobilityLevel,
+            Boolean avoidCrowded
+    ) {
         this.member = member;
         this.preferredArea = preferredArea;
         this.companionType = companionType;
@@ -49,8 +59,32 @@ public class UserPreference {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // [규칙 반영] 정적 팩토리 메서드
-    public static UserPreference create(Member member, String preferredArea, String companionType, String mobilityLevel, Boolean avoidCrowded) {
-        return new UserPreference(member, preferredArea, companionType, mobilityLevel, avoidCrowded);
+    public static UserPreference create(
+            Member member,
+            String preferredArea,
+            CompanionType companionType,
+            MobilityLevel mobilityLevel,
+            Boolean avoidCrowded
+    ) {
+        return new UserPreference(
+                member,
+                preferredArea,
+                companionType,
+                mobilityLevel,
+                avoidCrowded
+        );
+    }
+
+    public void update(
+            String preferredArea,
+            CompanionType companionType,
+            MobilityLevel mobilityLevel,
+            Boolean avoidCrowded
+    ) {
+        this.preferredArea = preferredArea;
+        this.companionType = companionType;
+        this.mobilityLevel = mobilityLevel;
+        this.avoidCrowded = avoidCrowded;
+        this.updatedAt = LocalDateTime.now();
     }
 }

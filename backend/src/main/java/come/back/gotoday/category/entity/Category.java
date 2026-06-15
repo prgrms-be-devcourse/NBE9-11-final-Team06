@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,6 +21,7 @@ public class Category {
     @Column(nullable = false, length = 50)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private CategoryType type;
 
@@ -36,7 +38,6 @@ public class Category {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // [규칙 반영] 정적 팩토리 메서드
     public static Category create(String name, CategoryType type) {
         return new Category(name, type);
     }
