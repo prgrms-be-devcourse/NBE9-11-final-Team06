@@ -75,7 +75,7 @@ public class EventChunkProcessor {
 
             if (existingEvent != null) {
                 // 업데이트 대상인데 데이터가 변경되었을 때만 벡터 추출 대상에 포함
-                if (existingEvent.isChanged(row.title(), startDate, endDate, row.orgLink(), row.mainImg())) {
+                if (existingEvent.isChanged(row.title(), startDate, endDate, row.orgLink(), row.mainImg(), row.lat(), row.lot())) {
                     validRows.add(row);
                     textsToEmbed.add(docText);
                 }
@@ -105,7 +105,7 @@ public class EventChunkProcessor {
 
                     if (existingEvent != null) {
                         // 진짜 업데이트 수행
-                        existingEvent.updateInfo(row.title(), startDate, endDate, row.orgLink(), row.mainImg());
+                        existingEvent.updateInfo(row.title(), startDate, endDate, row.orgLink(), row.mainImg(), row.lat(), row.lot());
                         existingEvent.setEmbeddingVector(embeddingVector);
                         log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}", row.title());
                     } else {
@@ -116,6 +116,7 @@ public class EventChunkProcessor {
                                 null, targetCategory, row.title(), startDate, endDate,
                                 row.eventTime(), row.useFee(), row.useTrgt(), row.orgLink(), row.mainImg(),
                                 null, EventSource.SEOUL_API, extId, embeddingVector, row.guName()
+                                ,row.lat(), row.lot()
                         );
                         eventRepository.save(newEvent);
                     }

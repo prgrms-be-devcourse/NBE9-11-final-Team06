@@ -72,13 +72,20 @@ public class Event {
     @Column(name = "area", length = 50)
     private String area;
 
+    // 1. 위도 경도 필드 추가
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
     @Lob
     @Column(name = "embedding_vector", columnDefinition = "LONGBLOB")
     private byte[] embeddingVectorBytes;
 
     private Event(Place place, Category category, String title, LocalDate startDate, LocalDate endDate,
                   String eventTime, String fee, String target, String homepageUrl, String imageUrl,
-                  String description, String source, String externalId,float[] embeddingVector,String area) {
+                  String description, String source, String externalId,float[] embeddingVector,String area,Double latitude, Double longitude) {
         this.place = place;
         this.category = category;
         this.title = title;
@@ -96,31 +103,38 @@ public class Event {
         this.updatedAt = LocalDateTime.now();
         setEmbeddingVector(embeddingVector);
         this.area =area;
+        this.latitude = latitude;   // <- 추가
+        this.longitude = longitude; // <- 추가
     }
 
     // [규칙 반영] 정적 팩토리 메서드
     public static Event create(Place place, Category category, String title, LocalDate startDate, LocalDate endDate,
                                String eventTime, String fee, String target, String homepageUrl, String imageUrl,
-                               String description, EventSource source, String externalId,float[] embeddingVector,String area) {
-        return new Event(place, category, title, startDate, endDate, eventTime, fee, target, homepageUrl, imageUrl, description, source.getCode(), externalId,embeddingVector,area);
+                               String description, EventSource source, String externalId,float[] embeddingVector,String area,Double latitude, Double longitude) {
+        return new Event(place, category, title, startDate, endDate, eventTime, fee, target, homepageUrl, imageUrl, description, source.getCode(), externalId,embeddingVector,area, latitude, longitude);
     }
 
     // 변경 감지용 메서드
-    public void updateInfo(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl) {
+    public void updateInfo(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl,Double latitude, Double longitude) {
         this.title = title;
         this.startDate = startDate;
         this.endDate = endDate;
         this.homepageUrl = homepageUrl;
         this.imageUrl = imageUrl;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.updatedAt = LocalDateTime.now();
     }
 
     // 데이터 일치 확인용 메서드
-    public boolean isChanged(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl) {
+    public boolean isChanged(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl,Double latitude, Double longitude) {
         return !this.title.equals(title) ||
                 !this.startDate.equals(startDate) ||
                 !this.endDate.equals(endDate) ||
                 !java.util.Objects.equals(this.homepageUrl, homepageUrl) ||
-                !java.util.Objects.equals(this.imageUrl, imageUrl);
+                !java.util.Objects.equals(this.imageUrl, imageUrl)||
+                !java.util.Objects.equals(this.latitude, latitude) ||
+                !java.util.Objects.equals(this.longitude, longitude);
     }
 
     // 2. 최하단에 float[] 변환 편의 메서드 추가
