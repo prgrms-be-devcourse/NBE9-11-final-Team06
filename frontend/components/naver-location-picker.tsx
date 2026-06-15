@@ -15,11 +15,22 @@ type NaverLocationPickerProps = {
   onSelect: (location: NaverSelectedLocation) => void
 }
 
-type SampleLocation = {
+type PlaceSearchResult = {
   name: string
-  address: string
-  latitude: number
-  longitude: number
+  category?: string
+  address?: string
+  roadAddress?: string
+  phone?: string
+  placeUrl?: string
+  mapy?: number
+  mapx?: number
+  source: string
+}
+
+type PlaceSearchApiResponse = {
+  success: boolean
+  message: string
+  data: PlaceSearchResult[]
 }
 
 declare global {
@@ -42,6 +53,7 @@ type NaverLatLng = {
   lat: () => number
   lng: () => number
 }
+
 
 type NaverMapOptions = {
   center: NaverLatLng
@@ -76,38 +88,8 @@ const DEFAULT_CENTER = {
   longitude: 126.978,
 }
 
-const SAMPLE_LOCATIONS: SampleLocation[] = [
-  {
-    name: "성수역",
-    address: "서울 성동구 아차산로 100",
-    latitude: 37.5446,
-    longitude: 127.0557,
-  },
-  {
-    name: "서울숲",
-    address: "서울 성동구 뚝섬로 273",
-    latitude: 37.5444,
-    longitude: 127.0374,
-  },
-  {
-    name: "잠실 롯데월드몰",
-    address: "서울 송파구 올림픽로 300",
-    latitude: 37.5131,
-    longitude: 127.1035,
-  },
-  {
-    name: "홍대입구역",
-    address: "서울 마포구 양화로 160",
-    latitude: 37.5572,
-    longitude: 126.9254,
-  },
-  {
-    name: "건대입구역",
-    address: "서울 광진구 아차산로 243",
-    latitude: 37.5404,
-    longitude: 127.0692,
-  },
-]
+const NAVER_LOCAL_COORDINATE_SCALE = 10_000_000
+
 
 export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLocationPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
@@ -119,9 +101,11 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   const [selectedLocationName, setSelectedLocationName] = useState<string | null>(initialKeyword || null)
   const [isMapReady, setIsMapReady] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [results, setResults] = useState(SAMPLE_LOCATIONS)
+  const [results, setResults] = useState<PlaceSearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   const naverMapClientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 
   useEffect(() => {
     setKeyword(initialKeyword)
@@ -204,54 +188,76 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     const trimmedKeyword = initialKeyword.trim()
 
     if (trimmedKeyword) {
-      const filteredResults = filterLocations(trimmedKeyword)
-
-      if (filteredResults.length > 0) {
-        setResults(filteredResults)
-        selectLocation(filteredResults[0], map)
-      }
+      void searchLocations(trimmedKeyword, map)
     }
   }
 
-  function filterLocations(searchKeyword: string) {
-    return SAMPLE_LOCATIONS.filter((location) =>
-      `${location.name} ${location.address}`.includes(searchKeyword),
-    )
-  }
+  async function searchLocations(searchKeyword = keyword, targetMap?: NaverMap) {
+    if (isSearching) return
 
-  function searchLocations() {
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = searchKeyword.trim()
 
     if (!trimmedKeyword) {
-      setResults(SAMPLE_LOCATIONS)
-      setSelectedLocationName(null)
-      setErrorMessage(null)
-      return
-    }
-
-    const filteredResults = filterLocations(trimmedKeyword)
-
-    if (filteredResults.length === 0) {
       setResults([])
       setSelectedLocationName(null)
-      setErrorMessage("임시 검색 결과가 없습니다. 기본 지역을 선택하거나 다른 키워드로 검색해 주세요.")
+      setErrorMessage("검색어를 입력해 주세요.")
       return
     }
 
-    setResults(filteredResults)
+    setIsSearching(true)
     setErrorMessage(null)
-    selectLocation(filteredResults[0])
+
+    try {
+      const normalizedApiBaseUrl = apiBaseUrl.replace(/\/$/, "")
+      const response = await fetch(
+        `${normalizedApiBaseUrl}/api/places/search?query=${encodeURIComponent(trimmedKeyword)}`,
+      )
+
+      if (!response.ok) {
+        throw new Error("장소 검색 요청에 실패했습니다.")
+      }
+
+      const body = (await response.json()) as PlaceSearchApiResponse
+      const searchedResults = body.data ?? []
+      const mappableResults = searchedResults.filter(
+        (location) => typeof location.mapx === "number" && typeof location.mapy === "number",
+      )
+
+      if (mappableResults.length === 0) {
+        setResults([])
+        setSelectedLocationName(null)
+        setErrorMessage("검색 결과가 없거나 지도에 표시할 수 있는 좌표가 없습니다.")
+        return
+      }
+
+      setResults(mappableResults)
+      setSelectedLocationName(null)
+    } catch (error) {
+      console.error(error)
+      setResults([])
+      setSelectedLocationName(null)
+      setErrorMessage("장소 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
+    } finally {
+      setIsSearching(false)
+    }
   }
 
-  function selectLocation(location: SampleLocation, targetMap?: NaverMap) {
+  function selectLocation(location: PlaceSearchResult, targetMap?: NaverMap) {
     const map = targetMap ?? mapRef.current
 
     if (!window.naver?.maps || !map) return
+    if (typeof location.mapx !== "number" || typeof location.mapy !== "number") {
+      setErrorMessage("선택한 장소의 좌표 정보가 없습니다.")
+      return
+    }
 
     markerRef.current?.setMap(null)
     infoWindowRef.current?.close()
 
-    const position = new window.naver.maps.LatLng(location.latitude, location.longitude)
+    const latitude = location.mapy / NAVER_LOCAL_COORDINATE_SCALE
+    const longitude = location.mapx / NAVER_LOCAL_COORDINATE_SCALE
+    const position = new window.naver.maps.LatLng(latitude, longitude)
+
     const marker = new window.naver.maps.Marker({
       map,
       position,
@@ -266,6 +272,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     map.setCenter(position)
     infoWindow.open(map, marker)
     setSelectedLocationName(location.name)
+    setKeyword(location.name)
 
     window.naver.maps.Event.addListener(marker, "click", () => {
       infoWindow.open(map, marker)
@@ -273,9 +280,9 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
     onSelect({
       name: location.name,
-      address: location.address,
-      latitude: location.latitude,
-      longitude: location.longitude,
+      address: location.roadAddress || location.address,
+      latitude: position.lat(),
+      longitude: position.lng(),
       source: "naver",
     })
   }
@@ -284,7 +291,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     <div className="rounded-2xl border bg-background p-4">
       <p className="font-semibold">네이버 지도로 위치 선택</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        현재는 지도 표시와 샘플 장소 검색을 지원합니다. 장소 검색 API 연동은 이후 작업에서 확장합니다.
+        장소명을 검색한 뒤 결과를 선택하면 지도 중심이 이동하고 마커가 표시됩니다.
       </p>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -294,19 +301,19 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault()
-              searchLocations()
+              void searchLocations()
             }
           }}
-          placeholder="예: 성수역, 서울숲, 잠실 롯데월드몰"
+          placeholder="예: 성수 카페, 서울숲 맛집, 잠실 롯데월드몰"
           className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
         <button
           type="button"
-          onClick={searchLocations}
-          disabled={!isMapReady}
+          onClick={() => void searchLocations()}
+          disabled={!isMapReady || isSearching}
           className="h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          검색
+          {isSearching ? "검색 중..." : "검색"}
         </button>
       </div>
 
@@ -323,7 +330,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
               return (
                 <button
-                  key={`${location.name}-${location.latitude}-${location.longitude}`}
+                  key={`${location.name}-${location.mapy}-${location.mapx}-${location.address ?? location.roadAddress ?? ""}`}
                   type="button"
                   onClick={() => selectLocation(location)}
                   className={`w-full rounded-xl border p-3 text-left transition-colors ${
@@ -333,7 +340,12 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
                   }`}
                 >
                   <p className="font-semibold">{location.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{location.address}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {location.roadAddress || location.address || "주소 정보 없음"}
+                  </p>
+                  {location.category && (
+                    <p className="mt-1 text-xs text-muted-foreground">{location.category}</p>
+                  )}
                 </button>
               )
             })}
