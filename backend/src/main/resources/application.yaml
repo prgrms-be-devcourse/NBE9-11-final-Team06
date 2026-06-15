@@ -5,9 +5,6 @@ spring:
   profiles:
     active: dev
 
-  config:
-    import: optional:classpath:application-secret.yml
-
   sql:
     init:
       mode: embedded
