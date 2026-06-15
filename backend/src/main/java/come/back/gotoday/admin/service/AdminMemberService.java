@@ -28,6 +28,10 @@ public class AdminMemberService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
+        if (member.isDeleted()) {
+            return;
+        }
+
         member.withdraw();
     }
 }
