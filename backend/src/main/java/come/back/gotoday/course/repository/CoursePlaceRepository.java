@@ -12,10 +12,12 @@ public interface CoursePlaceRepository extends JpaRepository<CoursePlace, Long> 
 
     void deleteByCourseId(Long courseId);
 
-
+    // 💡 join fetch를 left join fetch로 수정해서 place가 null이어도 다 긁어오게 변경!
     @Query("""
         select cp from CoursePlace cp
-        join fetch cp.place
+        left join fetch cp.place
+        left join fetch cp.event e
+        left join fetch e.place
         where cp.course.id = :courseId
         order by cp.visitOrder
     """)
