@@ -225,6 +225,7 @@ INSERT INTO `event` (
       (236, NULL, 16, '더멘즈콰이어남성합창단 제18회 정기연주회', '2026-06-11', '2026-06-26', '19:30 ~ 21:00', 'R석 150,000원 등', '성인, 청소년, 어린이', 'https://www.lotteconcerthall.com/product/ko/performance/261106', 'https://culture.seoul.go.kr/cmmn/file/getImage.do?atchFileId=67ce3d9bf2df4508923d4da9525474d9', '더멘즈콰이어 남성합창단 연주회', 'SEOUL_API', 'EV_236', NOW(), NOW(), '송파구', 37.51375200, 127.10444500, NULL); -- 롯데콘서트홀 기준
 
 
+
 ALTER TABLE `category` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `member` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `user_preference` ALTER COLUMN `id` RESTART WITH 100;
