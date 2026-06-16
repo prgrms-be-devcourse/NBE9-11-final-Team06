@@ -5,9 +5,6 @@ spring:
   profiles:
     active: local
 
-  config:
-    import: optional:classpath:application-secret.yml
-
   sql:
     init:
       mode: embedded
@@ -15,7 +12,6 @@ spring:
   jpa:
     open-in-view: false
     defer-datasource-initialization: true # Hibernate가 테이블을 다 만든 '후'에 data.sql이 돌도록 보장한다.
-
 
   security:
     oauth2:
@@ -36,7 +32,6 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - profile_nickname
-              - account_email
             client-name: Kakao
 
         provider:
@@ -96,3 +91,9 @@ naver:
     client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
+
+app:
+  oauth2:
+    redirect:
+      success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:3000/oauth/callback}
+      failure-url: ${OAUTH2_FAILURE_REDIRECT_URL:http://localhost:3000/login?error=oauth}

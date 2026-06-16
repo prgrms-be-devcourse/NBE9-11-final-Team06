@@ -1,10 +1,15 @@
 package come.back.gotoday.global.config;
 
+import come.back.gotoday.auth.oauth.CustomOAuth2AuthorizationRequestResolver;
+import come.back.gotoday.auth.oauth.CustomOAuth2UserService;
+import come.back.gotoday.auth.oauth.OAuth2LoginSuccessHandler;
+import come.back.gotoday.auth.oauth.OAuth2RedirectProperties;
 import come.back.gotoday.global.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,11 +24,18 @@ import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({
+        CorsProperties.class,
+        OAuth2RedirectProperties.class
+})
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsProperties corsProperties;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2RedirectProperties oAuth2RedirectProperties;
+    private final CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,6 +57,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/members").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/reissue").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                         .requestMatchers("/api/crowds/**").permitAll()
                         .requestMatchers("/api/places/search").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
@@ -62,6 +75,14 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(endpoint -> endpoint
                                 .baseUri("/oauth2/authorization")
+                                .authorizationRequestResolver(customOAuth2AuthorizationRequestResolver)
+                        )
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
+                        .successHandler(oAuth2LoginSuccessHandler)
+                        .failureHandler((request, response, exception) ->
+                                response.sendRedirect(oAuth2RedirectProperties.failureUrl())
                         )
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
