@@ -32,7 +32,6 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - profile_nickname
-              - account_email
             client-name: Kakao
 
         provider:
@@ -96,5 +95,5 @@ naver:
 app:
   oauth2:
     redirect:
-      success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:3000}
+      success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:3000/oauth/callback}
       failure-url: ${OAUTH2_FAILURE_REDIRECT_URL:http://localhost:3000/login?error=oauth}
