@@ -27,6 +27,7 @@ import { NaverLocationPicker } from "@/components/naver-location-picker"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
 const STEPS = ["날짜", "위치", "동행", "취향"]
+const MAX_CATEGORIES = 5
 const PREFERENCE_CATEGORIES = CATEGORIES.filter(
   (category) => category.label !== "식당" && category.label !== "카페",
 )
@@ -58,9 +59,20 @@ export function PlanWizard() {
     step === 3
 
   function toggleCategory(c: Category) {
-    setCategories((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-    )
+    setCategories((prev) => {
+      if (prev.includes(c)) {
+        setSubmitError(null)
+        return prev.filter((x) => x !== c)
+      }
+
+      if (prev.length >= MAX_CATEGORIES) {
+        setSubmitError(`카테고리는 최대 ${MAX_CATEGORIES}개까지 선택할 수 있습니다.`)
+        return prev
+      }
+
+      setSubmitError(null)
+      return [...prev, c]
+    })
   }
 
   function formatDate(value: Date) {
@@ -215,6 +227,12 @@ export function PlanWizard() {
           startDate: selectedDate,
           endDate: selectedDate,
           topK: 3,
+          area: area ?? selectedLocation.name,
+          categories,
+          companionType: companion,
+          address: selectedLocation.address ?? selectedLocation.name,
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
         }),
       })
 
@@ -425,7 +443,7 @@ export function PlanWizard() {
               <StepHeader
                 icon={Sparkles}
                 title="어떤 걸 좋아하세요?"
-                desc="원하는 카테고리를 모두 골라주세요. (선택 안 하면 전체 추천)"
+                desc={`원하는 카테고리를 골라주세요. (최대 ${MAX_CATEGORIES}개, 선택 안 하면 전체 추천)`}
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {PREFERENCE_CATEGORIES.map((c) => {
