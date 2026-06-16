@@ -70,8 +70,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return switch (registrationId.toLowerCase()) {
             case "google" -> OAuthProvider.GOOGLE;
             case "kakao" -> OAuthProvider.KAKAO;
-            default -> throw new OAuth2AuthenticationException(new
-                    org.springframework.security.oauth2.core.OAuth2Error("invalid_provider"), "지원하지 않는 OAuth provider입니다.");
+            default -> throw oauthException(
+                    "unsupported_oauth_provider",
+                    "지원하지 않는 OAuth Provider입니다."
+            );
         };
     }
 
@@ -103,7 +105,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private Member createOAuthMember(OAuthProvider provider, OAuth2UserInfo userInfo) {
         String email = resolveEmail(provider, userInfo);
-        validateEmailNotUsedByOtherMember(email, provider, userInfo.getProviderId());
+
+        validateEmailNotUsedByOtherAccount(email);
 
         String nickname = createUniqueNickname(userInfo.getNickname());
 
@@ -130,23 +133,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return provider.name().toLowerCase() + "_" + userInfo.getProviderId() + "@oauth.local";
     }
 
-    private void validateEmailNotUsedByOtherMember(
-            String email,
-            OAuthProvider provider,
-            String providerId
-    ) {
-        memberRepository.findByEmail(email)
-                .ifPresent(existingMember -> {
-                    boolean sameOAuthMember = provider.equals(existingMember.getProvider())
-                            && providerId.equals(existingMember.getProviderId());
-
-                    if (!sameOAuthMember) {
-                        throw oauthException(
-                                "email_already_exists",
-                                "이미 다른 계정으로 가입된 이메일입니다."
-                        );
-                    }
-                });
+    private void validateEmailNotUsedByOtherAccount(String email) {
+        if (memberRepository.existsByEmail(email)) {
+            throw oauthException(
+                    "email_already_used_by_other_account",
+                    "이미 다른 계정으로 가입된 이메일입니다."
+            );
+        }
     }
 
     private String resolveNicknameForUpdate(Member member, String rawNickname) {

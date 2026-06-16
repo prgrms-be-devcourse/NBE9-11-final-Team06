@@ -11,6 +11,11 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다."),
 
     INVALID_LOGIN(HttpStatus.UNAUTHORIZED, "INVALID_LOGIN", "이메일 또는 비밀번호가 올바르지 않습니다."),
+    OAUTH_MEMBER_CANNOT_LOGIN_WITH_PASSWORD(
+            HttpStatus.BAD_REQUEST,
+            "OAUTH_MEMBER_CANNOT_LOGIN_WITH_PASSWORD",
+            "소셜 로그인으로 가입한 회원은 비밀번호 로그인을 사용할 수 없습니다."
+    ),
 
     DUPLICATE_PREFERENCE(HttpStatus.CONFLICT, "DUPLICATE_PREFERENCE", "이미 등록된 선호 정보가 있습니다."),
     PREFERENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "PREFERENCE_NOT_FOUND", "등록된 선호 정보가 없습니다."),
