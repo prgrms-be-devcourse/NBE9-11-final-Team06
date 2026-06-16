@@ -1,14 +1,16 @@
 package come.back.gotoday.recommend.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
 public record RecommendationCourseCreateRequest(
+        @Size(max = 50, message = "코스 제목은 50자 이하여야 합니다.")
         String title,
 
         @NotNull(message = "시작일은 필수입니다.")

@@ -6,6 +6,8 @@ import come.back.gotoday.crowd.entity.CrowdStatus;
 import come.back.gotoday.crowd.repository.CrowdStatusRepository;
 import come.back.gotoday.external.seoul.SeoulCrowdClient;
 import come.back.gotoday.external.seoul.SeoulCrowdResponse;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -162,7 +164,7 @@ public class CrowdService {
     private SeoulCrowdResponse.CityData getCityData(SeoulCrowdResponse response, String areaName) {
         if (response == null || response.CITYDATA() == null) {
             log.warn("서울시 혼잡도 API 응답에 CITYDATA가 없습니다. areaName={}", areaName);
-            throw new IllegalArgumentException("해당 지역의 혼잡도 정보를 조회할 수 없습니다: " + areaName);
+            throw new BusinessException(ErrorCode.CROWD_AREA_NOT_FOUND);
         }
 
         return response.CITYDATA();
@@ -182,7 +184,7 @@ public class CrowdService {
     ) {
         if (populationStatuses == null || populationStatuses.isEmpty()) {
             log.warn("서울시 실시간 인구현황 데이터가 없습니다.");
-            throw new IllegalStateException("서울시 실시간 인구현황 데이터가 없습니다.");
+            throw new BusinessException(ErrorCode.CROWD_DATA_NOT_FOUND);
         }
 
         return populationStatuses.get(0);
