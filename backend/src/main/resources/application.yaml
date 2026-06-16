@@ -3,7 +3,7 @@ spring:
     name: go-today
 
   profiles:
-    active: dev
+    active: local
 
   config:
     import: optional:classpath:application-secret.yml
