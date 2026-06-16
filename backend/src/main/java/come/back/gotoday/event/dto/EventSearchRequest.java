@@ -12,8 +12,7 @@ public record EventSearchRequest(
 ) {
     public EventSearchRequest {
         if (page == null || page < 0) page = 0;
-        if (size == null || size <= 0) size = 10;
-        if (size > 10) {
+        if (size == null || size <= 0 || size > 10) {
             size = 10;
         }
     }
