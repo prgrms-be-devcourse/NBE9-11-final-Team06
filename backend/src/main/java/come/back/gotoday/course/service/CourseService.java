@@ -193,12 +193,17 @@ public class CourseService {
                             Long placeId = null;
                             String placeName = "알 수 없는 장소";
 
-                            if (cp.getPlace() != null) {
+                            // 💡 [수정] 이름 매핑 우선순위 필터링 개조
+                            if (cp.getEvent() != null) {
+                                // 1. 코스 장소에 '행사(Event)'가 꽂혀있는 경우 -> 행사 정보가 최우선!
+                                placeName = cp.getEvent().getTitle(); // 🎯 행사명을 바로 대입!
+                                if (cp.getEvent().getPlace() != null) {
+                                    placeId = cp.getEvent().getPlace().getId();
+                                }
+                            } else if (cp.getPlace() != null) {
+                                // 2. 카카오 API로 받아온 식당/카페처럼 일반 장소('Place')만 꽂혀있는 경우
                                 placeId = cp.getPlace().getId();
                                 placeName = cp.getPlace().getName();
-                            } else if (cp.getEvent() != null && cp.getEvent().getPlace() != null) {
-                                placeId = cp.getEvent().getPlace().getId();
-                                placeName = cp.getEvent().getPlace().getName();
                             }
 
                             return new CoursePlaceResponse(
