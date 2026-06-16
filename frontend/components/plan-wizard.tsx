@@ -24,6 +24,7 @@ import {
 } from "@/lib/data"
 import { SiteHeader } from "@/components/site-header"
 import { NaverLocationPicker } from "@/components/naver-location-picker"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
 const STEPS = ["날짜", "위치", "동행", "취향"]
 const PREFERENCE_CATEGORIES = CATEGORIES.filter(
@@ -47,6 +48,8 @@ export function PlanWizard() {
   const [locationKeyword, setLocationKeyword] = useState("")
   const [companion, setCompanion] = useState<Companion | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const canNext =
     (step === 0 && !!date) ||
@@ -60,25 +63,194 @@ export function PlanWizard() {
     )
   }
 
-  function submit() {
+  function formatDate(value: Date) {
+    const year = value.getFullYear()
+    const month = String(value.getMonth() + 1).padStart(2, "0")
+    const day = String(value.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  function normalizeAccessToken(value: string | null | undefined) {
+    if (!value) return null
+
+    const token = value.trim().replace(/^Bearer\s+/i, "")
+
+    if (!token || token === "undefined" || token === "null") {
+      return null
+    }
+
+    return token
+  }
+
+  function getAccessToken() {
+    if (typeof window === "undefined") return null
+
+    const storages = [localStorage, sessionStorage]
+    const tokenKeys = ["accessToken", "access_token", "token", "jwt"]
+
+    for (const storage of storages) {
+      for (const tokenKey of tokenKeys) {
+        const token = normalizeAccessToken(storage.getItem(tokenKey))
+        if (token) return token
+      }
+    }
+
+    for (const storage of storages) {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i)
+        if (!key) continue
+
+        const value = storage.getItem(key)
+        if (!value) continue
+
+        const rawToken = normalizeAccessToken(value)
+        if (rawToken?.startsWith("eyJ")) {
+          return rawToken
+        }
+
+        try {
+          const parsed = JSON.parse(value)
+          const token = findAccessToken(parsed)
+          if (token) return token
+        } catch {
+          // JSON이 아닌 값은 건너뜁니다.
+        }
+      }
+    }
+
+    return null
+  }
+
+  function findAccessToken(value: any): string | null {
+    if (!value) return null
+
+    if (typeof value === "string") {
+      const token = normalizeAccessToken(value)
+      return token?.startsWith("eyJ") ? token : null
+    }
+
+    if (typeof value !== "object") return null
+
+    const directToken =
+      normalizeAccessToken(value.accessToken) ??
+      normalizeAccessToken(value.access_token) ??
+      normalizeAccessToken(value.token) ??
+      normalizeAccessToken(value.jwt)
+
+    if (directToken) {
+      return directToken
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const token = findAccessToken(nestedValue)
+      if (token) return token
+    }
+
+    return null
+  }
+
+  function extractRecommendedCourse(result: any) {
+    return (
+      result?.data ??
+      result?.result ??
+      result?.body ??
+      result?.content ??
+      result?.response ??
+      result
+    )
+  }
+
+  function extractCourseId(value: any): number | string | null {
+    if (!value || typeof value !== "object") return null
+
+    if (value.courseId !== undefined && value.courseId !== null) return value.courseId
+    if (value.course_id !== undefined && value.course_id !== null) return value.course_id
+    if (value.id !== undefined && value.id !== null) return value.id
+
+    for (const key of ["data", "result", "body", "content", "response", "course"]) {
+      const nestedCourseId = extractCourseId(value[key])
+      if (nestedCourseId !== null) return nestedCourseId
+    }
+
+    return null
+  }
+
+  async function submit() {
+    if (!date || !selectedLocation) return
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
     const params = new URLSearchParams()
-    if (date) {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, "0")
-      const day = String(date.getDate()).padStart(2, "0")
-      params.set("date", `${year}-${month}-${day}`)
-    }
-    if (selectedLocation) {
-      params.set("area", area ?? selectedLocation.name)
-      params.set("locationName", selectedLocation.name)
-      params.set("locationSource", selectedLocation.source)
-      if (selectedLocation.address) params.set("locationAddress", selectedLocation.address)
-      if (selectedLocation.latitude !== undefined) params.set("lat", String(selectedLocation.latitude))
-      if (selectedLocation.longitude !== undefined) params.set("lng", String(selectedLocation.longitude))
-    }
+    const selectedDate = formatDate(date)
+
+    params.set("date", selectedDate)
+    params.set("area", area ?? selectedLocation.name)
+    params.set("locationName", selectedLocation.name)
+    params.set("locationSource", selectedLocation.source)
+
+    if (selectedLocation.address) params.set("locationAddress", selectedLocation.address)
+    if (selectedLocation.latitude !== undefined) params.set("lat", String(selectedLocation.latitude))
+    if (selectedLocation.longitude !== undefined) params.set("lng", String(selectedLocation.longitude))
     if (companion) params.set("companion", companion)
     if (categories.length) params.set("cats", categories.join(","))
-    router.push(`/recommend?${params.toString()}`)
+
+    try {
+      const accessToken = getAccessToken()
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      }
+
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/recommendations/courses`, {
+        method: "POST",
+        redirect: "manual",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({
+          title: `${area ?? selectedLocation.name} 추천 코스`,
+          startDate: selectedDate,
+          endDate: selectedDate,
+          topK: 3,
+        }),
+      })
+
+      const result = await response.json().catch(() => null)
+
+      if (response.status === 0 || response.status === 302 || response.type === "opaqueredirect") {
+        throw new Error("로그인 인증이 만료되었거나 토큰이 전달되지 않았습니다. 다시 로그인해주세요.")
+      }
+
+      if (!response.ok) {
+        throw new Error(result?.message ?? result?.error ?? "코스 추천 생성에 실패했습니다.")
+      }
+
+      const recommendedCourse = extractRecommendedCourse(result)
+      const courseId = extractCourseId(result) ?? extractCourseId(recommendedCourse)
+
+      console.log("추천 코스 생성 응답:", result)
+      console.log("추출된 추천 코스:", recommendedCourse)
+      console.log("추출된 courseId:", courseId)
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("recommendedCourse", JSON.stringify(recommendedCourse))
+      }
+
+      if (!courseId) {
+        throw new Error("추천 코스는 생성됐지만 courseId를 찾지 못했습니다.")
+      }
+
+      params.set("courseId", String(courseId))
+
+      router.push(`/recommend?${params.toString()}`)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "코스 추천 생성에 실패했습니다.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -281,6 +453,11 @@ export function PlanWizard() {
             </div>
           )}
 
+          {submitError && (
+            <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-medium text-destructive">
+              {submitError}
+            </div>
+          )}
           <div className="mt-8 flex items-center justify-between">
             <Button
               variant="ghost"
@@ -301,9 +478,9 @@ export function PlanWizard() {
                 <ArrowRight className="size-4" />
               </Button>
             ) : (
-              <Button onClick={submit} className="gap-1">
+              <Button onClick={submit} disabled={isSubmitting || !canNext} className="gap-1">
                 <Sparkles className="size-4" />
-                코스 추천받기
+                {isSubmitting ? "추천 코스 생성 중..." : "코스 추천받기"}
               </Button>
             )}
           </div>

@@ -159,4 +159,9 @@ public class Event {
         }
         this.embeddingVectorBytes = buffer.array();
     }
+
+    public void updatePlace(Place place) {
+        this.place = place;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

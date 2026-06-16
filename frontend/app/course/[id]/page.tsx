@@ -1,209 +1,406 @@
-import Image from "next/image"
-import { notFound } from "next/navigation"
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
 import {
-  Clock,
+  ArrowLeft,
+  CalendarDays,
   MapPin,
   Route,
   Sparkles,
-  Footprints,
-  Star,
+  Users,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { CourseMap } from "@/components/course-map"
-import { CourseActions } from "@/components/course-actions"
-import { CrowdBadge } from "@/components/crowd-badge"
-import { SAMPLE_COURSE, SAVED_COURSES } from "@/lib/data"
 
-export default async function CourseDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const course =
-    [SAMPLE_COURSE, ...SAVED_COURSES].find((c) => c.id === id) ?? SAMPLE_COURSE
-  if (!course) notFound()
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
+
+type CoursePlace = {
+  id?: number
+  placeId?: number
+  eventId?: number
+  title?: string
+  name?: string
+  placeName?: string
+  eventTitle?: string
+  category?: string
+  categoryName?: string
+  area?: string
+  address?: string
+  latitude?: number | string
+  longitude?: number | string
+  visitOrder?: number
+  sequence?: number
+  order?: number
+  memo?: string
+  recommendationReason?: string
+  reason?: string
+}
+
+type CourseDetail = {
+  id?: number
+  courseId?: number
+  title?: string
+  description?: string
+  courseType?: string
+  startDate?: string
+  endDate?: string
+  baseArea?: string
+  companionType?: string
+  recommendationReason?: string
+  reason?: string
+  places?: CoursePlace[]
+  coursePlaces?: CoursePlace[]
+}
+
+function normalizeAccessToken(value: string | null | undefined) {
+  if (!value) return null
+
+  const token = value.trim().replace(/^Bearer\s+/i, "")
+
+  if (!token || token === "undefined" || token === "null") {
+    return null
+  }
+
+  return token
+}
+
+function findAccessToken(value: any): string | null {
+  if (!value) return null
+
+  if (typeof value === "string") {
+    const token = normalizeAccessToken(value)
+    return token?.startsWith("eyJ") ? token : null
+  }
+
+  if (typeof value !== "object") return null
+
+  const directToken =
+    normalizeAccessToken(value.accessToken) ??
+    normalizeAccessToken(value.access_token) ??
+    normalizeAccessToken(value.token) ??
+    normalizeAccessToken(value.jwt)
+
+  if (directToken) return directToken
+
+  for (const nestedValue of Object.values(value)) {
+    const token = findAccessToken(nestedValue)
+    if (token) return token
+  }
+
+  return null
+}
+
+function getAccessToken() {
+  if (typeof window === "undefined") return null
+
+  const storages = [localStorage, sessionStorage]
+  const tokenKeys = ["accessToken", "access_token", "token", "jwt"]
+
+  for (const storage of storages) {
+    for (const tokenKey of tokenKeys) {
+      const token = normalizeAccessToken(storage.getItem(tokenKey))
+      if (token) return token
+    }
+  }
+
+  for (const storage of storages) {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i)
+      if (!key) continue
+
+      const value = storage.getItem(key)
+      if (!value) continue
+
+      const rawToken = normalizeAccessToken(value)
+      if (rawToken?.startsWith("eyJ")) return rawToken
+
+      try {
+        const parsed = JSON.parse(value)
+        const token = findAccessToken(parsed)
+        if (token) return token
+      } catch {
+        // JSON이 아닌 값은 건너뜁니다.
+      }
+    }
+  }
+
+  return null
+}
+
+function extractCourse(result: any) {
+  return (
+    result?.data ??
+    result?.result ??
+    result?.body ??
+    result?.content ??
+    result?.response ??
+    result
+  ) as CourseDetail | null
+}
+
+function getSavedRecommendedCourse(courseId?: string) {
+  if (typeof window === "undefined") return null
+
+  const saved = sessionStorage.getItem("recommendedCourse")
+  if (!saved) return null
+
+  try {
+    const parsed = JSON.parse(saved) as CourseDetail
+    const savedCourseId = parsed.id ?? parsed.courseId
+
+    if (!courseId || String(savedCourseId) === courseId) {
+      return parsed
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+function formatDate(dateStr?: string) {
+  return dateStr
+    ? new Date(dateStr).toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "short",
+      })
+    : "날짜 미정"
+}
+
+function getCoursePlaces(course: CourseDetail | null) {
+  return course?.places ?? course?.coursePlaces ?? []
+}
+
+function getPlaceTitle(place: CoursePlace) {
+  return place.title ?? place.placeName ?? place.eventTitle ?? place.name ?? "추천 장소"
+}
+
+function getPlaceCategory(place: CoursePlace) {
+  return place.categoryName ?? place.category ?? "추천"
+}
+
+function getPlaceReason(place: CoursePlace) {
+  return place.recommendationReason ?? place.reason ?? place.memo ?? "사용자 선호 정보와 행사 유사도를 기반으로 추천되었습니다."
+}
+
+function getVisitOrder(place: CoursePlace, index: number) {
+  return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
+}
+
+export default function CourseDetailPage() {
+  const params = useParams<{ id: string }>()
+  const courseId = params.id
+  const [course, setCourse] = useState<CourseDetail | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const savedCourse = getSavedRecommendedCourse(courseId)
+    if (savedCourse) {
+      setCourse(savedCourse)
+    }
+
+    async function fetchCourse() {
+      setIsLoading(true)
+      setErrorMessage(null)
+
+      try {
+        const accessToken = getAccessToken()
+        const headers: HeadersInit = {}
+
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
+          method: "GET",
+          credentials: "include",
+          headers,
+        })
+
+        const result = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          if (!savedCourse) {
+            setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+          }
+          return
+        }
+
+        const fetchedCourse = extractCourse(result)
+        setCourse(fetchedCourse)
+      } catch {
+        if (!savedCourse) {
+          setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (courseId) {
+      fetchCourse()
+    }
+  }, [courseId])
+
+  const coursePlaces = getCoursePlaces(course)
+  const title = course?.title ?? "코스 상세"
+  const description = course?.description ?? "추천 알고리즘으로 생성된 코스입니다."
+  const startDate = formatDate(course?.startDate)
+  const endDate = formatDate(course?.endDate)
+  const baseArea = course?.baseArea ?? "지역 미정"
+  const companion = course?.companionType ?? "동행 미정"
+  const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
 
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="flex-1">
-        {/* hero */}
-        <div className="relative h-56 w-full overflow-hidden sm:h-72">
-          <Image
-            src={course.cover || "/placeholder.svg"}
-            alt={course.title}
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-4 pb-6 sm:px-6">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="bg-background/90 text-foreground hover:bg-background">
-                {course.area}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <Button asChild variant="ghost" size="sm" className="mb-6 gap-2">
+          <Link href="/recommend">
+            <ArrowLeft className="size-4" />
+            추천 결과로 돌아가기
+          </Link>
+        </Button>
+
+        {isLoading && !course && (
+          <Card className="p-6 text-sm text-muted-foreground">
+            코스 상세 정보를 불러오는 중입니다.
+          </Card>
+        )}
+
+        {errorMessage && !course && (
+          <Card className="border-destructive/30 bg-destructive/5 p-6">
+            <p className="font-semibold text-destructive">{errorMessage}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              courseId={courseId} 조회에 실패했습니다. 백엔드 서버 실행 상태와 API 주소를 확인해주세요.
+            </p>
+          </Card>
+        )}
+
+        {course && (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                <CalendarDays className="size-3.5" />
+                {course?.startDate && course?.endDate ? `${startDate} ~ ${endDate}` : startDate}
               </Badge>
-              <Badge className="bg-background/90 text-foreground hover:bg-background">
-                {course.companion}
+              <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                <MapPin className="size-3.5" />
+                {baseArea}
+              </Badge>
+              <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                <Users className="size-3.5" />
+                {companion}
+              </Badge>
+              <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                <Route className="size-3.5" />
+                {coursePlaces.length}개 장소
               </Badge>
             </div>
-            <h1 className="mt-2 text-balance text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              {course.title}
+
+            <h1 className="mt-6 text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
+              {title}
             </h1>
-          </div>
-        </div>
-
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_380px]">
-          {/* left: itinerary */}
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap gap-4 text-sm">
-                <span className="flex items-center gap-1.5">
-                  <Route className="size-4 text-primary" />
-                  {course.stops.length}개 장소
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Clock className="size-4 text-primary" />
-                  {course.totalDuration}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Footprints className="size-4 text-primary" />
-                  총 {course.totalDistance}
-                </span>
-              </div>
-              <CourseActions title={course.title} />
-            </div>
-
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              {course.description}
+            <p className="mt-3 max-w-3xl leading-relaxed text-muted-foreground">
+              {description}
             </p>
 
-            {/* overall reasons */}
-            <Card className="mt-6 gap-3 bg-secondary/40 p-5">
-              <p className="flex items-center gap-1.5 font-semibold">
+            <Card className="mt-6 p-6">
+              <p className="mb-2 flex items-center gap-1.5 font-semibold">
                 <Sparkles className="size-4 text-accent" />
-                코스 전체 추천 이유
+                이 코스를 추천하는 이유
               </p>
-              <ul className="space-y-2">
-                {course.summaryReasons.map((r) => (
-                  <li
-                    key={r}
-                    className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
-                  >
-                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                    {r}
-                  </li>
-                ))}
-              </ul>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {recommendationReason}
+              </p>
             </Card>
 
-            {/* timeline */}
-            <h2 className="mt-8 text-xl font-bold tracking-tight">방문 순서</h2>
-            <ol className="mt-4">
-              {course.stops.map((stop, i) => (
-                <li key={stop.place.id} className="relative flex gap-4">
-                  {/* line + number */}
-                  <div className="flex flex-col items-center">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                      {stop.order}
-                    </span>
-                    {i < course.stops.length - 1 && (
-                      <span className="my-1 w-0.5 flex-1 bg-border" />
-                    )}
-                  </div>
+            <section className="mt-10">
+              <h2 className="text-2xl font-bold tracking-tight">방문 순서</h2>
+              <p className="mt-1 text-muted-foreground">
+                실제 생성된 코스의 CoursePlace 목록입니다.
+              </p>
 
-                  {/* content */}
-                  <div className="flex-1 pb-8">
-                    <Card className="overflow-hidden p-0 sm:flex-row">
-                      <div className="relative h-40 sm:h-auto sm:w-40 sm:shrink-0">
-                        <Image
-                          src={stop.place.image || "/placeholder.svg"}
-                          alt={stop.place.name}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 100vw, 160px"
-                        />
-                      </div>
-                      <div className="flex flex-1 flex-col gap-2 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="text-xs font-semibold text-primary">
-                              {stop.arrive} 도착 · {stop.place.category}
-                            </span>
-                            <h3 className="text-lg font-bold leading-tight">
-                              {stop.place.name}
-                            </h3>
+              {coursePlaces.length > 0 ? (
+                <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
+                  <div className="space-y-4">
+                    {coursePlaces
+                      .slice()
+                      .sort((a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0))
+                      .map((place, index) => (
+                        <Card key={`${place.placeId ?? place.eventId ?? index}`} className="p-5">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <Badge>{getVisitOrder(place, index)}번째</Badge>
+                              <h3 className="mt-3 text-xl font-bold leading-tight">
+                                {getPlaceTitle(place)}
+                              </h3>
+                            </div>
+                            <Badge variant="secondary">{getPlaceCategory(place)}</Badge>
                           </div>
-                          <CrowdBadge level={stop.place.crowd} />
-                        </div>
-                        <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="size-3.5" />
-                          {stop.place.address}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1 font-semibold text-amber-600">
-                            <Star className="size-3 fill-current" />
-                            {stop.place.rating}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="size-3" />
-                            {stop.place.duration}분 소요
-                          </span>
-                          <span className="font-medium text-foreground">
-                            {stop.place.priceLabel}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex flex-col gap-1">
-                          {stop.reasons.map((r) => (
-                            <span
-                              key={r}
-                              className="flex items-start gap-1.5 text-sm text-muted-foreground"
-                            >
-                              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" />
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </Card>
 
-                    {stop.travelToNext && (
-                      <div className="mt-3 flex items-center gap-2 pl-1 text-xs text-muted-foreground">
-                        <Footprints className="size-3.5" />
-                        {stop.travelToNext.mode} {stop.travelToNext.minutes}분 ·{" "}
-                        {stop.travelToNext.distance}
-                      </div>
-                    )}
+                          <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                            {place.area && (
+                              <p className="flex items-center gap-1.5">
+                                <MapPin className="size-3.5" />
+                                {place.area}
+                              </p>
+                            )}
+                            {place.address && (
+                              <p className="flex items-center gap-1.5">
+                                <MapPin className="size-3.5" />
+                                {place.address}
+                              </p>
+                            )}
+                            {place.latitude && place.longitude && (
+                              <p className="flex items-center gap-1.5">
+                                <MapPin className="size-3.5" />
+                                위도 {place.latitude}, 경도 {place.longitude}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="mt-4 rounded-2xl bg-secondary/50 p-4">
+                            <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+                              <Sparkles className="size-4 text-accent" />
+                              추천 이유
+                            </p>
+                            <p className="text-sm leading-relaxed text-muted-foreground">
+                              {getPlaceReason(place)}
+                            </p>
+                          </div>
+                        </Card>
+                      ))}
                   </div>
-                </li>
-              ))}
-            </ol>
-          </div>
 
-          {/* right: sticky map */}
-          <aside className="lg:sticky lg:top-20 lg:self-start">
-            <Card className="gap-3 p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-1.5 font-bold">
-                  <MapPin className="size-4 text-primary" />
-                  코스 경로
-                </h2>
-                <span className="text-xs text-muted-foreground">
-                  마커를 눌러보세요
-                </span>
-              </div>
-              <CourseMap stops={course.stops} />
-              <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-4 py-3 text-sm">
-                <span className="text-muted-foreground">총 이동 거리</span>
-                <span className="font-bold">{course.totalDistance}</span>
-              </div>
-            </Card>
-          </aside>
-        </div>
+                  <Card className="h-fit p-5">
+                    <p className="mb-3 flex items-center gap-1.5 font-semibold">
+                      <MapPin className="size-4 text-primary" />
+                      지도 보기
+                    </p>
+                    <div className="flex aspect-square items-center justify-center rounded-2xl bg-secondary/60 text-center text-sm text-muted-foreground">
+                      지도 영역입니다.
+                      <br />
+                      추후 Naver Map 마커 연동 가능
+                    </div>
+                  </Card>
+                </div>
+              ) : (
+                <Card className="mt-5 p-6 text-center text-muted-foreground">
+                  아직 표시할 코스 장소가 없습니다.
+                </Card>
+              )}
+            </section>
+          </>
+        )}
       </main>
       <SiteFooter />
     </div>
