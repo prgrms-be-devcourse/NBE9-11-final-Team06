@@ -5,6 +5,8 @@ import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
@@ -65,22 +67,39 @@ public class RecommendationService {
     @Transactional
     public RecommendationCourseResponse createRecommendedCourse(Long memberId, RecommendationCourseCreateRequest request) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
-        var preference = userPreferenceRepository.findByMemberId(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("선호 정보를 먼저 등록해야 합니다."));
+        var preferenceOptional = userPreferenceRepository.findByMemberId(memberId);
 
-        List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
-        String categoryJoined = String.join(", ", preferredCategories);
-        String companionType = preference.getCompanionType() != null ? preference.getCompanionType().toString() : null;
+        List<String> savedCategories = preferenceOptional
+                .map(preference -> userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId()))
+                .orElseGet(Collections::emptyList);
+
+        String selectedArea = hasText(request.area())
+                ? request.area()
+                : preferenceOptional.map(preference -> preference.getPreferredArea()).orElse(null);
+
+        List<String> selectedCategories = request.categories() != null && !request.categories().isEmpty()
+                ? request.categories()
+                : savedCategories;
+
+        String selectedCompanionType = hasText(request.companionType())
+                ? request.companionType()
+                : preferenceOptional
+                        .map(preference -> preference.getCompanionType() != null
+                                ? preference.getCompanionType().toString()
+                                : null)
+                        .orElse(null);
+
         String queryText = createQueryText(
-                preference.getPreferredArea(),
-                categoryJoined,
-                companionType
+                selectedArea,
+                String.join(", ", selectedCategories),
+                selectedCompanionType
         );
 
         List<Long> recommendedEventIds = getRecommendedEventIds(
-                memberId,
+                selectedArea,
+                selectedCategories,
                 queryText,
                 request.startDate(),
                 request.endDate(),
@@ -88,7 +107,7 @@ public class RecommendationService {
         );
 
         if (recommendedEventIds.isEmpty()) {
-            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
+            throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
         }
 
         Map<Long, Event> eventMap = eventRepository.findAllById(recommendedEventIds).stream()
@@ -106,11 +125,11 @@ public class RecommendationService {
                 "RECOMMENDATION",
                 request.startDate(),
                 request.endDate(),
-                preference.getPreferredArea(),
-                companionType,
+                selectedArea,
+                selectedCompanionType,
                 null,
                 null,
-                "사용자 선호 정보와 행사 유사도를 기반으로 추천되었습니다."
+                "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
         );
 
         List<RecommendedCoursePlaceResponse> places = new ArrayList<>();
@@ -118,7 +137,7 @@ public class RecommendationService {
 
         for (Event event : recommendedEvents) {
             Place place = getOrCreatePlaceFromEvent(event);
-            String reason = createRecommendationReason(event, preference.getPreferredArea(), preferredCategories);
+            String reason = createRecommendationReason(event, selectedArea, selectedCategories);
 
             CoursePlace coursePlace = CoursePlace.create(
                     course,
@@ -201,31 +220,44 @@ public class RecommendationService {
                 && preferredCategories.contains(event.getCategory().getName());
 
         if (areaMatched && categoryMatched) {
-            return "선호 지역과 선호 카테고리에 모두 부합하는 행사입니다.";
+            return "선택한 지역과 카테고리에 모두 부합하는 행사입니다.";
         }
 
         if (areaMatched) {
-            return "선호 지역에 맞는 행사입니다.";
+            return "선택한 지역에 맞는 행사입니다.";
         }
 
         if (categoryMatched) {
-            return "선호 카테고리에 맞는 행사입니다.";
+            return "선택한 카테고리에 맞는 행사입니다.";
         }
 
-        return "사용자 선호 정보와 행사 유사도를 기반으로 추천되었습니다.";
+        return "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다.";
     }
 
     @Transactional(readOnly = true)
     public List<Long> getRecommendedEventIds(Long memberId, String queryText, LocalDate searchStart, LocalDate searchEnd, int topK) {
-        var preferenceOpt = userPreferenceRepository.findByMemberId(memberId);
-        if (preferenceOpt.isEmpty()) {
-            return Collections.emptyList();
-        }
-        var preference = preferenceOpt.get();
+        var preference = userPreferenceRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND));
 
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
-        String targetArea = preference.getPreferredArea();
+        return getRecommendedEventIds(
+                preference.getPreferredArea(),
+                preferredCategories,
+                queryText,
+                searchStart,
+                searchEnd,
+                topK
+        );
+    }
 
+    private List<Long> getRecommendedEventIds(
+            String targetArea,
+            List<String> preferredCategories,
+            String queryText,
+            LocalDate searchStart,
+            LocalDate searchEnd,
+            int topK
+    ) {
         List<Event> candidateEvents = eventRepository.findRecommendedEventsWithCategory(
                 targetArea, searchStart, searchEnd, preferredCategories);
 
@@ -244,7 +276,7 @@ public class RecommendationService {
             candidateEvents = eventRepository.findAllEventsByDate(searchStart, searchEnd);
         }
 
-        log.info("검색 지역: {}, 기간: {} ~ {}", preference.getPreferredArea(), searchStart, searchEnd);
+        log.info("검색 지역: {}, 기간: {} ~ {}", targetArea, searchStart, searchEnd);
         log.info("필터링된 결과 개수: {}", candidateEvents.size());
 
         if (candidateEvents.isEmpty()) {
@@ -320,6 +352,10 @@ public class RecommendationService {
                 .limit(topK)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     public String createQueryText(String baseArea, String categories, String companionType) {

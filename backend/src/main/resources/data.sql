@@ -224,4 +224,11 @@ INSERT INTO `event` (
       (235, NULL, 13, '[동작문화재단] 2026 까망돌어울마당 아트홀 공연실황 스크린 ON-AIR 5회차 [춘향탈옥] 2부', '2026-06-11', '2026-06-26', '19:00', '무료', '제한 없음', 'https://www.idfac.or.kr/bbs/board.php?bo_table=gallery_info&wr_id=272', 'https://culture.seoul.go.kr/cmmn/file/getImage.do?atchFileId=0a6230768fb641c280971b270a6b78ae', '까망돌어울마당 아트홀 스크린 상영회', 'SEOUL_API', 'EV_235', NOW(), NOW(), '동작구', 37.50742100, 126.95874100, NULL), -- 까망돌도서관/아트홀 기준
       (236, NULL, 16, '더멘즈콰이어남성합창단 제18회 정기연주회', '2026-06-11', '2026-06-26', '19:30 ~ 21:00', 'R석 150,000원 등', '성인, 청소년, 어린이', 'https://www.lotteconcerthall.com/product/ko/performance/261106', 'https://culture.seoul.go.kr/cmmn/file/getImage.do?atchFileId=67ce3d9bf2df4508923d4da9525474d9', '더멘즈콰이어 남성합창단 연주회', 'SEOUL_API', 'EV_236', NOW(), NOW(), '송파구', 37.51375200, 127.10444500, NULL); -- 롯데콘서트홀 기준
 
-ALTER TABLE member ALTER COLUMN id RESTART WITH 100;
+
+
+ALTER TABLE `category` ALTER COLUMN `id` RESTART WITH 100;
+ALTER TABLE `member` ALTER COLUMN `id` RESTART WITH 100;
+ALTER TABLE `user_preference` ALTER COLUMN `id` RESTART WITH 100;
+ALTER TABLE `user_preference_category` ALTER COLUMN `id` RESTART WITH 100;
+ALTER TABLE `place` ALTER COLUMN `id` RESTART WITH 1000;
+ALTER TABLE `event` ALTER COLUMN `id` RESTART WITH 1000;
