@@ -8,12 +8,14 @@ import come.back.gotoday.auth.service.AuthService;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -73,15 +75,42 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletRequest request
     ) {
-        log.info("로그아웃 요청: memberId={}", userDetails.getMemberId());
-        authService.logout(userDetails.getMemberId());
-        log.info("로그아웃 응답 완료: memberId={}", userDetails.getMemberId());
+        Long memberId = userDetails.getMemberId();
+
+        log.info("로그아웃 요청: memberId={}", memberId);
+
+        authService.logout(memberId);
+        invalidateSession(request);
+        SecurityContextHolder.clearContext();
+
+        log.info("로그아웃 응답 완료: memberId={}", memberId);
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, tokenCookieProvider.deleteAccessTokenCookie().toString())
-                .header(HttpHeaders.SET_COOKIE, tokenCookieProvider.deleteRefreshTokenCookie().toString())
+                .headers(headers -> {
+                    headers.add(
+                            HttpHeaders.SET_COOKIE,
+                            tokenCookieProvider.deleteAccessTokenCookie().toString()
+                    );
+                    headers.add(
+                            HttpHeaders.SET_COOKIE,
+                            tokenCookieProvider.deleteRefreshTokenCookie().toString()
+                    );
+                    headers.add(
+                            HttpHeaders.SET_COOKIE,
+                            tokenCookieProvider.deleteSessionCookie().toString()
+                    );
+                })
                 .body(ApiResponse.success("로그아웃에 성공했습니다."));
+    }
+
+    private void invalidateSession(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+
+        if (session != null) {
+            session.invalidate();
+        }
     }
 }
