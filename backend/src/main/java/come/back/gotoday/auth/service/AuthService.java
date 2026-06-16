@@ -29,6 +29,7 @@ public class AuthService {
     @Transactional
     public TokenLoginResult login(LoginRequest request) {
         log.info("로그인 처리 시작: email={}", request.email());
+
         Member member = memberRepository.findByEmail(request.email())
                 .orElseThrow(() -> {
                     log.warn("로그인 실패: 존재하지 않는 이메일입니다. email={}", request.email());
@@ -36,12 +37,14 @@ public class AuthService {
                 });
 
         validateActiveMember(member);
+        validatePasswordLoginMember(member);
         validatePassword(request.password(), member.getPassword());
 
         String accessToken = jwtTokenProvider.createAccessToken(member);
         String refreshToken = jwtTokenProvider.createRefreshToken(member);
 
         saveOrUpdateRefreshToken(member, refreshToken);
+
         log.info("로그인 처리 완료: memberId={}", member.getId());
 
         return new TokenLoginResult(
@@ -54,6 +57,7 @@ public class AuthService {
     @Transactional
     public TokenReissueResult reissue(String refreshToken) {
         log.info("Access Token 재발급 처리 시작");
+
         if (refreshToken == null) {
             log.warn("Access Token 재발급 실패: Refresh Token이 없습니다.");
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
@@ -66,7 +70,10 @@ public class AuthService {
                 });
 
         if (savedRefreshToken.isExpired()) {
-            log.warn("Access Token 재발급 실패: 만료된 Refresh Token입니다. memberId={}", resolveMemberIdSafely(savedRefreshToken));
+            log.warn(
+                    "Access Token 재발급 실패: 만료된 Refresh Token입니다. memberId={}",
+                    resolveMemberIdSafely(savedRefreshToken)
+            );
             refreshTokenRepository.delete(savedRefreshToken);
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
@@ -75,7 +82,10 @@ public class AuthService {
             Claims claims = jwtTokenProvider.parseAndValidateToken(refreshToken);
 
             if (!jwtTokenProvider.isRefreshToken(claims)) {
-                log.warn("Access Token 재발급 실패: Refresh Token 타입이 아닙니다. memberId={}", resolveMemberIdSafely(savedRefreshToken));
+                log.warn(
+                        "Access Token 재발급 실패: Refresh Token 타입이 아닙니다. memberId={}",
+                        resolveMemberIdSafely(savedRefreshToken)
+                );
                 refreshTokenRepository.delete(savedRefreshToken);
                 throw new BusinessException(ErrorCode.INVALID_LOGIN);
             }
@@ -85,13 +95,18 @@ public class AuthService {
             validateActiveMember(member);
 
             String newAccessToken = jwtTokenProvider.createAccessToken(member);
+
             log.info("Access Token 재발급 처리 완료: memberId={}", member.getId());
 
             return new TokenReissueResult(newAccessToken);
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            log.warn("Access Token 재발급 실패: Refresh Token 검증 중 오류가 발생했습니다. memberId={}, message={}", resolveMemberIdSafely(savedRefreshToken), exception.getMessage());
+            log.warn(
+                    "Access Token 재발급 실패: Refresh Token 검증 중 오류가 발생했습니다. memberId={}, message={}",
+                    resolveMemberIdSafely(savedRefreshToken),
+                    exception.getMessage()
+            );
             refreshTokenRepository.delete(savedRefreshToken);
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
@@ -100,6 +115,7 @@ public class AuthService {
     @Transactional
     public void logout(Long memberId) {
         log.info("로그아웃 처리 시작: memberId={}", memberId);
+
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> {
                     log.warn("로그아웃 실패: 존재하지 않는 회원입니다. memberId={}", memberId);
@@ -109,11 +125,13 @@ public class AuthService {
         validateActiveMember(member);
 
         refreshTokenRepository.deleteByMemberId(memberId);
+
         log.info("로그아웃 처리 완료: memberId={}", memberId);
     }
 
     private void saveOrUpdateRefreshToken(Member member, String refreshToken) {
         log.info("Refresh Token 저장 또는 갱신 시작: memberId={}", member.getId());
+
         refreshTokenRepository.findByMemberId(member.getId())
                 .ifPresentOrElse(
                         savedToken -> {
@@ -141,6 +159,7 @@ public class AuthService {
             if (refreshToken == null || refreshToken.getMember() == null) {
                 return null;
             }
+
             return refreshToken.getMember().getId();
         } catch (RuntimeException exception) {
             log.warn("Refresh Token 회원 ID 조회 실패: message={}", exception.getMessage());
@@ -152,6 +171,17 @@ public class AuthService {
         if (member.isDeleted()) {
             log.warn("인증 실패: 탈퇴한 회원입니다. memberId={}", member.getId());
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
+        }
+    }
+
+    private void validatePasswordLoginMember(Member member) {
+        if (member.getProvider() != null) {
+            log.warn(
+                    "로그인 실패: OAuth 회원은 비밀번호 로그인을 사용할 수 없습니다. memberId={}, provider={}",
+                    member.getId(),
+                    member.getProvider()
+            );
+            throw new BusinessException(ErrorCode.OAUTH_MEMBER_CANNOT_LOGIN_WITH_PASSWORD);
         }
     }
 
