@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -196,6 +196,28 @@ function getVisitOrder(place: CoursePlace, index: number) {
 }
 
 export default function RecommendPage() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
+      <Suspense fallback={<RecommendPageFallback />}>
+        <RecommendContent />
+      </Suspense>
+      <SiteFooter />
+    </div>
+  )
+}
+
+function RecommendPageFallback() {
+  return (
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <Card className="p-6 text-sm text-muted-foreground">
+        추천 코스를 불러오는 중입니다.
+      </Card>
+    </main>
+  )
+}
+
+function RecommendContent() {
   const searchParams = useSearchParams()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoadingCourse, setIsLoadingCourse] = useState(false)
@@ -276,9 +298,7 @@ export default function RecommendPage() {
   const displayCourseId = course?.id ?? course?.courseId ?? courseId
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
             <CalendarDays className="size-3.5" />
@@ -451,8 +471,6 @@ export default function RecommendPage() {
             </Card>
           )}
         </section>
-      </main>
-      <SiteFooter />
-    </div>
+    </main>
   )
 }
