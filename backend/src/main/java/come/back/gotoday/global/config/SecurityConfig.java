@@ -1,6 +1,7 @@
 package come.back.gotoday.global.config;
 
 import come.back.gotoday.auth.oauth.CustomOAuth2UserService;
+import come.back.gotoday.auth.oauth.OAuth2LoginSuccessHandler;
 import come.back.gotoday.auth.oauth.OAuth2RedirectProperties;
 import come.back.gotoday.global.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsProperties corsProperties;
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final OAuth2RedirectProperties oAuth2RedirectProperties;
 
     @Bean
@@ -73,9 +75,7 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
-                        .successHandler((request, response, authentication) ->
-                                response.sendRedirect(oAuth2RedirectProperties.successUrl())
-                        )
+                        .successHandler(oAuth2LoginSuccessHandler)
                         .failureHandler((request, response, exception) ->
                                 response.sendRedirect(oAuth2RedirectProperties.failureUrl())
                         )
