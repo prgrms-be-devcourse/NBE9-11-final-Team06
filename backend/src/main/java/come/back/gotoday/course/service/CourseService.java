@@ -1,5 +1,7 @@
 package come.back.gotoday.course.service;
 
+import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.category.repository.CategoryRepository; // 💡 카테고리 레포 추가
 import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
@@ -12,12 +14,15 @@ import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
+import come.back.gotoday.place.entity.Place;
+import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -29,6 +34,8 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final MemberRepository memberRepository;
+    private final PlaceRepository placeRepository;
+    private final CategoryRepository categoryRepository; // 💡 주입 완료!
 
     private final RecommendationService recommendationService;
     private final EventRepository eventRepository;
@@ -39,9 +46,11 @@ public class CourseService {
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         log.info("코스 생성 처리 시작: memberId={}, title={}", memberId, request.title());
 
+        // 1. 회원 검증
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
 
+        // 2. AI 추천 엔진 호출 및 이벤트 조회
         String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(), request.companionType());
         List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
                 memberId, queryText, request.startDate(), request.endDate(), 3
@@ -52,15 +61,26 @@ public class CourseService {
             throw new IllegalArgumentException("추천된 행사가 없습니다.");
         }
 
-        double centerLat = events.stream().mapToDouble(Event::getLatitude).average().orElseThrow();
-        double centerLng = events.stream().mapToDouble(Event::getLongitude).average().orElseThrow();
+        // 3. 행사 중심 좌표 계산 (중간값)
+        double centerLat = events.stream()
+                .filter(e -> e.getLatitude() != null)
+                .mapToDouble(Event::getLatitude)
+                .average()
+                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
+        double centerLng = events.stream()
+                .filter(e -> e.getLongitude() != null)
+                .mapToDouble(Event::getLongitude)
+                .average()
+                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
 
+        // 4. 카카오 API 카페, 식당 추천 받기
         KakaoPlaceResponse cafeResponse = kakaoLocalService.searchCafe(centerLat, centerLng);
-        KakaoPlaceDocument cafe = cafeResponse.documents().stream().findFirst().orElse(null);
+        KakaoPlaceDocument cafeDoc = cafeResponse.documents().stream().findFirst().orElse(null);
 
         KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng);
-        KakaoPlaceDocument restaurant = restaurantResponse.documents().stream().findFirst().orElse(null);
+        KakaoPlaceDocument restaurantDoc = restaurantResponse.documents().stream().findFirst().orElse(null);
 
+        // 5. 코스 마스터 엔티티 생성
         Course course = Course.create(
                 member, request.title(), request.description(), request.courseType(),
                 request.startDate(), request.endDate(), request.baseArea(), request.companionType(),
@@ -73,41 +93,83 @@ public class CourseService {
 
         int order = 1;
 
-        // ① AI 추천 행사들 추가 (11개 파라미터 자리 완벽 일치)
+        // ① AI 추천 행사들을 코스 장소 리스트에 추가
         for (Event event : events) {
             CoursePlace coursePlace = CoursePlace.create(
                     course,
                     event.getPlace(),
                     event,
                     order++,
-                    null, null, null, null, null, null, // 💡 형이 쓰던 오리지널 null 6개 복구
-                    String.format("%s||[%s] 맞춤 추천 행사입니다.", event.getTitle(), userPreferenceText) // 맨 마지막 파라미터가 사유 자리!
+                    null, null, null, null, null, null,
+                    String.format("[%s] 맞춤 추천 행사입니다.", userPreferenceText)
             );
             course.addCoursePlace(coursePlace);
         }
 
-        // ② 주변 추천 식당 추가
-        if (restaurant != null) {
+        // ② 주변 추천 식당 추가 (Kakao -> Place 변환 및 저장 로직 적용)
+        if (restaurantDoc != null) {
+            Category restaurantCategory = categoryRepository.findByName("맛집")
+                    .orElseThrow(() -> new IllegalArgumentException("'맛집' 카테고리가 초기화되지 않았습니다."));
+
+            Place restaurantPlace = placeRepository.findByName(restaurantDoc.placeName())
+                    .orElseGet(() -> placeRepository.save(
+                            Place.builder()
+                                    .name(restaurantDoc.placeName())
+                                    .address(restaurantDoc.addressName())
+                                    .roadAddress(restaurantDoc.roadAddressName())
+                                    .phone(restaurantDoc.phone())
+                                    .latitude(BigDecimal.valueOf(Double.parseDouble(restaurantDoc.y())))
+                                    .longitude(BigDecimal.valueOf(Double.parseDouble(restaurantDoc.x())))
+                                    .category(restaurantCategory)
+                                    // 💡 DB 제약조건 통과를 위해 직접 현재 시간 주입!
+                                    .createdAt(java.time.LocalDateTime.now())
+                                    .updatedAt(java.time.LocalDateTime.now())
+                                    .isActive(true) // 💡 혹시 isActive도 Not Null 이라면 안전하게 미리 세팅!
+                                    .source("KAKAO")
+                                    .build()
+                    ));
+
             CoursePlace restaurantCoursePlace = CoursePlace.create(
                     course,
-                    null,
+                    restaurantPlace,
                     null,
                     order++,
                     null, null, null, null, null, null,
-                    String.format("%s||추천 행사 주변 맛집입니다. (%s 취향 반영)", restaurant.placeName(), userPreferenceText)
+                    String.format("추천 행사 주변 맛집입니다. (%s 취향 반영)", userPreferenceText)
             );
             course.addCoursePlace(restaurantCoursePlace);
         }
 
         // ③ 주변 추천 카페 추가
-        if (cafe != null) {
+        if (cafeDoc != null) {
+            Category cafeCategory = categoryRepository.findByName("카페")
+                    .orElseThrow(() -> new IllegalArgumentException("'카페' 카테고리가 초기화되지 않았습니다."));
+
+            Place cafePlace = placeRepository.findByName(cafeDoc.placeName())
+                    .orElseGet(() -> placeRepository.save(
+                            Place.builder()
+                                    .name(cafeDoc.placeName())
+                                    .address(cafeDoc.addressName())
+                                    .roadAddress(cafeDoc.roadAddressName())
+                                    .phone(cafeDoc.phone())
+                                    .latitude(BigDecimal.valueOf(Double.parseDouble(cafeDoc.y())))
+                                    .longitude(BigDecimal.valueOf(Double.parseDouble(cafeDoc.x())))
+                                    .category(cafeCategory)
+                                    // 💡 카페도 동일하게 시간 데이터 완비!
+                                    .createdAt(java.time.LocalDateTime.now())
+                                    .updatedAt(java.time.LocalDateTime.now())
+                                    .isActive(true)
+                                    .source("KAKAO")
+                                    .build()
+                    ));
+
             CoursePlace cafeCoursePlace = CoursePlace.create(
                     course,
-                    null,
+                    cafePlace,
                     null,
                     order++,
                     null, null, null, null, null, null,
-                    String.format("%s||코스의 마무리를 장식할 추천 카페입니다. (%s 취향 반영)", cafe.placeName(), userPreferenceText)
+                    String.format("코스의 마무리를 장식할 추천 카페입니다. (%s 취향 반영)", userPreferenceText)
             );
             course.addCoursePlace(cafeCoursePlace);
         }
@@ -130,30 +192,20 @@ public class CourseService {
                         .map(cp -> {
                             Long placeId = null;
                             String placeName = "알 수 없는 장소";
-                            String reason = "추천된 장소입니다.";
 
                             if (cp.getPlace() != null) {
                                 placeId = cp.getPlace().getId();
+                                placeName = cp.getPlace().getName();
                             } else if (cp.getEvent() != null && cp.getEvent().getPlace() != null) {
                                 placeId = cp.getEvent().getPlace().getId();
-                            }
-
-                            // 💡 11번째 파라미터인 getRecommendationReason()을 안전하게 파싱
-                            if (cp.getRecommendationReason() != null && cp.getRecommendationReason().contains("||")) {
-                                String[] split = cp.getRecommendationReason().split("\\|\\|");
-                                placeName = split[0];
-                                reason = split[1];
-                            } else if (cp.getEvent() != null) {
-                                placeName = cp.getEvent().getTitle();
-                            } else if (cp.getPlace() != null) {
-                                placeName = cp.getPlace().getName();
+                                placeName = cp.getEvent().getPlace().getName();
                             }
 
                             return new CoursePlaceResponse(
                                     placeId,
                                     placeName,
                                     cp.getVisitOrder(),
-                                    reason
+                                    cp.getRecommendationReason()
                             );
                         })
                         .toList();

@@ -17,5 +17,6 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     Optional<Place> findByIdAndIsActiveTrue(Long id);
 
-    Optional<Place> findByNameAndIsActiveTrue(String name);
+    Optional<Place> findByName(String name);
+
 }
