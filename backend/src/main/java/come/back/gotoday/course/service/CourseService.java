@@ -7,6 +7,9 @@ import come.back.gotoday.course.repository.CoursePlaceRepository;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
+import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
@@ -33,6 +36,8 @@ public class CourseService {
     private final PlaceRepository placeRepository;
 
     private final RecommendationService recommendationService;
+    private final EventRepository eventRepository;
+    private final KakaoLocalService kakaoLocalService;
 
     //코스저장
     @Transactional
@@ -48,6 +53,47 @@ public class CourseService {
                 memberId, queryText, request.startDate(), request.endDate(), 3
        );
         log.info("출력된 이벤트 아이디:  {}", recommendedEventIds);
+
+        List<Event> events = eventRepository.findAllById(recommendedEventIds);
+        if (events.isEmpty()) {
+            throw new IllegalArgumentException("추천된 행사가 없습니다.");
+        }
+
+        double centerLat = events.stream()
+                .mapToDouble(Event::getLatitude)
+                .average()
+                .orElseThrow();
+
+        double centerLng = events.stream()
+                .mapToDouble(Event::getLongitude)
+                .average()
+                .orElseThrow();
+
+        log.info("행사 중심 좌표 계산 완료 lat={}, lng={}", centerLat, centerLng);
+//
+//        KakaoPlaceResponse cafeResponse =
+//                kakaoLocalService.searchCafe(
+//                        event.getLatitude(),
+//                        event.getLongitude()
+//                );
+//
+//        KakaoPlaceDocument cafe =
+//                cafeResponse.documents().stream()
+//                        .findFirst()
+//                        .orElse(null);
+//
+//        KakaoPlaceResponse restaurantResponse =
+//                kakaoLocalService.searchRestaurant(
+//                        event.getLatitude(),
+//                        event.getLongitude()
+//                );
+//
+//        KakaoPlaceDocument restaurant =
+//                restaurantResponse.documents().stream()
+//                        .findFirst()
+//                        .orElse(null);
+//
+
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> {
