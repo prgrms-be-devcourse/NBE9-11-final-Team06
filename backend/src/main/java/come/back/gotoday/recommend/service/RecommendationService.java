@@ -64,10 +64,6 @@ public class RecommendationService {
 
     @Transactional
     public RecommendationCourseResponse createRecommendedCourse(Long memberId, RecommendationCourseCreateRequest request) {
-        if (request.startDate().isAfter(request.endDate())) {
-            throw new IllegalArgumentException("종료일은 시작일보다 빠를 수 없습니다.");
-        }
-
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
@@ -76,7 +72,7 @@ public class RecommendationService {
 
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
         String categoryJoined = String.join(", ", preferredCategories);
-        String companionType = String.valueOf(preference.getCompanionType());
+        String companionType = preference.getCompanionType() != null ? preference.getCompanionType().toString() : null;
         String queryText = createQueryText(
                 preference.getPreferredArea(),
                 categoryJoined,
@@ -187,7 +183,9 @@ public class RecommendationService {
                 true
         );
 
-        return placeRepository.save(place);
+        Place savedPlace = placeRepository.save(place);
+        event.updatePlace(savedPlace);
+        return savedPlace;
     }
 
     private BigDecimal toBigDecimal(Double coordinate) {

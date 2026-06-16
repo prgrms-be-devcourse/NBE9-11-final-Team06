@@ -4,6 +4,7 @@ import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.AssertTrue;
 
 import java.time.LocalDate;
 
@@ -22,6 +23,14 @@ public record RecommendationCourseCreateRequest(
         @Max(value = 10, message = "추천 개수는 10개 이하여야 합니다.")
         Integer topK
 ) {
+    @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")
+    public boolean isValidPeriod() {
+        if (startDate == null || endDate == null) {
+            return true;
+        }
+        return !startDate.isAfter(endDate);
+    }
+
     public int getTopKOrDefault() {
         return topK == null ? 3 : topK;
     }
