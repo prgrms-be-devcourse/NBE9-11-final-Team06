@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -196,6 +196,28 @@ function getVisitOrder(place: CoursePlace, index: number) {
 }
 
 export default function RecommendPage() {
+  return (
+    <Suspense fallback={<RecommendPageFallback />}>
+      <RecommendContent />
+    </Suspense>
+  )
+}
+
+function RecommendPageFallback() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <Card className="p-6 text-sm text-muted-foreground">
+          추천 코스를 불러오는 중입니다.
+        </Card>
+      </main>
+      <SiteFooter />
+    </div>
+  )
+}
+
+function RecommendContent() {
   const searchParams = useSearchParams()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoadingCourse, setIsLoadingCourse] = useState(false)
