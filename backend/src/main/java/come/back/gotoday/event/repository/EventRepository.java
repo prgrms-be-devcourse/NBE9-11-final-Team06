@@ -1,11 +1,14 @@
 package come.back.gotoday.event.repository;
 import come.back.gotoday.event.entity.Event;
+import come.back.gotoday.event.enums.EventStatus;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -61,7 +64,33 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     // [기존 유지] 전체 검색
     @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.endDate >= :start AND e.startDate <= :end")
     List<Event> findAllEventsByDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
-//
+
+    @Query("select e from Event e " +
+            "join fetch e.category " +
+            "left join fetch e.place " +
+            "where e.id = :eventId")
+    Optional<Event> findByIdWithFetch(@Param("eventId") Long eventId);
+
+    @Query("select e from Event e " +
+            "join fetch e.category c " +
+            "where (:area is null or e.area = :area) " +
+            "and (:categoryId is null or c.id = :categoryId) " +
+            "and (:keyword is null or e.title like %:keyword%) " +
+            "and (" +
+            "    :status is null " +
+            "    or (:status = 'ING' and e.startDate <= :now and e.endDate >= :now) " +
+            "    or (:status = 'END' and e.endDate < :now)" +
+            ")")
+    Page<Event> findEventsByFilters(
+            @Param("area") String area,
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            @Param("now") LocalDate now,
+            Pageable pageable
+    );
+
+    //
 //    //지워도 됨 이 아래로는 가중치 설정하기 위해 임시로 추가한 것=============
 //    // 과거 30개의 데이터 (Train Set - 학습 및 가중치 탐색용)
 //    @Query(value = "SELECT * FROM event ORDER BY created_at ASC, id ASC LIMIT 30", nativeQuery = true)
