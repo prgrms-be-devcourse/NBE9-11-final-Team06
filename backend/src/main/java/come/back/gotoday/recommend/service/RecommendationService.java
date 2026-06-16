@@ -40,21 +40,14 @@ public class RecommendationService {
 
     @Transactional(readOnly = true)
     public List<Long> getRecommendedEventIds(Long memberId, String queryText,LocalDate searchStart, LocalDate searchEnd, int topK){
-        log.info("=== RecommendationService 진입 ===");
-        log.info("memberId={}", memberId);
-        log.info("queryText={}", queryText);
         // 1. 유저 선호 데이터 기반 쿼리 텍스트 빌드 (예시 1 방식)
             var preferenceOpt = userPreferenceRepository.findByMemberId(memberId);
         if (preferenceOpt.isEmpty()) return Collections.emptyList(); // 선호 정보가 없으면 빈 리스트 반환
         var preference = preferenceOpt.get();
 
-        log.info("선호지역={}", preference.getPreferredArea());
-        log.info("preferenceId={}", preference.getId());
-
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
         String categoryJoined = String.join(", ", preferredCategories);
 
-        log.info("선호카테고리={}", preferredCategories);
         // 추천 시스템의 정확도를 위해 하드 필터링(Hard Filtering) 수행 => 정해진 지역에서만 행사 추출
         String targetArea = preference.getPreferredArea();
 
