@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisplayName("혼잡도 점수 계산 테스트")
 class CrowdScoreCalculatorTest {
 
     private final CrowdScoreCalculator crowdScoreCalculator = new CrowdScoreCalculator(30, 10, -10, -30);
