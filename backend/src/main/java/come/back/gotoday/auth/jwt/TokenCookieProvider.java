@@ -2,6 +2,7 @@ package come.back.gotoday.auth.jwt;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,13 @@ public class TokenCookieProvider {
 
     public static final String ACCESS_TOKEN_COOKIE_NAME = "accessToken";
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    public static final String SESSION_COOKIE_NAME = "JSESSIONID";
+
+    @Value("${cookie.secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${cookie.same-site:Lax}")
+    private String cookieSameSite;
 
     public ResponseCookie createAccessTokenCookie(String accessToken, long expirationMillis) {
         return createCookie(
@@ -39,6 +47,10 @@ public class TokenCookieProvider {
         return deleteCookie(REFRESH_TOKEN_COOKIE_NAME);
     }
 
+    public ResponseCookie deleteSessionCookie() {
+        return deleteCookie(SESSION_COOKIE_NAME);
+    }
+
     public String resolveAccessToken(HttpServletRequest request) {
         return resolveCookieValue(request, ACCESS_TOKEN_COOKIE_NAME).orElse(null);
     }
@@ -50,8 +62,8 @@ public class TokenCookieProvider {
     private ResponseCookie createCookie(String name, String value, Duration maxAge) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(false)
-                .sameSite("Lax")
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
                 .path("/")
                 .maxAge(maxAge)
                 .build();
@@ -60,10 +72,10 @@ public class TokenCookieProvider {
     private ResponseCookie deleteCookie(String name) {
         return ResponseCookie.from(name, "")
                 .httpOnly(true)
-                .secure(false)
-                .sameSite("Lax")
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
                 .path("/")
-                .maxAge(0)
+                .maxAge(Duration.ZERO)
                 .build();
     }
 

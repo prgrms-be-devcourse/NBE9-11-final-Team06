@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { CategoryMultiSelect } from "@/components/category-multi-select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,14 +28,6 @@ import type {
   UserPreference,
 } from "@/lib/types"
 import { MapPin, Clock, Route, Heart, Settings, Bookmark } from "lucide-react"
-
-const CATEGORY_OPTIONS = [
-  { id: 1, label: "전시" },
-  { id: 2, label: "카페" },
-  { id: 3, label: "산책" },
-  { id: 4, label: "맛집" },
-  { id: 5, label: "공연" },
-]
 
 const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
   { value: "SOLO", label: "혼자" },
@@ -73,9 +66,15 @@ export default function MyPage() {
   const [isPreferenceDeleting, setIsPreferenceDeleting] = useState(false)
 
   useEffect(() => {
+    let ignore = false
+
     async function fetchInitialData() {
       try {
         const memberResponse = await memberApi.getMyInfo()
+
+        if (ignore) {
+          return
+        }
 
         if (!memberResponse.success || !memberResponse.data) {
           toast.error(memberResponse.message ?? "로그인이 필요합니다.")
@@ -89,18 +88,37 @@ export default function MyPage() {
 
         const preferenceResponse = await preferenceApi.getMyPreference()
 
+        if (ignore) {
+          return
+        }
+
         if (preferenceResponse.success && preferenceResponse.data) {
           applyPreference(preferenceResponse.data)
+          return
+        }
+
+        if (!preferenceResponse.success && preferenceResponse.code !== "PREFERENCE_NOT_FOUND") {
+          toast.error(
+            preferenceResponse.message ?? "선호 정보를 불러오는 중 오류가 발생했습니다.",
+          )
         }
       } catch {
-        toast.error("회원 정보를 불러오는 중 오류가 발생했습니다.")
-        router.push("/login")
+        if (!ignore) {
+          toast.error("회원 정보를 불러오는 중 오류가 발생했습니다.")
+          router.push("/login")
+        }
       } finally {
-        setIsLoading(false)
+        if (!ignore) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchInitialData()
+
+    return () => {
+      ignore = true
+    }
   }, [router])
 
   function applyPreference(nextPreference: UserPreference) {
@@ -119,14 +137,6 @@ export default function MyPage() {
     setCompanionType(null)
     setMobilityLevel(null)
     setAvoidCrowded(null)
-  }
-
-  function toggleCategory(categoryId: number) {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId],
-    )
   }
 
   async function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
@@ -213,7 +223,9 @@ export default function MyPage() {
       }
 
       applyPreference(response.data)
-      toast.success(preference ? "선호 정보가 수정되었습니다." : "선호 정보가 등록되었습니다.")
+      toast.success(
+        preference ? "선호 정보가 수정되었습니다." : "선호 정보가 등록되었습니다.",
+      )
     } catch {
       toast.error("선호 정보 저장 중 오류가 발생했습니다.")
     } finally {
@@ -291,7 +303,9 @@ export default function MyPage() {
       <div className="flex min-h-screen flex-col bg-background">
         <SiteHeader />
         <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-10">
-          <p className="text-sm text-muted-foreground">회원 정보를 불러오는 중...</p>
+          <p className="text-sm text-muted-foreground">
+            회원 정보를 불러오는 중...
+          </p>
         </main>
         <SiteFooter />
       </div>
@@ -325,7 +339,9 @@ export default function MyPage() {
             </Avatar>
 
             <div>
-              <h1 className="font-heading text-xl font-bold">{member.nickname}님</h1>
+              <h1 className="font-heading text-xl font-bold">
+                {member.nickname}님
+              </h1>
               <p className="text-sm text-muted-foreground">{member.email}</p>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -376,7 +392,9 @@ export default function MyPage() {
                     </div>
 
                     <CardContent className="px-5 pb-5">
-                      <h3 className="font-heading font-semibold">{course.title}</h3>
+                      <h3 className="font-heading font-semibold">
+                        {course.title}
+                      </h3>
 
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                         {course.description}
@@ -392,7 +410,8 @@ export default function MyPage() {
                         </span>
 
                         <span className="flex items-center gap-1">
-                          <MapPin className="size-3.5" /> {course.stops.length}개 장소
+                          <MapPin className="size-3.5" />{" "}
+                          {course.stops.length}개 장소
                         </span>
                       </div>
                     </CardContent>
@@ -449,7 +468,10 @@ export default function MyPage() {
 
                 <Separator />
 
-                <form onSubmit={handleSavePreference} className="flex flex-col gap-6">
+                <form
+                  onSubmit={handleSavePreference}
+                  className="flex flex-col gap-6"
+                >
                   <div>
                     <p className="mb-3 text-sm font-medium">선호 지역</p>
                     <Input
@@ -461,27 +483,11 @@ export default function MyPage() {
 
                   <div>
                     <p className="mb-3 text-sm font-medium">관심 카테고리</p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {CATEGORY_OPTIONS.map((category) => {
-                        const active = selectedCategoryIds.includes(category.id)
-
-                        return (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => toggleCategory(category.id)}
-                            className={`rounded-full border px-3 py-1.5 text-sm ${
-                              active
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-background text-muted-foreground"
-                            }`}
-                          >
-                            {category.label}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <CategoryMultiSelect
+                      selectedCategoryIds={selectedCategoryIds}
+                      onChange={setSelectedCategoryIds}
+                      disabled={isPreferenceSaving}
+                    />
                   </div>
 
                   <Separator />
@@ -497,8 +503,9 @@ export default function MyPage() {
                           <button
                             key={option.value}
                             type="button"
+                            disabled={isPreferenceSaving}
                             onClick={() => setCompanionType(option.value)}
-                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                            className={`rounded-full border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
                               active
                                 ? "border-accent bg-accent text-accent-foreground"
                                 : "border-border bg-background text-muted-foreground"
@@ -522,8 +529,9 @@ export default function MyPage() {
                           <button
                             key={option.value}
                             type="button"
+                            disabled={isPreferenceSaving}
                             onClick={() => setMobilityLevel(option.value)}
-                            className={`rounded-full border px-3 py-1.5 text-sm ${
+                            className={`rounded-full border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
                               active
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "border-border bg-background text-muted-foreground"
@@ -542,8 +550,9 @@ export default function MyPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
+                        disabled={isPreferenceSaving}
                         onClick={() => setAvoidCrowded(true)}
-                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                        className={`rounded-full border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
                           avoidCrowded === true
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border bg-background text-muted-foreground"
@@ -554,8 +563,9 @@ export default function MyPage() {
 
                       <button
                         type="button"
+                        disabled={isPreferenceSaving}
                         onClick={() => setAvoidCrowded(false)}
-                        className={`rounded-full border px-3 py-1.5 text-sm ${
+                        className={`rounded-full border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${
                           avoidCrowded === false
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border bg-background text-muted-foreground"
@@ -567,7 +577,11 @@ export default function MyPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button type="submit" className="w-fit" disabled={isPreferenceSaving}>
+                    <Button
+                      type="submit"
+                      className="w-fit"
+                      disabled={isPreferenceSaving}
+                    >
                       {isPreferenceSaving
                         ? "저장 중..."
                         : preference
@@ -592,7 +606,9 @@ export default function MyPage() {
                 <Separator />
 
                 <div>
-                  <p className="mb-2 text-sm font-medium text-destructive">회원 탈퇴</p>
+                  <p className="mb-2 text-sm font-medium text-destructive">
+                    회원 탈퇴
+                  </p>
 
                   <p className="mb-3 text-sm text-muted-foreground">
                     탈퇴하면 현재 계정으로 다시 로그인할 수 없습니다.
