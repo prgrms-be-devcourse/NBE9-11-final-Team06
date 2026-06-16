@@ -1,8 +1,9 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { toast } from "sonner"
 import { MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -10,16 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { CategoryMultiSelect } from "@/components/category-multi-select"
 import { preferenceApi } from "@/lib/preference-api"
 import type { CompanionType, MobilityLevel } from "@/lib/types"
-
-const CATEGORY_OPTIONS = [
-  { id: 1, label: "전시" },
-  { id: 2, label: "카페" },
-  { id: 3, label: "산책" },
-  { id: 4, label: "맛집" },
-  { id: 5, label: "공연" },
-]
 
 const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
   { value: "SOLO", label: "혼자" },
@@ -46,14 +40,6 @@ export function PreferenceSetupForm() {
     useState<MobilityLevel | null>(null)
   const [avoidCrowded, setAvoidCrowded] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  function toggleCategory(categoryId: number) {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId],
-    )
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -117,11 +103,11 @@ export function PreferenceSetupForm() {
         </div>
 
         <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight">
-          선호 정보 설정
+          오늘 어디가?
         </h1>
 
         <p className="mt-1 text-sm text-muted-foreground">
-          하루서울이 더 잘 추천할 수 있도록 취향을 알려주세요.
+          추천을 위해 선호 정보를 먼저 등록해주세요.
         </p>
       </div>
 
@@ -141,27 +127,11 @@ export function PreferenceSetupForm() {
 
             <div className="flex flex-col gap-2">
               <Label>관심사</Label>
-
-              <div className="flex flex-wrap gap-2">
-                {CATEGORY_OPTIONS.map((category) => {
-                  const active = selectedCategoryIds.includes(category.id)
-
-                  return (
-                    <button
-                      key={category.id}
-                      type="button"
-                      onClick={() => toggleCategory(category.id)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background text-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      {category.label}
-                    </button>
-                  )
-                })}
-              </div>
+              <CategoryMultiSelect
+                selectedCategoryIds={selectedCategoryIds}
+                onChange={setSelectedCategoryIds}
+                disabled={isLoading}
+              />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -175,8 +145,9 @@ export function PreferenceSetupForm() {
                     <button
                       key={option.value}
                       type="button"
+                      disabled={isLoading}
                       onClick={() => setSelectedCompanion(option.value)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         active
                           ? "border-accent bg-accent text-accent-foreground"
                           : "border-border bg-background text-foreground hover:border-accent/40"
@@ -200,8 +171,9 @@ export function PreferenceSetupForm() {
                     <button
                       key={option.value}
                       type="button"
+                      disabled={isLoading}
                       onClick={() => setSelectedMobilityLevel(option.value)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         active
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background text-foreground hover:border-primary/40"
@@ -220,8 +192,9 @@ export function PreferenceSetupForm() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  disabled={isLoading}
                   onClick={() => setAvoidCrowded(true)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     avoidCrowded === true
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-background text-foreground hover:border-primary/40"
@@ -232,8 +205,9 @@ export function PreferenceSetupForm() {
 
                 <button
                   type="button"
+                  disabled={isLoading}
                   onClick={() => setAvoidCrowded(false)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     avoidCrowded === false
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-background text-foreground hover:border-primary/40"
@@ -256,13 +230,6 @@ export function PreferenceSetupForm() {
           </form>
         </CardContent>
       </Card>
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        나중에 설정할게요?{" "}
-        <Link href="/" className="font-medium text-primary hover:underline">
-          홈으로 이동
-        </Link>
-      </p>
     </div>
   )
 }

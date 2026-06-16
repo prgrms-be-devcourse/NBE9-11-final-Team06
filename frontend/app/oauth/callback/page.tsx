@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { memberApi } from "@/lib/member-api"
 import { preferenceApi } from "@/lib/preference-api"
 import { MapPin } from "lucide-react"
@@ -34,19 +35,28 @@ export default function OAuthCallbackPage() {
           return
         }
 
-        if (!preferenceResponse.success) {
+        if (preferenceResponse.success && preferenceResponse.data) {
+          router.replace("/")
+          return
+        }
+
+        if (preferenceResponse.success && !preferenceResponse.data) {
           router.replace("/onboarding")
           return
         }
 
-        if (!preferenceResponse.data) {
+        if (preferenceResponse.code === "PREFERENCE_NOT_FOUND") {
           router.replace("/onboarding")
           return
         }
 
-        router.replace("/")
+        toast.error(
+          preferenceResponse.message ?? "선호 정보 조회 중 오류가 발생했습니다.",
+        )
+        router.replace("/login?error=preference")
       } catch {
         if (!ignore) {
+          toast.error("서버와 통신 중 오류가 발생했습니다.")
           router.replace("/login?error=oauth")
         }
       }
@@ -67,7 +77,7 @@ export default function OAuthCallbackPage() {
         </div>
 
         <h1 className="mt-5 font-heading text-2xl font-bold tracking-tight">
-          하루서울
+          오늘 어디가?
         </h1>
 
         <p className="mt-3 text-sm text-muted-foreground">{message}</p>

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { CategoryMultiSelect } from "@/components/category-multi-select"
 import { memberApi } from "@/lib/member-api"
 import { preferenceApi } from "@/lib/preference-api"
 import type { CompanionType, MobilityLevel } from "@/lib/types"
@@ -19,14 +20,6 @@ import { MapPin } from "lucide-react"
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
-
-const CATEGORY_OPTIONS = [
-  { id: 1, label: "전시" },
-  { id: 2, label: "카페" },
-  { id: 3, label: "산책" },
-  { id: 4, label: "맛집" },
-  { id: 5, label: "공연" },
-]
 
 const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
   { value: "SOLO", label: "혼자" },
@@ -70,19 +63,19 @@ export function AuthForm() {
   const [isLoginLoading, setIsLoginLoading] = useState(false)
 
   useEffect(() => {
-    if (searchParams.get("error") === "oauth") {
+    const error = searchParams.get("error")
+
+    if (error === "oauth") {
       toast.error("소셜 로그인에 실패했습니다. 다시 시도해주세요.")
+      router.replace("/login")
+      return
+    }
+
+    if (error === "preference") {
+      toast.error("선호 정보 조회 중 오류가 발생했습니다. 다시 로그인해주세요.")
       router.replace("/login")
     }
   }, [router, searchParams])
-
-  function toggleCategory(categoryId: number) {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId],
-    )
-  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -219,11 +212,11 @@ export function AuthForm() {
         </div>
 
         <h1 className="mt-4 font-heading text-2xl font-bold tracking-tight">
-          하루서울
+          오늘 어디가?
         </h1>
 
         <p className="mt-1 text-sm text-muted-foreground">
-          서울의 하루를 가장 나답게
+          오늘의 일정과 장소를 가장 나답게 추천받아보세요.
         </p>
       </div>
 
@@ -369,27 +362,11 @@ export function AuthForm() {
 
                 <div className="flex flex-col gap-2">
                   <Label>관심사</Label>
-
-                  <div className="flex flex-wrap gap-2">
-                    {CATEGORY_OPTIONS.map((category) => {
-                      const active = selectedCategoryIds.includes(category.id)
-
-                      return (
-                        <button
-                          key={category.id}
-                          type="button"
-                          onClick={() => toggleCategory(category.id)}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                            active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-foreground hover:border-primary/40"
-                          }`}
-                        >
-                          {category.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <CategoryMultiSelect
+                    selectedCategoryIds={selectedCategoryIds}
+                    onChange={setSelectedCategoryIds}
+                    disabled={isSignupLoading}
+                  />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -403,8 +380,9 @@ export function AuthForm() {
                         <button
                           key={option.value}
                           type="button"
+                          disabled={isSignupLoading}
                           onClick={() => setSelectedCompanion(option.value)}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                             active
                               ? "border-accent bg-accent text-accent-foreground"
                               : "border-border bg-background text-foreground hover:border-accent/40"
@@ -428,8 +406,9 @@ export function AuthForm() {
                         <button
                           key={option.value}
                           type="button"
+                          disabled={isSignupLoading}
                           onClick={() => setSelectedMobilityLevel(option.value)}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                             active
                               ? "border-primary bg-primary text-primary-foreground"
                               : "border-border bg-background text-foreground hover:border-primary/40"
@@ -448,8 +427,9 @@ export function AuthForm() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
+                      disabled={isSignupLoading}
                       onClick={() => setAvoidCrowded(true)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         avoidCrowded === true
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background text-foreground hover:border-primary/40"
@@ -460,8 +440,9 @@ export function AuthForm() {
 
                     <button
                       type="button"
+                      disabled={isSignupLoading}
                       onClick={() => setAvoidCrowded(false)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         avoidCrowded === false
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-background text-foreground hover:border-primary/40"
