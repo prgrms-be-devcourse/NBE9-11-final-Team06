@@ -63,7 +63,15 @@ public class AdminPlaceController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<AdminPlaceResponse>> getPlaces(Pageable pageable) {
-        return ResponseEntity.ok(adminPlaceService.getPlaces(pageable));
+    public ResponseEntity<Page<AdminPlaceResponse>> getPlaces(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) String source,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(
+                adminPlaceService.getPlaces(keyword, categoryId, isActive, source, pageable)
+        );
     }
 }

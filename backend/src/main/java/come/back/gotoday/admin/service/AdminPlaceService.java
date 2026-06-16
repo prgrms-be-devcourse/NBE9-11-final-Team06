@@ -124,8 +124,14 @@ public class AdminPlaceService {
         }
     }
 
-    public Page<AdminPlaceResponse> getPlaces(Pageable pageable) {
-        return placeRepository.findAll(pageable)
+    public Page<AdminPlaceResponse> getPlaces(
+            String keyword,
+            Long categoryId,
+            Boolean isActive,
+            String source,
+            Pageable pageable
+    ) {
+        return placeRepository.searchAdminPlaces(keyword, categoryId, isActive, source, pageable)
                 .map(AdminPlaceResponse::from);
     }
 }
