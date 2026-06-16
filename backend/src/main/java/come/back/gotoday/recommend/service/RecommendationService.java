@@ -5,6 +5,8 @@ import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
@@ -65,10 +67,10 @@ public class RecommendationService {
     @Transactional
     public RecommendationCourseResponse createRecommendedCourse(Long memberId, RecommendationCourseCreateRequest request) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         var preference = userPreferenceRepository.findByMemberId(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("선호 정보를 먼저 등록해야 합니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND));
 
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
         String categoryJoined = String.join(", ", preferredCategories);
@@ -88,7 +90,7 @@ public class RecommendationService {
         );
 
         if (recommendedEventIds.isEmpty()) {
-            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
+            throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
         }
 
         Map<Long, Event> eventMap = eventRepository.findAllById(recommendedEventIds).stream()
@@ -217,11 +219,8 @@ public class RecommendationService {
 
     @Transactional(readOnly = true)
     public List<Long> getRecommendedEventIds(Long memberId, String queryText, LocalDate searchStart, LocalDate searchEnd, int topK) {
-        var preferenceOpt = userPreferenceRepository.findByMemberId(memberId);
-        if (preferenceOpt.isEmpty()) {
-            return Collections.emptyList();
-        }
-        var preference = preferenceOpt.get();
+        var preference = userPreferenceRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND));
 
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
         String targetArea = preference.getPreferredArea();

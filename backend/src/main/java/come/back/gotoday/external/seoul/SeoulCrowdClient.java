@@ -1,9 +1,13 @@
 package come.back.gotoday.external.seoul;
 
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
+
 import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
@@ -82,11 +86,18 @@ public class SeoulCrowdClient {
                     .retrieve()
                     .body(SeoulCrowdResponse.class);
 
-            log.info("서울시 실시간 도시데이터 API 호출 완료: areaName={}, hasCityData={}", areaName, response != null && response.CITYDATA() != null);
+            if (response == null) {
+                log.warn("서울시 실시간 도시데이터 API 응답이 비어 있습니다. areaName={}", areaName);
+                throw new BusinessException(ErrorCode.CROWD_API_RESPONSE_EMPTY);
+            }
+
+            log.info("서울시 실시간 도시데이터 API 호출 완료: areaName={}, hasCityData={}", areaName, response.CITYDATA() != null);
             return response;
-        } catch (RuntimeException exception) {
-            log.error("서울시 실시간 도시데이터 API 호출 실패: areaName={}, message={}", areaName, exception.getMessage(), exception);
+        } catch (BusinessException exception) {
             throw exception;
+        } catch (RestClientException exception) {
+            log.error("서울시 실시간 도시데이터 API 호출 실패: areaName={}, message={}", areaName, exception.getMessage(), exception);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }
 }
