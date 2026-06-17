@@ -18,7 +18,11 @@ import java.time.LocalDateTime;
 @Table(
         name = "crowd_status",
         indexes = {
-                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC")
+                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC"),
+                @Index(
+                        name = "idx_crowd_status_area_measured_at",
+                        columnList = "area_name, measured_at"
+                )
         }
 )
 @Getter

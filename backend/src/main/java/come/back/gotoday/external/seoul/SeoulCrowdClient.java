@@ -40,6 +40,9 @@ public class SeoulCrowdClient {
     /** 서울시 API 기본 URL과 인증키 설정 값입니다. */
     private final SeoulApiProperties seoulApiProperties;
 
+    /** 서울시 혼잡도 대상 전체 지역명 설정입니다. */
+    private final SeoulCrowdArea seoulCrowdArea;
+
     /**
      * 서울시 API 설정 값을 주입받고 RestClient를 생성합니다.
      *
@@ -48,11 +51,13 @@ public class SeoulCrowdClient {
      */
     public SeoulCrowdClient(
             SeoulApiProperties seoulApiProperties,
+            SeoulCrowdArea seoulCrowdArea,
             ObjectProvider<RestClient.Builder> restClientBuilderProvider
     ) {
         RestClient.Builder restClientBuilder = restClientBuilderProvider.getIfAvailable(RestClient::builder);
         this.restClient = restClientBuilder.build();
         this.seoulApiProperties = seoulApiProperties;
+        this.seoulCrowdArea = seoulCrowdArea;
     }
 
     /**
@@ -63,7 +68,7 @@ public class SeoulCrowdClient {
      * @return 서울시 혼잡도 대상 전체 지역명 목록
      */
     public List<String> getAllAreaNames() {
-        return SeoulCrowdArea.getAllAreaNames();
+        return seoulCrowdArea.getAllAreaNames();
     }
 
     /**

@@ -204,7 +204,7 @@ class CrowdServiceTest {
                 .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                         eq(areaName),
                         any(LocalDateTime.class),
-                        eq(visitAt)
+                        any(LocalDateTime.class)
                 ))
                 .willReturn(List.of(
                         firstHistory,
@@ -227,8 +227,8 @@ class CrowdServiceTest {
         verify(crowdStatusRepository)
                 .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                         eq(areaName),
-                        eq(visitAt.minusWeeks(8)),
-                        eq(visitAt)
+                        any(LocalDateTime.class),
+                        any(LocalDateTime.class)
                 );
         verify(seoulCrowdClient, never()).getCrowdStatus(any());
     }
@@ -245,7 +245,7 @@ class CrowdServiceTest {
                 .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                         eq(areaName),
                         any(LocalDateTime.class),
-                        eq(visitAt)
+                        any(LocalDateTime.class)
                 ))
                 .willReturn(Collections.emptyList());
         given(crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName))

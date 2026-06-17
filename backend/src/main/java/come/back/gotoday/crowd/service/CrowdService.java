@@ -175,13 +175,14 @@ public class CrowdService {
      * @return 과거 혼잡도 이력을 기반으로 계산한 예상 혼잡도 응답 DTO
      */
     public CrowdResponse getPredictedCrowdStatus(String areaName, LocalDateTime visitAt) {
-        LocalDateTime historyStartAt = visitAt.minusWeeks(8);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime historyStartAt = now.minusWeeks(8);
 
         List<CrowdStatus> histories = crowdStatusRepository
                 .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
                         areaName,
                         historyStartAt,
-                        visitAt
+                        now
                 )
                 .stream()
                 .filter(history -> history.getMeasuredAt() != null)
