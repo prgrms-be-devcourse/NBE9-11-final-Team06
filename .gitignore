@@ -99,3 +99,9 @@ docker-compose.override.yml
 .aws/
 credentials.csv
 accessKeys.csv
+
+# local auth/cookie files
+cookies.txt
+*.cookies
+.cookie
+.http-cookie*
