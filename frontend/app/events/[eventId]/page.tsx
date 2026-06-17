@@ -140,7 +140,7 @@ function EventDetailContent() {
 
   // 2. 네이버 지도 SDK 동적 로드 및 지도 인스턴스 생성 (보내주신 Picker 로직 규격 반영)
   useEffect(() => {
-    if (isLoading || error || !event || !event.latitude || !event.longitude) return
+    if (isLoading || error || !event || event.latitude === null || event.longitude === null) return
     let isMounted = true
 
     const initializeDetailMap = () => {
@@ -164,14 +164,29 @@ function EventDetailContent() {
         position,
         map,
       })
-
+        // 1. XSS 방어를 위한 이스케이프 헬퍼 함수 정의 
+      const escapeHtml = (str: string) => {
+        return str.replace(/[&<>/"']/g, (m) => {
+          const map: Record<string, string> = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            '/': '&#x2F;'
+          };
+          return map[m] || m;
+        });
+      };
+    
+      // 2. 전달받은 escapeHtml 함수를 사용해 안전하게 HTML 구성
       const infoWindow = new window.naver.maps.InfoWindow({
         content: `
           <div style="padding:8px 12px; font-size:13px; font-weight:700; border-radius:8px; line-height:1.4;">
-            <p style="margin:0; color:#0f172a;">${event.placeName || event.title}</p>
-            <p style="margin:2px 0 0 0; font-size:11px; font-weight:400; color:#64748b;">${event.address || event.area}</p>
+            <p style="margin:0; color:#0f172a;">${escapeHtml(event.placeName || event.title)}</p>
+            <p style="margin:2px 0 0 0; font-size:11px; font-weight:400; color:#64748b;">${escapeHtml(event.area)}</p>
           </div>
-        `,
+        `, // 💡 기존 가독성이 좋은 백틱(`) 구조를 유지하면서 감싸주어도 똑같이 안전합니다!
         borderWidth: 1,
         disableAnchor: false,
       })
@@ -402,7 +417,7 @@ function EventDetailContent() {
             </svg>
 
             {/* 실제 네이버 지도가 주입될 컨테이너 */}
-            {event.latitude && event.longitude ? (
+            {event.latitude !== null && event.longitude !== null ? (
               <div ref={mapContainerRef} className="absolute inset-0 size-full z-10" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-muted-foreground bg-secondary/40">
@@ -413,7 +428,7 @@ function EventDetailContent() {
             )}
 
             {/* 지도 로딩 인디케이터 백그라운드 홀더 */}
-            {!isMapLoaded && event.latitude && event.longitude && (
+            {!isMapLoaded && event.latitude !== null && event.longitude !== null && (
               <div className="absolute inset-0 flex items-center justify-center bg-secondary/50 text-xs text-muted-foreground">
                 네이버 지도를 불러오는 중입니다...
               </div>
