@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/reissue").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                         .requestMatchers("/api/crowds/**").permitAll()
                         .requestMatchers("/api/places/search").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
