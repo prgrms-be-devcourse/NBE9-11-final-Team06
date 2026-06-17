@@ -3,7 +3,7 @@ spring:
     name: go-today
 
   profiles:
-    active: local
+    active: dev
 
   sql:
     init:
