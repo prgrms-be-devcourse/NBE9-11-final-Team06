@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -164,5 +165,142 @@ class CrowdServiceTest {
 
         verify(seoulCrowdClient, never()).getCrowdStatus(any());
         verify(crowdStatusRepository, never()).save(any());
+    }
+    @Test
+    @DisplayName("미래 혼잡도는 최근 이력 중 동일 요일과 동일 시간대 데이터의 평균으로 계산한다")
+    void getPredictedCrowdStatusCalculatesAverageFromSameDayAndHourHistories() {
+        String areaName = "강남역";
+        LocalDateTime visitAt = LocalDateTime.of(2026, 6, 22, 15, 0);
+
+        CrowdStatus firstHistory = mock(CrowdStatus.class);
+        CrowdStatus secondHistory = mock(CrowdStatus.class);
+        CrowdStatus thirdHistory = mock(CrowdStatus.class);
+        CrowdStatus differentHourHistory = mock(CrowdStatus.class);
+        CrowdStatus differentDayHistory = mock(CrowdStatus.class);
+
+        given(firstHistory.getMeasuredAt()).willReturn(visitAt.minusWeeks(3));
+        given(firstHistory.getPopulationMin()).willReturn(1000);
+        given(firstHistory.getPopulationMax()).willReturn(2000);
+        given(firstHistory.getCongestionLevel()).willReturn(CongestionLevel.RELAXED);
+
+        given(secondHistory.getMeasuredAt()).willReturn(visitAt.minusWeeks(2));
+        lenient().when(secondHistory.getAreaCode()).thenReturn("POI001");
+        given(secondHistory.getPopulationMin()).willReturn(2000);
+        given(secondHistory.getPopulationMax()).willReturn(3000);
+        given(secondHistory.getCongestionLevel()).willReturn(CongestionLevel.RELAXED);
+
+        given(thirdHistory.getMeasuredAt()).willReturn(visitAt.minusWeeks(1));
+        lenient().when(thirdHistory.getAreaCode()).thenReturn("POI001");
+        given(thirdHistory.getPopulationMin()).willReturn(3000);
+        given(thirdHistory.getPopulationMax()).willReturn(4000);
+        given(thirdHistory.getCongestionLevel()).willReturn(CongestionLevel.CROWDED);
+
+        lenient().when(differentHourHistory.getMeasuredAt())
+                .thenReturn(visitAt.minusWeeks(1).withHour(14));
+        lenient().when(differentDayHistory.getMeasuredAt())
+                .thenReturn(visitAt.minusDays(1));
+
+        given(crowdStatusRepository
+                .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+                        eq(areaName),
+                        any(LocalDateTime.class),
+                        eq(visitAt)
+                ))
+                .willReturn(List.of(
+                        firstHistory,
+                        secondHistory,
+                        thirdHistory,
+                        differentHourHistory,
+                        differentDayHistory
+                ));
+
+        CrowdResponse result = crowdService.getPredictedCrowdStatus(areaName, visitAt);
+
+        assertThat(result.areaName()).isEqualTo(areaName);
+        assertThat(result.areaCode()).isEqualTo("POI001");
+        assertThat(result.congestionLevel()).isEqualTo(CongestionLevel.RELAXED);
+        assertThat(result.populationMin()).isEqualTo(2000);
+        assertThat(result.populationMax()).isEqualTo(3000);
+        assertThat(result.measuredAt()).isEqualTo(visitAt);
+        assertThat(result.message()).contains("과거 동일 요일·시간대");
+
+        verify(crowdStatusRepository)
+                .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+                        eq(areaName),
+                        eq(visitAt.minusWeeks(8)),
+                        eq(visitAt)
+                );
+        verify(seoulCrowdClient, never()).getCrowdStatus(any());
+    }
+
+    @Test
+    @DisplayName("예측에 사용할 과거 데이터가 없으면 현재 혼잡도 캐시를 반환한다")
+    void getPredictedCrowdStatusReturnsCurrentCacheWhenHistoryIsEmpty() {
+        String areaName = "강남역";
+        LocalDateTime visitAt = LocalDateTime.of(2026, 6, 22, 15, 0);
+        LocalDateTime measuredAt = LocalDateTime.now().minusMinutes(1);
+        CrowdStatus cachedStatus = mock(CrowdStatus.class);
+
+        given(crowdStatusRepository
+                .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+                        eq(areaName),
+                        any(LocalDateTime.class),
+                        eq(visitAt)
+                ))
+                .willReturn(Collections.emptyList());
+        given(crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName))
+                .willReturn(Optional.of(cachedStatus));
+        given(cachedStatus.getCreatedAt()).willReturn(LocalDateTime.now());
+        given(cachedStatus.getAreaName()).willReturn(areaName);
+        given(cachedStatus.getAreaCode()).willReturn("POI001");
+        given(cachedStatus.getCongestionLevel()).willReturn(CongestionLevel.NORMAL);
+        given(cachedStatus.getMessage()).willReturn("보통입니다.");
+        given(cachedStatus.getPopulationMin()).willReturn(4000);
+        given(cachedStatus.getPopulationMax()).willReturn(5000);
+        given(cachedStatus.getMeasuredAt()).willReturn(measuredAt);
+
+        CrowdResponse result = crowdService.getPredictedCrowdStatus(areaName, visitAt);
+
+        assertThat(result.areaName()).isEqualTo(areaName);
+        assertThat(result.congestionLevel()).isEqualTo(CongestionLevel.NORMAL);
+        assertThat(result.populationMin()).isEqualTo(4000);
+        assertThat(result.populationMax()).isEqualTo(5000);
+        assertThat(result.measuredAt()).isEqualTo(measuredAt);
+
+        verify(crowdStatusRepository)
+                .findTopByAreaNameOrderByCreatedAtDesc(areaName);
+        verify(seoulCrowdClient, never()).getCrowdStatus(any());
+        verify(crowdStatusRepository, never()).save(any());
+    }
+    @Test
+    @DisplayName("전체 지역 수집 중 일부 지역이 실패해도 나머지 지역 수집을 계속한다")
+    void refreshAllCrowdStatusesContinuesWhenOneAreaFails() {
+        List<String> areaNames = List.of("강남역", "홍대 관광특구", "성수카페거리");
+        CrowdService spyCrowdService = spy(crowdService);
+
+        given(seoulCrowdClient.getAllAreaNames()).willReturn(areaNames);
+
+        CrowdResponse gangnamResponse = mock(CrowdResponse.class);
+        CrowdResponse seongsuResponse = mock(CrowdResponse.class);
+
+        doReturn(gangnamResponse)
+                .when(spyCrowdService)
+                .refreshCrowdStatus("강남역");
+        doThrow(new BusinessException(ErrorCode.CROWD_DATA_NOT_FOUND))
+                .when(spyCrowdService)
+                .refreshCrowdStatus("홍대 관광특구");
+        doReturn(seongsuResponse)
+                .when(spyCrowdService)
+                .refreshCrowdStatus("성수카페거리");
+
+        CrowdService.CrowdCollectionResult result =
+                spyCrowdService.refreshAllCrowdStatuses();
+
+        assertThat(result.successCount()).isEqualTo(2);
+        assertThat(result.failureCount()).isEqualTo(1);
+
+        verify(spyCrowdService).refreshCrowdStatus("강남역");
+        verify(spyCrowdService).refreshCrowdStatus("홍대 관광특구");
+        verify(spyCrowdService).refreshCrowdStatus("성수카페거리");
     }
 }
