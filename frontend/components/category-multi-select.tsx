@@ -26,7 +26,7 @@ export function CategoryMultiSelect({
       setIsLoading(true)
 
       try {
-        const response = await categoryApi.getCategories()
+        const response = await categoryApi.getPreferenceCategories()
 
         if (ignore) {
           return
@@ -82,7 +82,7 @@ export function CategoryMultiSelect({
   if (categories.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        등록된 카테고리가 없습니다.
+        등록된 선호 카테고리가 없습니다.
       </p>
     )
   }

@@ -7,4 +7,10 @@ export const categoryApi = {
       method: "GET",
     })
   },
+
+  getPreferenceCategories() {
+    return apiRequest<PreferenceCategory[]>("/api/categories?type=PREFERENCE", {
+      method: "GET",
+    })
+  },
 }
