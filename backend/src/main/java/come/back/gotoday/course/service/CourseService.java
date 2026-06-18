@@ -141,16 +141,17 @@ public class CourseService {
                 );
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
-
+        
         double centerLat = events.stream()
+                .filter(e -> e.getLatitude() != null)
                 .mapToDouble(Event::getLatitude)
                 .average()
-                .orElseThrow();
-
+                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
         double centerLng = events.stream()
+                .filter(e -> e.getLongitude() != null)
                 .mapToDouble(Event::getLongitude)
                 .average()
-                .orElseThrow();
+                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
 
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(centerLat, centerLng);
