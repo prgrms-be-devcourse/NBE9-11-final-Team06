@@ -36,4 +36,12 @@ public interface UserPreferenceCategoryRepository extends JpaRepository<UserPref
             where upc.userPreference.id = :preferenceId
             """)
     List<String> findCategoryNamesByPreferenceId(@Param("preferenceId") Long preferenceId);
+
+    @Query("""
+            select c.id
+            from UserPreferenceCategory upc
+            join upc.category c
+            where upc.userPreference.id = :preferenceId
+            """)
+    List<Long> findCategoryIdsByPreferenceId(@Param("preferenceId") Long preferenceId);
 }

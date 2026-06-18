@@ -1,5 +1,12 @@
 package come.back.gotoday.recommend.service;
 
+import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.category.repository.PreferenceEventCategoryMappingRepository;
+import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.preference.entity.UserPreference;
+import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
+import come.back.gotoday.preference.repository.UserPreferenceRepository;
+
 import come.back.gotoday.crowd.entity.CongestionLevel;
 import come.back.gotoday.crowd.service.CrowdScoreCalculator;
 import come.back.gotoday.crowd.service.NearestCrowdAreaService;
@@ -12,18 +19,34 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("추천 서비스 단위 테스트")
 class RecommendationServiceTest {
+
+    @Mock
+    private UserPreferenceRepository userPreferenceRepository;
+
+    @Mock
+    private UserPreferenceCategoryRepository userPreferenceCategoryRepository;
+
+    @Mock
+    private PreferenceEventCategoryMappingRepository preferenceEventCategoryMappingRepository;
+
+    @Mock
+    private EventRepository eventRepository;
 
     @Mock
     private NearestCrowdAreaService nearestCrowdAreaService;
@@ -33,6 +56,129 @@ class RecommendationServiceTest {
 
     @InjectMocks
     private RecommendationService recommendationService;
+    @Test
+    @DisplayName("저장된 PREFERENCE 카테고리를 매핑된 EVENT 카테고리 ID로 변환해 조회한다")
+    void getRecommendedEventIdsUsesMappedEventCategoryIds() {
+        Long memberId = 1L;
+        Long preferenceId = 10L;
+        LocalDate startDate = LocalDate.of(2026, 6, 20);
+        LocalDate endDate = LocalDate.of(2026, 6, 21);
+
+        UserPreference preference = org.mockito.Mockito.mock(UserPreference.class);
+        given(preference.getId()).willReturn(preferenceId);
+        given(preference.getPreferredArea()).willReturn("종로구");
+        given(preference.getAvoidCrowded()).willReturn(false);
+
+        given(userPreferenceRepository.findByMemberId(memberId))
+                .willReturn(Optional.of(preference));
+        given(userPreferenceCategoryRepository.findCategoryIdsByPreferenceId(preferenceId))
+                .willReturn(List.of(101L));
+        given(preferenceEventCategoryMappingRepository
+                .findEventCategoryIdsByPreferenceCategoryIds(List.of(101L)))
+                .willReturn(List.of(201L, 202L));
+        given(eventRepository.findRecommendedEventsWithCategoryIds(
+                "종로구",
+                startDate,
+                endDate,
+                Set.of(201L, 202L)
+        )).willReturn(List.of());
+        given(eventRepository.findRecommendedEvents("종로구", startDate, endDate))
+                .willReturn(List.of());
+        given(eventRepository.findRecommendedEvents(
+                "종로구",
+                startDate.minusDays(7),
+                endDate.plusDays(7)
+        )).willReturn(List.of());
+        given(eventRepository.findAllEventsByDate(startDate, endDate))
+                .willReturn(List.of());
+
+        List<Long> result = recommendationService.getRecommendedEventIds(
+                memberId,
+                "전시 추천",
+                startDate,
+                endDate,
+                3
+        );
+
+        assertThat(result).isEmpty();
+        verify(preferenceEventCategoryMappingRepository)
+                .findEventCategoryIdsByPreferenceCategoryIds(List.of(101L));
+        verify(eventRepository).findRecommendedEventsWithCategoryIds(
+                "종로구",
+                startDate,
+                endDate,
+                Set.of(201L, 202L)
+        );
+    }
+
+    @Test
+    @DisplayName("카테고리 매핑 결과가 없으면 카테고리 조건 없이 지역과 기간으로 재조회한다")
+    void getRecommendedEventIdsFallsBackWhenMappingDoesNotExist() {
+        Long memberId = 1L;
+        Long preferenceId = 10L;
+        LocalDate startDate = LocalDate.of(2026, 6, 20);
+        LocalDate endDate = LocalDate.of(2026, 6, 21);
+
+        UserPreference preference = org.mockito.Mockito.mock(UserPreference.class);
+        given(preference.getId()).willReturn(preferenceId);
+        given(preference.getPreferredArea()).willReturn("마포구");
+        given(preference.getAvoidCrowded()).willReturn(false);
+
+        given(userPreferenceRepository.findByMemberId(memberId))
+                .willReturn(Optional.of(preference));
+        given(userPreferenceCategoryRepository.findCategoryIdsByPreferenceId(preferenceId))
+                .willReturn(List.of(301L));
+        given(preferenceEventCategoryMappingRepository
+                .findEventCategoryIdsByPreferenceCategoryIds(List.of(301L)))
+                .willReturn(List.of());
+        given(eventRepository.findRecommendedEvents("마포구", startDate, endDate))
+                .willReturn(List.of());
+        given(eventRepository.findRecommendedEvents(
+                "마포구",
+                startDate.minusDays(7),
+                endDate.plusDays(7)
+        )).willReturn(List.of());
+        given(eventRepository.findAllEventsByDate(startDate, endDate))
+                .willReturn(List.of());
+
+        List<Long> result = recommendationService.getRecommendedEventIds(
+                memberId,
+                "산책 추천",
+                startDate,
+                endDate,
+                3
+        );
+
+        assertThat(result).isEmpty();
+        verify(eventRepository, never()).findRecommendedEventsWithCategoryIds(
+                anyString(),
+                any(LocalDate.class),
+                any(LocalDate.class),
+                any()
+        );
+        verify(eventRepository).findRecommendedEvents("마포구", startDate, endDate);
+    }
+
+    @Test
+    @DisplayName("추천 이유는 매핑된 EVENT 카테고리 ID를 기준으로 생성한다")
+    void createRecommendationReasonUsesMappedEventCategoryId() {
+        Category eventCategory = org.mockito.Mockito.mock(Category.class);
+        given(eventCategory.getId()).willReturn(201L);
+
+        Event event = org.mockito.Mockito.mock(Event.class);
+        given(event.getArea()).willReturn("종로구");
+        given(event.getCategory()).willReturn(eventCategory);
+
+        String reason = ReflectionTestUtils.invokeMethod(
+                recommendationService,
+                "createRecommendationReason",
+                event,
+                "종로구",
+                Set.of(201L)
+        );
+
+        assertThat(reason).isEqualTo("선택한 지역과 카테고리에 모두 부합하는 행사입니다.");
+    }
 
     @Test
     @DisplayName("프론트 선택 지역·카테고리·동행 유형이 추천 검색어에 반영된다")
