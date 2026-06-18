@@ -300,7 +300,7 @@ public class RecommendationService {
         );
     }
 
-    private List<Long> getRecommendedEventIds(
+    List<Long> getRecommendedEventIds(
             String targetArea,
             Set<Long> preferredEventCategoryIds,
             String queryText,
