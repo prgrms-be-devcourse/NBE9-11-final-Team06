@@ -81,10 +81,10 @@ seoul:
 recommendation:
   score:
     crowd:
-      relaxed: 30
-      normal: 10
-      crowded: -10
-      very-crowded: -30
+      relaxed: 100
+      normal: 70
+      crowded: 40
+      very-crowded: 10
 
 naver:
   search:
