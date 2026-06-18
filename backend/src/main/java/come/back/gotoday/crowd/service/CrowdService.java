@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 혼잡도 조회 비즈니스 로직을 담당하는 서비스입니다.
@@ -92,6 +95,178 @@ public class CrowdService {
      */
     private boolean isFresh(CrowdStatus crowdStatus) {
         return crowdStatus.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(CACHE_TTL_MINUTES));
+    }
+
+    /**
+     * 서울시 API에서 최신 혼잡도 데이터를 강제로 조회하여 DB에 저장합니다.
+     *
+     * 정기 수집 스케줄러에서 사용하며, 기존 5분 캐시 여부와 관계없이
+     * 외부 API를 호출해 새로운 혼잡도 이력을 저장합니다.
+     *
+     * @param areaName 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소명
+     * @return 새로 저장된 혼잡도 응답 DTO
+     */
+    public CrowdResponse refreshCrowdStatus(String areaName) {
+        log.info("혼잡도 강제 갱신 시작: areaName={}", areaName);
+        CrowdResponse response = fetchAndSaveCrowdStatus(areaName);
+        log.info("혼잡도 강제 갱신 완료: areaName={}", areaName);
+        return response;
+    }
+
+    /**
+     * 서울시에서 제공하는 전체 혼잡도 대상 지역의 최신 데이터를 수집하여 DB에 저장합니다.
+     *
+     * 한 지역의 수집에 실패하더라도 나머지 지역의 수집은 계속 진행합니다.
+     *
+     * @return 전체 지역 수집 성공·실패 건수
+     */
+    public CrowdCollectionResult refreshAllCrowdStatuses() {
+        List<String> areaNames = seoulCrowdClient.getAllAreaNames();
+
+        log.info("전체 지역 혼잡도 강제 갱신 시작: targetAreaCount={}", areaNames.size());
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (String areaName : areaNames) {
+            try {
+                refreshCrowdStatus(areaName);
+                successCount++;
+            } catch (RuntimeException exception) {
+                failureCount++;
+                log.warn(
+                        "전체 지역 혼잡도 갱신 중 일부 지역 실패: areaName={}, message={}",
+                        areaName,
+                        exception.getMessage(),
+                        exception
+                );
+            }
+        }
+
+        log.info(
+                "전체 지역 혼잡도 강제 갱신 완료: successCount={}, failureCount={}",
+                successCount,
+                failureCount
+        );
+
+        return new CrowdCollectionResult(successCount, failureCount);
+    }
+
+    /**
+     * 전체 지역 혼잡도 수집 결과입니다.
+     *
+     * @param successCount 수집 성공 지역 수
+     * @param failureCount 수집 실패 지역 수
+     */
+    public record CrowdCollectionResult(
+            int successCount,
+            int failureCount
+    ) {
+    }
+
+    /**
+     * 미래 방문 시각의 예상 혼잡도를 과거 동일 요일·동일 시간대 데이터로 계산합니다.
+     *
+     * 최근 8주 동안 저장된 동일 지역의 혼잡도 이력 중 방문 예정일과 같은 요일,
+     * 같은 시간대의 데이터만 사용하여 최소·최대 인구 평균과 예상 혼잡도 단계를 계산합니다.
+     *
+     * @param areaName 혼잡도를 예측할 서울시 핫스팟 장소명
+     * @param visitAt 사용자의 예상 방문 시각
+     * @return 과거 혼잡도 이력을 기반으로 계산한 예상 혼잡도 응답 DTO
+     */
+    public CrowdResponse getPredictedCrowdStatus(String areaName, LocalDateTime visitAt) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime historyStartAt = now.minusWeeks(8);
+
+        List<CrowdStatus> histories = crowdStatusRepository
+                .findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+                        areaName,
+                        historyStartAt,
+                        now
+                )
+                .stream()
+                .filter(history -> history.getMeasuredAt() != null)
+                .filter(history -> history.getMeasuredAt().getDayOfWeek() == visitAt.getDayOfWeek())
+                .filter(history -> history.getMeasuredAt().getHour() == visitAt.getHour())
+                .toList();
+
+        if (histories.isEmpty()) {
+            log.info(
+                    "예측에 사용할 과거 혼잡도 데이터가 없어 현재 혼잡도를 반환합니다. areaName={}, visitAt={}",
+                    areaName,
+                    visitAt
+            );
+            return getCrowdStatus(areaName);
+        }
+
+        int averagePopulationMin = calculateAveragePopulationMin(histories);
+        int averagePopulationMax = calculateAveragePopulationMax(histories);
+        CongestionLevel predictedLevel = calculatePredictedLevel(histories);
+        CrowdStatus latestHistory = histories.get(histories.size() - 1);
+
+        log.info(
+                "미래 혼잡도 예측 완료: areaName={}, visitAt={}, historyCount={}, predictedLevel={}, populationMin={}, populationMax={}",
+                areaName,
+                visitAt,
+                histories.size(),
+                predictedLevel,
+                averagePopulationMin,
+                averagePopulationMax
+        );
+
+        return new CrowdResponse(
+                areaName,
+                latestHistory.getAreaCode(),
+                predictedLevel,
+                predictedLevel.getText(),
+                "과거 동일 요일·시간대 혼잡도 평균을 기반으로 계산한 예상값입니다.",
+                averagePopulationMin,
+                averagePopulationMax,
+                visitAt
+        );
+    }
+
+    /**
+     * 과거 혼잡도 이력의 최소 인구 평균을 계산합니다.
+     */
+    private int calculateAveragePopulationMin(List<CrowdStatus> histories) {
+        return (int) Math.round(
+                histories.stream()
+                        .map(CrowdStatus::getPopulationMin)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .average()
+                        .orElse(0.0)
+        );
+    }
+
+    /**
+     * 과거 혼잡도 이력의 최대 인구 평균을 계산합니다.
+     */
+    private int calculateAveragePopulationMax(List<CrowdStatus> histories) {
+        return (int) Math.round(
+                histories.stream()
+                        .map(CrowdStatus::getPopulationMax)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .average()
+                        .orElse(0.0)
+        );
+    }
+
+    /**
+     * 과거 혼잡도 이력에서 가장 자주 나타난 혼잡도 단계를 예상 단계로 사용합니다.
+     */
+    private CongestionLevel calculatePredictedLevel(List<CrowdStatus> histories) {
+        return histories.stream()
+                .map(CrowdStatus::getCongestionLevel)
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(level -> level, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(CongestionLevel.NORMAL);
     }
 
     /**

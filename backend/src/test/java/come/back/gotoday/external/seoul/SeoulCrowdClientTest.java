@@ -30,6 +30,9 @@ class SeoulCrowdClientTest {
     private SeoulApiProperties seoulApiProperties;
 
     @Mock
+    private SeoulCrowdArea seoulCrowdArea;
+
+    @Mock
     private ObjectProvider<RestClient.Builder> restClientBuilderProvider;
 
     @Mock
@@ -51,6 +54,7 @@ class SeoulCrowdClientTest {
 
         seoulCrowdClient = new SeoulCrowdClient(
                 seoulApiProperties,
+                seoulCrowdArea,
                 restClientBuilderProvider
         );
     }

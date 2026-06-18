@@ -2,13 +2,14 @@ package come.back.gotoday.external.seoul;
 
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
-
-import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
 
 /**
  * 서울시 실시간 도시데이터 API를 호출하는 외부 API 클라이언트입니다.
@@ -39,6 +40,9 @@ public class SeoulCrowdClient {
     /** 서울시 API 기본 URL과 인증키 설정 값입니다. */
     private final SeoulApiProperties seoulApiProperties;
 
+    /** 서울시 혼잡도 대상 전체 지역명 설정입니다. */
+    private final SeoulCrowdArea seoulCrowdArea;
+
     /**
      * 서울시 API 설정 값을 주입받고 RestClient를 생성합니다.
      *
@@ -47,11 +51,24 @@ public class SeoulCrowdClient {
      */
     public SeoulCrowdClient(
             SeoulApiProperties seoulApiProperties,
+            SeoulCrowdArea seoulCrowdArea,
             ObjectProvider<RestClient.Builder> restClientBuilderProvider
     ) {
         RestClient.Builder restClientBuilder = restClientBuilderProvider.getIfAvailable(RestClient::builder);
         this.restClient = restClientBuilder.build();
         this.seoulApiProperties = seoulApiProperties;
+        this.seoulCrowdArea = seoulCrowdArea;
+    }
+
+    /**
+     * 서울시 실시간 도시데이터 API에서 제공하는 전체 혼잡도 대상 지역명을 반환합니다.
+     *
+     * 전체 지역 혼잡도 이력을 정기 수집할 때 사용합니다.
+     *
+     * @return 서울시 혼잡도 대상 전체 지역명 목록
+     */
+    public List<String> getAllAreaNames() {
+        return seoulCrowdArea.getAllAreaNames();
     }
 
     /**

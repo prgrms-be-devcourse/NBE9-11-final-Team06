@@ -26,7 +26,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
+        "crowd.scheduler.enabled=false"
+})
 @AutoConfigureMockMvc
 @Transactional // 테스트 완료 후 DB 자동 Rollback 보장
 @WithMockUser  // 시큐리티 필터 통과용 가상 유저

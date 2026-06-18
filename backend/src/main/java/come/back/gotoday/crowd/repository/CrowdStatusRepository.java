@@ -3,6 +3,8 @@ package come.back.gotoday.crowd.repository;
 import come.back.gotoday.crowd.entity.CrowdStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -23,4 +25,21 @@ public interface CrowdStatusRepository extends JpaRepository<CrowdStatus, Long> 
      * @return 해당 장소의 가장 최근 저장 데이터가 있으면 Optional에 담아 반환
      */
     Optional<CrowdStatus> findTopByAreaNameOrderByCreatedAtDesc(String areaName);
+
+    /**
+     * 특정 지역의 지정된 기간 내 혼잡도 이력을 측정 시각 오름차순으로 조회합니다.
+     *
+     * 미래 일정의 혼잡도를 예측할 때 최근 일정 기간의 데이터를 조회한 뒤,
+     * 서비스 계층에서 방문 예정일과 동일한 요일 및 시간대만 필터링하는 데 사용합니다.
+     *
+     * @param areaName 조회할 서울시 핫스팟 장소명
+     * @param startAt 조회 시작 시각(포함)
+     * @param endAt 조회 종료 시각(포함)
+     * @return 기간 내 저장된 혼잡도 이력 목록
+     */
+    List<CrowdStatus> findAllByAreaNameAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+            String areaName,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    );
 }
