@@ -1,5 +1,6 @@
 package come.back.gotoday.external.kakao.service;
 
+import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,15 +39,16 @@ public class KakaoLocalService {
 
     public KakaoPlaceResponse searchRestaurant(
             double latitude,
-            double longitude
+            double longitude,
+            RestaurantType restaurantType
     ) {
 
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .scheme("https")
                         .host("dapi.kakao.com")
-                        .path("/v2/local/search/category.json")
-                        .queryParam("category_group_code", "FD6")
+                        .path("/v2/local/search/keyword.json")
+                        .queryParam("query", restaurantType.getKeyword())
                         .queryParam("x", longitude)
                         .queryParam("y", latitude)
                         .queryParam("radius", 2000)

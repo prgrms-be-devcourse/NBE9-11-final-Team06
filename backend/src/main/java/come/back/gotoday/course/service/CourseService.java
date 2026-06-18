@@ -77,7 +77,7 @@ public class CourseService {
         KakaoPlaceResponse cafeResponse = kakaoLocalService.searchCafe(centerLat, centerLng);
         KakaoPlaceDocument cafeDoc = cafeResponse.documents().stream().findFirst().orElse(null);
 
-        KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng);
+        KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng, request.restaurantType());
         KakaoPlaceDocument restaurantDoc = restaurantResponse.documents().stream().findFirst().orElse(null);
 
         // 5. 코스 마스터 엔티티 생성
