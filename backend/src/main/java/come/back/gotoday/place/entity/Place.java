@@ -3,6 +3,8 @@ package come.back.gotoday.place.entity;
 import come.back.gotoday.category.entity.Category;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
@@ -58,9 +60,12 @@ public class Place {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    //자동 주입되도록 수정
+    @CreatedDate
+    @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
@@ -79,8 +84,6 @@ public class Place {
         this.source = source;
         this.externalId = externalId;
         this.isActive = isActive;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // [규칙 반영] 정적 팩토리 메서드
@@ -112,11 +115,9 @@ public class Place {
         this.placeUrl = placeUrl;
         this.description = description;
         this.externalId = externalId;
-        this.updatedAt = LocalDateTime.now();
     }
 
     public void deactivate() {
         this.isActive = false;
-        this.updatedAt = LocalDateTime.now();
     }
 }

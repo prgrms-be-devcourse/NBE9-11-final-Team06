@@ -8,6 +8,7 @@ public record PlaceResponse(
         String address,
         BigDecimal latitude,
         BigDecimal longitude,
+        String url,
         Long categoryId
 ) {
 }

@@ -2,6 +2,9 @@ package come.back.gotoday.place.service;
 
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
+import come.back.gotoday.course.entity.Course;
+import come.back.gotoday.course.entity.CoursePlace;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
 import come.back.gotoday.external.naver.dto.NaverLocalSearchResponse;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
@@ -14,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -72,6 +76,7 @@ public class PlaceService {
                 place.getAddress(),
                 place.getLatitude(),
                 place.getLongitude(),
+                place.getPlaceUrl(),
                 place.getCategory().getId()
         );
 
@@ -90,6 +95,7 @@ public class PlaceService {
                         place.getAddress(),
                         place.getLatitude(),
                         place.getLongitude(),
+                        place.getPlaceUrl(),
                         place.getCategory().getId()
                 ))
                 .toList();
@@ -134,4 +140,35 @@ public class PlaceService {
         placeRepository.delete(place);
         log.info("장소 삭제 처리 완료: placeId={}", placeId);
     }
+
+    //DB에 Place 있으면 가져오고, 없으면 새로 만들어서 저장하는 메서드
+    @Transactional
+    public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
+
+        return placeRepository
+                .findByNameAndAddressAndIsActiveTrue(
+                        doc.placeName(),
+                        doc.addressName()
+                )
+                .orElseGet(() ->
+                        placeRepository.save(
+                                Place.builder()
+                                        .name(doc.placeName())
+                                        .address(doc.addressName())
+                                        .roadAddress(doc.roadAddressName())
+                                        .phone(doc.phone())
+                                        .latitude(BigDecimal.valueOf(Double.parseDouble(doc.y())))
+                                        .longitude(BigDecimal.valueOf(Double.parseDouble(doc.x())))
+                                        .placeUrl(doc.placeUrl())
+                                        .category(category)
+                                        .isActive(true)
+                                        .source("KAKAO")
+                                        .build()
+                        )
+                );
+    }
+
+
+
+
 }
