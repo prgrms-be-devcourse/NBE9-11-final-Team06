@@ -51,7 +51,7 @@ public class KakaoLocalService {
                         .queryParam("query", restaurantType.getKeyword())
                         .queryParam("x", longitude)
                         .queryParam("y", latitude)
-                        .queryParam("radius", 2000)
+                        .queryParam("radius", 2000) //2km이내에 있는
                         .queryParam("sort", "distance")
                         .build())
                 .header("Authorization", "KakaoAK " + apiKey)

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import {
   CATEGORIES,
   COMPANIONS,
+  RestaurantType,
   SEOUL_AREAS,
   type Category,
   type Companion,
@@ -26,7 +27,7 @@ import { SiteHeader } from "@/components/site-header"
 import { NaverLocationPicker } from "@/components/naver-location-picker"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
-const STEPS = ["날짜", "위치", "동행", "취향"]
+const STEPS = ["날짜", "위치", "동행", "음식", "취향"]
 const MAX_CATEGORIES = 5
 const PREFERENCE_CATEGORIES = CATEGORIES.filter(
   (category) => category.label !== "식당" && category.label !== "카페",
@@ -51,12 +52,14 @@ export function PlanWizard() {
   const [categories, setCategories] = useState<Category[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [restaurantType, setRestaurantType] = useState<RestaurantType | null>(null)
 
   const canNext =
-    (step === 0 && !!date) ||
-    (step === 1 && !!selectedLocation) ||
-    (step === 2 && !!companion) ||
-    step === 3
+  (step === 0 && !!date) ||
+  (step === 1 && !!selectedLocation) ||
+  (step === 2 && !!companion) ||
+  (step === 3 && !!restaurantType)||
+  (step === 4 && categories.length > 0)
 
   function toggleCategory(c: Category) {
     setCategories((prev) => {
@@ -442,34 +445,66 @@ export function PlanWizard() {
             <div className="flex flex-col gap-4">
               <StepHeader
                 icon={Sparkles}
-                title="어떤 걸 좋아하세요?"
-                desc={`원하는 카테고리를 골라주세요. (최대 ${MAX_CATEGORIES}개, 선택 안 하면 전체 추천)`}
+                title="어떤 음식을 좋아하세요?"
+                desc="식당 추천을 위해 음식 종류를 선택해주세요."
               />
+
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {PREFERENCE_CATEGORIES.map((c) => {
-                  const active = categories.includes(c.value)
-                  return (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => toggleCategory(c.value)}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-2xl border p-4 transition-all",
-                        active
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "border-border hover:border-primary/50",
-                      )}
-                    >
-                      <span className="text-2xl" aria-hidden>
-                        {c.emoji}
-                      </span>
-                      <span className="text-sm font-semibold">{c.label}</span>
-                    </button>
-                  )
-                })}
+                {[
+                  { value: "KOREAN", label: "한식", emoji: "🍚" },
+                  { value: "WESTERN", label: "양식", emoji: "🍝" },
+                  { value: "JAPANESE", label: "일식", emoji: "🍣" },
+                  { value: "CHINESE", label: "중식", emoji: "🥟" },
+                ].map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => setRestaurantType(type.value as any)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-2xl border p-4",
+                      restaurantType === type.value
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <span className="text-2xl">{type.emoji}</span>
+                    <span className="text-sm font-semibold">{type.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
+          {step === 4 && (
+          <div className="flex flex-col gap-4">
+            <StepHeader
+              icon={Sparkles}
+              title="어떤 걸 좋아하세요?"
+              desc={`원하는 카테고리를 골라주세요. (최대 ${MAX_CATEGORIES}개, 선택 안 하면 전체 추천)`}
+            />
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PREFERENCE_CATEGORIES.map((c) => {
+                const active = categories.includes(c.value)
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => toggleCategory(c.value)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-2xl border p-4",
+                      active
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <span className="text-2xl">{c.emoji}</span>
+                    <span className="text-sm font-semibold">{c.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
           {submitError && (
             <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-medium text-destructive">
@@ -496,7 +531,7 @@ export function PlanWizard() {
                 <ArrowRight className="size-4" />
               </Button>
             ) : (
-              <Button onClick={submit} disabled={isSubmitting || !canNext} className="gap-1">
+              <Button onClick={submit} disabled={isSubmitting ||!restaurantType} className="gap-1">
                 <Sparkles className="size-4" />
                 {isSubmitting ? "추천 코스 생성 중..." : "코스 추천받기"}
               </Button>
