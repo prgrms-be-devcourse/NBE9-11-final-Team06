@@ -152,18 +152,20 @@ public class PlaceService {
                 )
                 .orElseGet(() ->
                         placeRepository.save(
-                                Place.builder()
-                                        .name(doc.placeName())
-                                        .address(doc.addressName())
-                                        .roadAddress(doc.roadAddressName())
-                                        .phone(doc.phone())
-                                        .latitude(BigDecimal.valueOf(Double.parseDouble(doc.y())))
-                                        .longitude(BigDecimal.valueOf(Double.parseDouble(doc.x())))
-                                        .placeUrl(doc.placeUrl())
-                                        .category(category)
-                                        .isActive(true)
-                                        .source("KAKAO")
-                                        .build()
+                                Place.create(
+                                        category,
+                                        doc.placeName(),
+                                        doc.addressName(),
+                                        doc.roadAddressName(),
+                                        BigDecimal.valueOf(Double.parseDouble(doc.y())),
+                                        BigDecimal.valueOf(Double.parseDouble(doc.x())),
+                                        doc.phone(),
+                                        doc.placeUrl(),
+                                        null,
+                                        "KAKAO",
+                                        doc.placeUrl().substring(doc.placeUrl().lastIndexOf("/") + 1),
+                                        true
+                                )
                         )
                 );
     }

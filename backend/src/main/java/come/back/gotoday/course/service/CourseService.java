@@ -166,7 +166,8 @@ public class CourseService {
         Category cafeCategory = categoryRepository.findByName("카페")
                 .orElseThrow(() -> new IllegalArgumentException("카페 카테고리 없음"));
 
-        // 🔥 핵심: 여기서 DB 저장 (UPsert)
+
+        //DB 저장 Place
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
                 .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
@@ -220,7 +221,7 @@ public class CourseService {
                             // 💡 [수정] 이름 매핑 우선순위 필터링 개조
                             if (cp.getEvent() != null) {
                                 // 1. 코스 장소에 '행사(Event)'가 꽂혀있는 경우 -> 행사 정보가 최우선!
-                                placeName = cp.getEvent().getTitle(); // 🎯 행사명을 바로 대입!
+                                placeName = cp.getEvent().getTitle(); //행사명 대입한다.
                                 if (cp.getEvent().getPlace() != null) {
                                     placeId = cp.getEvent().getPlace().getId();
                                 }
