@@ -105,7 +105,6 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   const [isSearching, setIsSearching] = useState(false)
 
   const naverMapClientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 
   useEffect(() => {
     setKeyword(initialKeyword)
@@ -208,9 +207,11 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     setErrorMessage(null)
 
     try {
-      const normalizedApiBaseUrl = apiBaseUrl.replace(/\/$/, "")
       const response = await fetch(
-        `${normalizedApiBaseUrl}/api/places/search?query=${encodeURIComponent(trimmedKeyword)}`,
+          `/api/places/search?query=${encodeURIComponent(trimmedKeyword)}`,
+          {
+            credentials: "include",
+          },
       )
 
       if (!response.ok) {
