@@ -123,38 +123,6 @@ public class CourseService {
     }
 
 
-    //코스 생성시에 place 저장하는 메서드
-    public void savePlace(
-            Course course,
-            KakaoPlaceDocument placeDoc,
-            int order,
-            String categoryName,
-            String userPreferenceText
-    ) {
-        if (placeDoc == null) return;
-
-        Category category = categoryRepository.findByName(categoryName)
-                .orElseThrow(() -> new IllegalArgumentException(categoryName + " 카테고리가 없습니다."));
-
-        Place place = placeService.getOrCreatePlace(placeDoc, category);
-
-        course.addCoursePlace(
-                CoursePlace.create(
-                        course,
-                        place,
-                        null,
-                        order,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        "추천 장소입니다. (" + userPreferenceText + " 반영)"
-                )
-        );
-    }
-
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CourseCreateRequest request) {
 

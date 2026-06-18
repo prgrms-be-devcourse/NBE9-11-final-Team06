@@ -9,7 +9,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableRetry
 @EnableScheduling
-@EnableJpaAuditing
 @SpringBootApplication
 @ConfigurationPropertiesScan
 public class GoTodayApplication {
