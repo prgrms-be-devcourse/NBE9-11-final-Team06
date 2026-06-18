@@ -13,13 +13,14 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("local")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@org.junit.jupiter.api.Disabled("로컬에서 도커에 직접 값을 넣을 때 사용하는 테스트 코드 / 배치를 강제로 실행")
+@org.junit.jupiter.api.Disabled("로컬에서 도커에 직접 값을 넣을 때 사용하는 테스트 코드")
 class RealDataRecommendationFilterTest {
 
     private static final Logger log = LoggerFactory.getLogger(RealDataRecommendationFilterTest.class);
@@ -66,7 +67,7 @@ class RealDataRecommendationFilterTest {
         // When: ✨ 역변한 팀원의 getRecommendedEventIds 파라미터 구조에 맞춰 정밀 호출 완료
         List<Long> recommendedIds = recommendationService.getRecommendedEventIds(
                 sampleArea,
-                List.of("전시/미술"),
+                Set.of(17L),
                 queryText,
                 start,
                 end,

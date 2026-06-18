@@ -1,7 +1,7 @@
 package come.back.gotoday.recommend.service;
 
 import come.back.gotoday.category.entity.Category;
-import come.back.gotoday.category.repository.CategoryRepository; // 프로젝트 실제 패키지 경로에 맞게 확인 필요
+import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.category.type.CategoryType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.enums.EventSource;
@@ -20,11 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
+@org.junit.jupiter.api.Disabled("로컬에서 사용 가능한 테스트 코드, SEOUL_CROWD_AREA_NAMES이 로컬에 존재->요일별 필터링 가능")
 class RecommendationScheduleFilterTest {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendationScheduleFilterTest.class);
@@ -53,7 +55,7 @@ class RecommendationScheduleFilterTest {
     @BeforeEach
     void setUp() {
         // 1. 제공된 테이블 구조 규칙 반영: Category 정적 팩토리 메서드를 통해 생성 및 저장
-        testCategory = Category.create("전시/미술", CategoryType.EVENT); // CategoryType 구조에 맞게 매핑 필요
+        testCategory = Category.create("전시/미술", CategoryType.EVENT);
         categoryRepository.save(testCategory);
 
         // 2. 제공된 테이블 구조 규칙 반영: Member 정적 팩토리 메서드로 필수 제약조건(not null) 충족하여 생성
@@ -84,7 +86,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "마포",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
@@ -115,7 +117,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "종로",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
@@ -146,7 +148,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "종로",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
@@ -177,7 +179,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "종로",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
@@ -218,7 +220,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "종로",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
@@ -272,7 +274,7 @@ class RecommendationScheduleFilterTest {
         // When: 변경된 9개의 파라미터 구조에 맞추어 연동 호출 수행
         List<Long> resultIds = recommendationService.getRecommendedEventIds(
                 "강남",
-                List.of("전시/미술"),
+                Set.of(testCategory.getId()),
                 queryText,
                 start,
                 end,
