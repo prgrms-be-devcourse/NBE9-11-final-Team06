@@ -32,6 +32,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  frontend:
+    container_name: gotoday-frontend
+    image: ghcr.io/prgrms-be-devcourse/gotoday-frontend:latest
+    expose:
+      - "3000"
+    restart: unless-stopped
+
   mysql:
     container_name: gotoday-mysql
     image: mysql:8.0
