@@ -8,6 +8,7 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
+      - frontend
     restart: unless-stopped
 
   backend:
@@ -15,6 +16,8 @@ services:
     image: ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
     expose:
       - "8080"
+    env_file:
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SEOUL_API_KEY: ${SEOUL_API_KEY:-dummy}

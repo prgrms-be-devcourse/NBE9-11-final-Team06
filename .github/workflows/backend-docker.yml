@@ -111,6 +111,7 @@ jobs:
             cd ~/gotoday
 
             docker pull ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
+            docker pull ghcr.io/prgrms-be-devcourse/gotoday-frontend:latest || true
             docker compose down
             docker compose up -d
 
