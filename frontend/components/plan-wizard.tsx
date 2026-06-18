@@ -24,7 +24,6 @@ import {
 } from "@/lib/data"
 import { SiteHeader } from "@/components/site-header"
 import { NaverLocationPicker } from "@/components/naver-location-picker"
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
 const STEPS = ["날짜", "위치", "동행", "취향"]
 const MAX_CATEGORIES = 5
@@ -217,7 +216,7 @@ export function PlanWizard() {
         headers.Authorization = `Bearer ${accessToken}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/recommendations/courses`, {
+      const response = await fetch(`/api/recommendations/courses`, {
         method: "POST",
         redirect: "manual",
         credentials: "include",

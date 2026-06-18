@@ -18,9 +18,6 @@ import type { CompanionType, MobilityLevel } from "@/lib/types"
 import { toast } from "sonner"
 import { MapPin } from "lucide-react"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
-
 const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
   { value: "SOLO", label: "혼자" },
   { value: "COUPLE", label: "커플" },
@@ -39,8 +36,8 @@ export function AuthForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const googleOAuthLoginUrl = `${API_BASE_URL}/oauth2/authorization/google`
-  const kakaoOAuthLoginUrl = `${API_BASE_URL}/oauth2/authorization/kakao`
+  const googleOAuthLoginUrl = `/oauth2/authorization/google`
+  const kakaoOAuthLoginUrl = `/oauth2/authorization/kakao`
 
   const [mode, setMode] = useState("login")
 

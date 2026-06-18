@@ -18,8 +18,6 @@ import { Card } from "@/components/ui/card"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteHeader } from "@/components/site-header"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
-
 type CoursePlace = {
   id?: number
   placeId?: number
@@ -257,7 +255,7 @@ function RecommendContent() {
           headers.Authorization = `Bearer ${accessToken}`
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
+        const response = await fetch(`/api/courses/${courseId}`, {
           method: "GET",
           credentials: "include",
           headers,

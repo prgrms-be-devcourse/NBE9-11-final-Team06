@@ -1,15 +1,5 @@
 import type { ApiResponse } from "./types"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
-
-
-
-
-  console.log("NEXT_PUBLIC_API_BASE_URL =", process.env.NEXT_PUBLIC_API_BASE_URL)
-
-  console.log("API_BASE_URL =", API_BASE_URL)
-
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
 interface ApiRequestOptions {
@@ -23,13 +13,13 @@ export async function apiRequest<T>(
 ): Promise<ApiResponse<T>> {
   const requestInit = createRequestInit(options)
 
-  let response = await fetch(`${API_BASE_URL}${path}`, requestInit)
+  let response = await fetch(path, requestInit)
 
   if (response.status === 401 && shouldTryReissue(path)) {
     const reissueSuccess = await reissueAccessToken()
 
     if (reissueSuccess) {
-      response = await fetch(`${API_BASE_URL}${path}`, requestInit)
+      response = await fetch(path, requestInit)
     }
   }
 
@@ -53,7 +43,7 @@ function shouldTryReissue(path: string): boolean {
 
 async function reissueAccessToken(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/reissue`, {
+    const response = await fetch(`/api/auth/reissue`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
