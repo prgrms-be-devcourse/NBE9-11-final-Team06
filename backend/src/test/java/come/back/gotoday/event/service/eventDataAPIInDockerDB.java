@@ -1,6 +1,7 @@
 package come.back.gotoday.event.service;
 
 
+import come.back.gotoday.GoTodayApplication;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
+@SpringBootTest(classes = GoTodayApplication.class)
 @ActiveProfiles("dev")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @org.junit.jupiter.api.Disabled("로컬에서 도커에 직접 값을 넣을 때 사용하는 테스트 코드/ 배치를 강제로 실행")
