@@ -21,7 +21,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     Optional<Place> findByIdAndIsActiveTrue(Long id);
 
-    Optional<Place> findByName(String name);
+    Optional<Place> findByNameAndAddressAndIsActiveTrue(
+            String name,
+            String address
+    );
 
     @Query("""
         SELECT p

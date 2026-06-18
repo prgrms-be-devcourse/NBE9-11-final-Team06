@@ -111,7 +111,11 @@ public class CourseService {
             Category restaurantCategory = categoryRepository.findByName("맛집")
                     .orElseThrow(() -> new IllegalArgumentException("'맛집' 카테고리가 초기화되지 않았습니다."));
 
-            Place restaurantPlace = placeRepository.findByName(restaurantDoc.placeName())
+            Place restaurantPlace = placeRepository
+                    .findByNameAndAddressAndIsActiveTrue(
+                            restaurantDoc.placeName(),
+                            restaurantDoc.addressName()
+                    )
                     .orElseGet(() -> placeRepository.save(
                             Place.builder()
                                     .name(restaurantDoc.placeName())
@@ -145,7 +149,11 @@ public class CourseService {
             Category cafeCategory = categoryRepository.findByName("카페")
                     .orElseThrow(() -> new IllegalArgumentException("'카페' 카테고리가 초기화되지 않았습니다."));
 
-            Place cafePlace = placeRepository.findByName(cafeDoc.placeName())
+            Place cafePlace = placeRepository
+                    .findByNameAndAddressAndIsActiveTrue(
+                            cafeDoc.placeName(),
+                            cafeDoc.addressName()
+                    )
                     .orElseGet(() -> placeRepository.save(
                             Place.builder()
                                     .name(cafeDoc.placeName())
