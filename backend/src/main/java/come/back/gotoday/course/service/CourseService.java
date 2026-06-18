@@ -51,7 +51,7 @@ public class CourseService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
 
-        List<Event> events = eventRepository.findAllById(request.eventIds());
+        List<Event> events = request.eventIds() != null ? eventRepository.findAllById(request.eventIds()) : List.of();
 
         Course course = Course.create(
                 member,
@@ -141,7 +141,7 @@ public class CourseService {
                 );
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
-        
+
         double centerLat = events.stream()
                 .filter(e -> e.getLatitude() != null)
                 .mapToDouble(Event::getLatitude)
