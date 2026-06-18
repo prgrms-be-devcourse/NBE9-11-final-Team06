@@ -1,167 +1,385 @@
+-- =================================================================================
+-- Category Seed Data
+-- EVENT: 서울시 문화행사 원본 분류용
+-- PREFERENCE: 회원가입 / 온보딩 / 마이페이지 선호정보 선택용
+-- =================================================================================
+
 -- 1. 무용
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '무용', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '무용');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '무용' AND `type` = 'EVENT'
+);
 
 -- 2. 축제-기타
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-기타', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-기타');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-기타' AND `type` = 'EVENT'
+);
 
--- 3. 기타 (기타 등등)
+-- 3. 기타
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '기타', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '기타');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '기타' AND `type` = 'EVENT'
+);
 
 -- 4. 축제-자연/경관
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-자연/경관', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-자연/경관');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-자연/경관' AND `type` = 'EVENT'
+);
 
 -- 5. 교육/체험
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '교육/체험', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '교육/체험');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '교육/체험' AND `type` = 'EVENT'
+);
 
 -- 6. 영화
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '영화', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '영화');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '영화' AND `type` = 'EVENT'
+);
 
 -- 7. 축제-관광/체육
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-관광/체육', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-관광/체육');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-관광/체육' AND `type` = 'EVENT'
+);
 
 -- 8. 국악
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '국악', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '국악');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '국악' AND `type` = 'EVENT'
+);
 
 -- 9. 축제-문화/예술
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-문화/예술', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-문화/예술');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-문화/예술' AND `type` = 'EVENT'
+);
 
 -- 10. 연극
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '연극', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '연극');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '연극' AND `type` = 'EVENT'
+);
 
 -- 11. 독주/독창회
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '독주/독창회', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '독주/독창회');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '독주/독창회' AND `type` = 'EVENT'
+);
 
 -- 12. 축제-전통/역사
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-전통/역사', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-전통/역사');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-전통/역사' AND `type` = 'EVENT'
+);
 
 -- 13. 뮤지컬/오페라
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '뮤지컬/오페라', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '뮤지컬/오페라');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '뮤지컬/오페라' AND `type` = 'EVENT'
+);
 
 -- 14. 콘서트
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '콘서트', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '콘서트');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '콘서트' AND `type` = 'EVENT'
+);
 
 -- 15. 축제-시민화합
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '축제-시민화합', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '축제-시민화합');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제-시민화합' AND `type` = 'EVENT'
+);
 
 -- 16. 클래식
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '클래식', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '클래식');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '클래식' AND `type` = 'EVENT'
+);
 
 -- 17. 전시/미술
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
 SELECT '전시/미술', 'EVENT', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '전시/미술');
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '전시/미술' AND `type` = 'EVENT'
+);
+
+-- =================================================================================
+-- Preference Categories
+-- 회원가입 / 온보딩 / 마이페이지 선호정보 선택용 카테고리
+-- =================================================================================
+
+-- 18. 전시
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '전시', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '전시' AND `type` = 'PREFERENCE'
+);
+
+-- 19. 공연
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '공연', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '공연' AND `type` = 'PREFERENCE'
+);
+
+-- 20. 축제
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '축제', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제' AND `type` = 'PREFERENCE'
+);
+
+-- 21. 체험
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '체험', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '체험' AND `type` = 'PREFERENCE'
+);
+
+-- 22. 식당
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '식당', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '식당' AND `type` = 'PREFERENCE'
+);
+
+-- 23. 카페
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '카페', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '카페' AND `type` = 'PREFERENCE'
+);
+
+-- 24. 산책
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '산책', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '산책' AND `type` = 'PREFERENCE'
+);
+
+-- 25. 문화시설
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '문화시설', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '문화시설' AND `type` = 'PREFERENCE'
+);
+
 -- =================================================================================
 -- 1. 기초 인프라 데이터 (회원, 선호도, 카테고리 선호, 장소) 삽입
 -- =================================================================================
 
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
 SELECT 1, 'seoul_culture_lover@gotoday.com', 'hashed_pass_456', '영등포마포러버', 'http://example.com/profile.jpg', 'USER', 'ACTIVE', NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 1);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `member`
+    WHERE `id` = 1
+);
 
--- 유저 선호 데이터 (User Preference) - 유저 1번
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
 SELECT 1, 1, '영등포', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 1);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `user_preference`
+    WHERE `id` = 1
+);
 
--- 유저 선호 카테고리 매핑 - 유저 1번
+-- 유저 1번: 공연, 문화시설, 체험
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 1, 1, 16 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 1);
+SELECT 1, 1, c.id
+FROM `category` c
+WHERE c.name = '공연'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 1
+);
 
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 2, 1, 13 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 2);
+SELECT 2, 1, c.id
+FROM `category` c
+WHERE c.name = '문화시설'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 2
+);
 
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 3, 1, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 3);
-
+SELECT 3, 1, c.id
+FROM `category` c
+WHERE c.name = '체험'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 3
+);
 
 -- 유저 2번 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
 SELECT 2, 'gallery_lover@gotoday.com', 'pass', '혼자하는전시', 'http://example.com/p2.jpg', 'USER', 'ACTIVE', NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 2);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `member`
+    WHERE `id` = 2
+);
 
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
 SELECT 2, 2, '종로', 'SOLO', 'NORMAL', TRUE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 2);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `user_preference`
+    WHERE `id` = 2
+);
+
+-- 유저 2번: 전시, 문화시설
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 4, 2, c.id
+FROM `category` c
+WHERE c.name = '전시'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 4
+);
 
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 4, 2, 17 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 4);
-
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 5, 2, 6 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 5);
-
+SELECT 5, 2, c.id
+FROM `category` c
+WHERE c.name = '문화시설'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 5
+);
 
 -- 유저 3번 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
 SELECT 3, 'festival_goer@gotoday.com', 'pass', '페스티벌크루', 'http://example.com/p3.jpg', 'USER', 'ACTIVE', NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 3);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `member`
+    WHERE `id` = 3
+);
 
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
 SELECT 3, 3, '홍대', 'FRIEND', 'NORMAL', FALSE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 3);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `user_preference`
+    WHERE `id` = 3
+);
+
+-- 유저 3번: 축제, 공연
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 6, 3, c.id
+FROM `category` c
+WHERE c.name = '축제'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 6
+);
 
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 6, 3, 9 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 6);
-
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 7, 3, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 7);
-
+SELECT 7, 3, c.id
+FROM `category` c
+WHERE c.name = '공연'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 7
+);
 
 -- 유저 4번 생성
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
 SELECT 4, 'mapo_family@gotoday.com', 'pass', '마포가족나들이', 'http://example.com/p4.jpg', 'USER', 'ACTIVE', NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `member` WHERE `id` = 4);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `member`
+    WHERE `id` = 4
+);
 
 INSERT INTO `user_preference` (`id`, `member_id`, `preferred_area`, `companion_type`, `mobility_level`, `avoid_crowded`, `created_at`, `updated_at`)
 SELECT 4, 4, '마포구', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `user_preference` WHERE `id` = 4);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `user_preference`
+    WHERE `id` = 4
+);
+
+-- 유저 4번: 공연, 체험
+INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
+SELECT 8, 4, c.id
+FROM `category` c
+WHERE c.name = '공연'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 8
+);
 
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 8, 4, 14 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 8);
-
-INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
-SELECT 9, 4, 5 WHERE NOT EXISTS (SELECT 1 FROM `user_preference_category` WHERE `id` = 9);
-
+SELECT 9, 4, c.id
+FROM `category` c
+WHERE c.name = '체험'
+  AND c.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1 FROM `user_preference_category`
+    WHERE `id` = 9
+);
 
 -- 장소 (Place) 생성
 INSERT INTO `place` (`id`, `category_id`, `name`, `address`, `road_address`, `latitude`, `longitude`, `phone`, `place_url`, `description`, `source`, `external_id`, `is_active`, `created_at`, `updated_at`)
 SELECT 100, 16, '영등포아트홀', '서울시 영등포구 국회대로53길 20', '서울시 영등포구 국회대로53길 20', 37.5261234, 126.9011234, '02-2670-3131', 'https://www.ydpcf.or.kr', '영등포 문화재단 핵심 아트홀', 'SEOUL_API', 'P_YDP_ART', TRUE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `place` WHERE `id` = 100);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `place`
+    WHERE `id` = 100
+);
 
 INSERT INTO `place` (`id`, `category_id`, `name`, `address`, `road_address`, `latitude`, `longitude`, `phone`, `place_url`, `description`, `source`, `external_id`, `is_active`, `created_at`, `updated_at`)
 SELECT 101, 16, '마포아트센터 대흥홀', '서울시 마포구 대흥로20길 28', '서울시 마포구 대흥로20길 28', 37.5501234, 126.9421234, '02-3274-8600', 'https://www.mfac.or.kr', '마포 문화공연의 중심지', 'SEOUL_API', 'P_MAPO_ART', TRUE, NOW(), NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM `place` WHERE `id` = 101);
+    WHERE NOT EXISTS (
+    SELECT 1 FROM `place`
+    WHERE `id` = 101
+);
 
 -- 2. 실제 API 원본 기반 Event 테이블 41개 전체 인서트 (embedding_vector는 NULL로 시작)
 -- =================================================================================

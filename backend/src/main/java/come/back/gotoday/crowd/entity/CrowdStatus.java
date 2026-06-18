@@ -18,7 +18,11 @@ import java.time.LocalDateTime;
 @Table(
         name = "crowd_status",
         indexes = {
-                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC")
+                @Index(name = "idx_area_name_created_at", columnList = "area_name, created_at DESC"),
+                @Index(
+                        name = "idx_crowd_status_area_measured_at",
+                        columnList = "area_name, measured_at"
+                )
         }
 )
 @Getter
@@ -46,6 +50,14 @@ public class CrowdStatus {
     /** 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 장소 코드입니다. */
     @Column(name = "area_code", length = 30)
     private String areaCode;
+
+    /** 서울시 실시간 도시데이터 API에서 제공하는 핫스팟 위도입니다. */
+    @Column(name = "latitude")
+    private Double latitude;
+
+    /** 서울시 실시간 도시데이터 API에서 제공하는 핫스팟 경도입니다. */
+    @Column(name = "longitude")
+    private Double longitude;
 
     /** 서울시 API의 한글 혼잡도 값을 우리 서비스 enum으로 변환해 저장합니다. */
     @Enumerated(EnumType.STRING)
@@ -82,13 +94,26 @@ public class CrowdStatus {
             Place place,
             String areaName,
             String areaCode,
+            Double latitude,
+            Double longitude,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
             String message,
             LocalDateTime measuredAt
     ) {
-        return new CrowdStatus(place, areaName, areaCode, congestionLevel, populationMin, populationMax, message, measuredAt);
+        return new CrowdStatus(
+                place,
+                areaName,
+                areaCode,
+                latitude,
+                longitude,
+                congestionLevel,
+                populationMin,
+                populationMax,
+                message,
+                measuredAt
+        );
     }
 
     /**
@@ -101,6 +126,8 @@ public class CrowdStatus {
             Place place,
             String areaName,
             String areaCode,
+            Double latitude,
+            Double longitude,
             CongestionLevel congestionLevel,
             Integer populationMin,
             Integer populationMax,
@@ -110,6 +137,8 @@ public class CrowdStatus {
         this.place = place;
         this.areaName = areaName;
         this.areaCode = areaCode;
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.congestionLevel = congestionLevel;
         this.populationMin = populationMin;
         this.populationMax = populationMax;

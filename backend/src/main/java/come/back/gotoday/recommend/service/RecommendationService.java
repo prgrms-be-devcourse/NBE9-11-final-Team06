@@ -3,8 +3,12 @@ package come.back.gotoday.recommend.service;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CourseRepository;
+import come.back.gotoday.crowd.service.CrowdScoreCalculator;
+import come.back.gotoday.crowd.service.NearestCrowdAreaService;
+import come.back.gotoday.crowd.util.GeoDistanceCalculator;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.event.service.EventScheduleMatcher;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
@@ -23,18 +27,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class RecommendationService {
+
+    private static final double AVOID_CROWD_PREFERENCE_WEIGHT = 0.5;
+    private static final double AVOID_CROWD_WEIGHT = 0.3;
+    private static final double AVOID_CROWD_DISTANCE_WEIGHT = 0.2;
+    private static final double INDIFFERENT_PREFERENCE_WEIGHT = 0.7;
+    private static final double INDIFFERENT_DISTANCE_WEIGHT = 0.3;
+    private static final double DEFAULT_CROWD_SCORE = 0.5;
 
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserPreferenceCategoryRepository userPreferenceCategoryRepository;
@@ -42,7 +49,10 @@ public class RecommendationService {
     private final MemberRepository memberRepository;
     private final CourseRepository courseRepository;
     private final PlaceRepository placeRepository;
+    private final NearestCrowdAreaService nearestCrowdAreaService;
+    private final CrowdScoreCalculator crowdScoreCalculator;
 
+    private final EventScheduleMatcher eventScheduleMatcher;
     private final SearchUtils searchUtils;
     private final VectorEmbeddingEngine vectorEngine;
 
@@ -52,6 +62,9 @@ public class RecommendationService {
                                  MemberRepository memberRepository,
                                  CourseRepository courseRepository,
                                  PlaceRepository placeRepository,
+                                 NearestCrowdAreaService nearestCrowdAreaService,
+                                 CrowdScoreCalculator crowdScoreCalculator,
+                                 EventScheduleMatcher eventScheduleMatcher,
                                  SearchUtils searchUtils,
                                  VectorEmbeddingEngine vectorEngine) {
         this.userPreferenceRepository = userPreferenceRepository;
@@ -60,6 +73,9 @@ public class RecommendationService {
         this.memberRepository = memberRepository;
         this.courseRepository = courseRepository;
         this.placeRepository = placeRepository;
+        this.nearestCrowdAreaService = nearestCrowdAreaService;
+        this.crowdScoreCalculator = crowdScoreCalculator;
+        this.eventScheduleMatcher = eventScheduleMatcher;
         this.searchUtils = searchUtils;
         this.vectorEngine = vectorEngine;
     }
@@ -91,6 +107,10 @@ public class RecommendationService {
                                 : null)
                         .orElse(null);
 
+        boolean avoidCrowds = preferenceOptional
+                .map(preference -> Boolean.TRUE.equals(preference.getAvoidCrowded()))
+                .orElse(false);
+
         String queryText = createQueryText(
                 selectedArea,
                 String.join(", ", selectedCategories),
@@ -103,6 +123,9 @@ public class RecommendationService {
                 queryText,
                 request.startDate(),
                 request.endDate(),
+                request.latitude(),
+                request.longitude(),
+                avoidCrowds,
                 request.getTopKOrDefault()
         );
 
@@ -240,12 +263,16 @@ public class RecommendationService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND));
 
         List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
+        boolean avoidCrowds = Boolean.TRUE.equals(preference.getAvoidCrowded());
         return getRecommendedEventIds(
                 preference.getPreferredArea(),
                 preferredCategories,
                 queryText,
                 searchStart,
                 searchEnd,
+                null,
+                null,
+                avoidCrowds,
                 topK
         );
     }
@@ -256,6 +283,9 @@ public class RecommendationService {
             String queryText,
             LocalDate searchStart,
             LocalDate searchEnd,
+            Double startLatitude,
+            Double startLongitude,
+            boolean avoidCrowds,
             int topK
     ) {
         List<Event> candidateEvents = eventRepository.findRecommendedEventsWithCategory(
@@ -282,6 +312,25 @@ public class RecommendationService {
         if (candidateEvents.isEmpty()) {
             log.warn("최종적으로 추천할 데이터가 없습니다.");
             return Collections.emptyList();
+        }
+        Set<DayOfWeek> userCourseDays = eventScheduleMatcher.getDaysOfWeekInPeriod(searchStart, searchEnd);
+
+        List<Event> dayOfWeekFilteredEvents = candidateEvents.stream()
+                .filter(event -> eventScheduleMatcher.isEventAvailableOnDays(
+                        event.getEventTime(),
+                        searchStart,
+                        searchEnd,
+                        userCourseDays
+                ))
+                .collect(Collectors.toList());
+
+        // 만약 요일 필터링을 거쳤더니 남은 행사가 0건인 경우 (선택 B: 원래 데이터를 복구하고 알림 플래그를 false로 전환)
+        if (dayOfWeekFilteredEvents.isEmpty()) {
+            log.info("요일 하드 필터링 결과 매칭되는 행사가 0건입니다. 선택 B 정책에 따라 요일 필터를 해제하고 차선책을 제공합니다.");
+            // candidateEvents 원본을 그대로 유지하여 형태 보존 처리
+        } else {
+            log.info("요일 하드 필터링 통과 완료. 남은 후보 개수: {}/{}", dayOfWeekFilteredEvents.size(), candidateEvents.size());
+            candidateEvents = dayOfWeekFilteredEvents; // 필터링된 컬렉션으로 교체
         }
 
         List<String> queryTokens = searchUtils.tokenize(queryText);
@@ -347,11 +396,160 @@ public class RecommendationService {
             }
         }
 
-        return rrfScores.entrySet().stream()
-                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
-                .limit(topK)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+        return selectGreedyEventIds(
+                candidateEvents,
+                rrfScores,
+                startLatitude,
+                startLongitude,
+                avoidCrowds,
+                topK
+        );
+    }
+
+    /**
+     * 기존 검색 관련도 점수를 선호 점수로 유지하면서 현재 위치와의 거리까지
+     * 매 선택 단계마다 다시 계산해 다음 행사를 고르는 그리디 선택 로직입니다.
+     *
+     * 시작 좌표가 없으면 첫 번째 행사는 선호 점수가 가장 높은 후보를 선택하고,
+     * 이후부터는 직전에 선택된 행사의 좌표를 현재 위치로 사용합니다.
+     */
+    private List<Long> selectGreedyEventIds(
+            List<Event> candidateEvents,
+            Map<Long, Double> preferenceScores,
+            Double startLatitude,
+            Double startLongitude,
+            boolean avoidCrowds,
+            int topK
+    ) {
+        if (topK <= 0 || candidateEvents.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        double maxPreferenceScore = preferenceScores.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .max()
+                .orElse(0.0);
+
+        List<GreedyCandidate> candidates = candidateEvents.stream()
+                .filter(event -> preferenceScores.containsKey(event.getId()))
+                .map(event -> new GreedyCandidate(
+                        event,
+                        normalizePreferenceScore(
+                                preferenceScores.getOrDefault(event.getId(), 0.0),
+                                maxPreferenceScore
+                        ),
+                        avoidCrowds ? calculateCrowdScore(event) : 0.0
+                ))
+                .toList();
+
+        List<Long> selectedEventIds = new ArrayList<>();
+        Set<Long> selectedIds = new HashSet<>();
+        Double currentLatitude = startLatitude;
+        Double currentLongitude = startLongitude;
+
+        while (selectedEventIds.size() < topK && selectedIds.size() < candidates.size()) {
+            Double scoringLatitude = currentLatitude;
+            Double scoringLongitude = currentLongitude;
+
+            GreedyCandidate selected = candidates.stream()
+                    .filter(candidate -> !selectedIds.contains(candidate.event().getId()))
+                    .max(Comparator
+                            .comparingDouble((GreedyCandidate candidate) -> calculateGreedyScore(
+                                    candidate,
+                                    scoringLatitude,
+                                    scoringLongitude,
+                                    avoidCrowds
+                            ))
+                            .thenComparingLong(candidate -> -candidate.event().getId()))
+                    .orElse(null);
+
+            if (selected == null) {
+                break;
+            }
+
+            Event selectedEvent = selected.event();
+            selectedEventIds.add(selectedEvent.getId());
+            selectedIds.add(selectedEvent.getId());
+
+            if (hasCoordinate(selectedEvent)) {
+                currentLatitude = selectedEvent.getLatitude();
+                currentLongitude = selectedEvent.getLongitude();
+            }
+        }
+
+        return selectedEventIds;
+    }
+
+    private double calculateGreedyScore(
+            GreedyCandidate candidate,
+            Double currentLatitude,
+            Double currentLongitude,
+            boolean avoidCrowds
+    ) {
+        double distanceScore = calculateDistanceScore(
+                candidate.event(),
+                currentLatitude,
+                currentLongitude
+        );
+
+        if (avoidCrowds) {
+            return (candidate.preferenceScore() * AVOID_CROWD_PREFERENCE_WEIGHT)
+                    + (candidate.crowdScore() * AVOID_CROWD_WEIGHT)
+                    + (distanceScore * AVOID_CROWD_DISTANCE_WEIGHT);
+        }
+
+        return (candidate.preferenceScore() * INDIFFERENT_PREFERENCE_WEIGHT)
+                + (distanceScore * INDIFFERENT_DISTANCE_WEIGHT);
+    }
+
+    private double calculateCrowdScore(Event event) {
+        if (!hasCoordinate(event)) {
+            return DEFAULT_CROWD_SCORE;
+        }
+
+        return nearestCrowdAreaService.findNearest(
+                        event.getLatitude(),
+                        event.getLongitude()
+                )
+                .map(nearest -> crowdScoreCalculator.calculate(nearest.congestionLevel()) / 100.0)
+                .orElse(DEFAULT_CROWD_SCORE);
+    }
+
+    private double calculateDistanceScore(
+            Event event,
+            Double currentLatitude,
+            Double currentLongitude
+    ) {
+        if (currentLatitude == null || currentLongitude == null || !hasCoordinate(event)) {
+            return 0.0;
+        }
+
+        double distanceKm = GeoDistanceCalculator.calculateKilometers(
+                currentLatitude,
+                currentLongitude,
+                event.getLatitude(),
+                event.getLongitude()
+        );
+
+        return 1.0 / (1.0 + distanceKm);
+    }
+
+    private double normalizePreferenceScore(double score, double maxScore) {
+        if (maxScore <= 0.0) {
+            return 0.0;
+        }
+        return score / maxScore;
+    }
+
+    private boolean hasCoordinate(Event event) {
+        return event.getLatitude() != null && event.getLongitude() != null;
+    }
+
+    private record GreedyCandidate(
+            Event event,
+            double preferenceScore,
+            double crowdScore
+    ) {
     }
 
     private boolean hasText(String value) {

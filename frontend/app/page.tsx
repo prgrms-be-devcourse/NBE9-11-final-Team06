@@ -152,30 +152,36 @@ export default function HomePage() {
                 <Sparkles className="size-4 text-primary" />
                 서울 하루 여행, 고민은 그만
               </span>
-                <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-                  오늘 서울, 어디로 갈지{" "}
-                  <span className="text-primary">3초 만에</span> 정해드려요
-                </h1>
-                <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
-                  날짜와 위치, 동행, 취향만 고르면 실시간 혼잡도까지 반영한 맞춤
-                  하루 코스를 만들어 드려요.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                      href="/plan"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    코스 추천받기
-                    <ArrowRight className="size-4" />
-                  </Link>
-                  <Link
-                      href="/explore"
-                      className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    장소 둘러보기
-                  </Link>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
+              <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+                오늘 서울, 어디로 갈지{" "}
+                <span className="text-primary">3초 만에</span> 정해드려요
+              </h1>
+              <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
+                날짜와 위치, 동행, 취향만 고르면 실시간 혼잡도까지 반영한 맞춤
+                하루 코스를 만들어 드려요.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/plan"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  코스 추천받기
+                  <ArrowRight className="size-4" />
+                </Link>
+                <Link
+                  href="/explore"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  장소 둘러보기
+                </Link>
+                <Link
+                  href="/events"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  행사 둘러보기
+                </Link>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="size-4 text-primary" />
                   서울 8개 인기 지역

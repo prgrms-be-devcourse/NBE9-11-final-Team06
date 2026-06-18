@@ -1,5 +1,7 @@
 package come.back.gotoday.course.service;
 
+import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.category.repository.CategoryRepository; // 💡 카테고리 레포 추가
 import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
@@ -7,18 +9,20 @@ import come.back.gotoday.course.repository.CoursePlaceRepository;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
+import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
-import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
-import come.back.gotoday.preference.repository.UserPreferenceRepository;
 import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -31,167 +35,226 @@ public class CourseService {
     private final CoursePlaceRepository coursePlaceRepository;
     private final MemberRepository memberRepository;
     private final PlaceRepository placeRepository;
+    private final CategoryRepository categoryRepository; // 💡 주입 완료!
 
     private final RecommendationService recommendationService;
+    private final EventRepository eventRepository;
+    private final KakaoLocalService kakaoLocalService;
 
-    //코스저장
+    // 코스 저장 (생성)
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
-        log.info("코스 생성 처리 시작: memberId={}, title={}, placeCount={}", memberId, request.title(), request.placeIds().size());
+        log.info("코스 생성 처리 시작: memberId={}, title={}", memberId, request.title());
 
-        // 해당 방법으로 추천된 행사 아이디를 가져올 수 있습니다. getRecommendedEventIds 끝에 숫자는 추천하는 행사의 개수입니다.
-//        String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(),  request.companionType());
-//
-//        //  AI 추천 엔진 호출 (획득한 queryText 전달)
-//        List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
-//                memberId, queryText, request.startDate(), request.endDate(), 3
-//        );
-//        log.info("출력된 이벤트 아이디:  {}", recommendedEventIds);
-//
+        // 1. 회원 검증
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> {
-                    log.warn("코스 생성 실패: 존재하지 않는 회원입니다. memberId={}", memberId);
-                    return new IllegalArgumentException("회원이 존재하지 않습니다.");
-                });
+                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
 
-        Course course = Course.create(
-                member,
-                request.title(),
-                request.description(),
-                request.courseType(),
-                request.startDate(),
-                request.endDate(),
-                request.baseArea(),
-                request.companionType(),
-                null,
-                null,
-                null
+        // 2. AI 추천 엔진 호출 및 이벤트 조회
+        String queryText = recommendationService.createQueryText(request.baseArea(), request.courseType(), request.companionType());
+        List<Long> recommendedEventIds = recommendationService.getRecommendedEventIds(
+                memberId, queryText, request.startDate(), request.endDate(), 3
         );
 
-        List<Place> places = placeRepository.findAllById(request.placeIds());
-        java.util.Map<Long, Place> placeMap = places.stream()
-                .collect(java.util.stream.Collectors.toMap(Place::getId, java.util.function.Function.identity()));
+        List<Event> events = eventRepository.findAllById(recommendedEventIds);
+        if (events.isEmpty()) {
+            throw new IllegalArgumentException("추천된 행사가 없습니다.");
+        }
 
-        log.info("코스 생성 장소 조회 완료: requestedPlaceCount={}, foundPlaceCount={}", request.placeIds().size(), places.size());
+        // 3. 행사 중심 좌표 계산 (중간값)
+        double centerLat = events.stream()
+                .filter(e -> e.getLatitude() != null)
+                .mapToDouble(Event::getLatitude)
+                .average()
+                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
+        double centerLng = events.stream()
+                .filter(e -> e.getLongitude() != null)
+                .mapToDouble(Event::getLongitude)
+                .average()
+                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
+
+        // 4. 카카오 API 카페, 식당 추천 받기
+        KakaoPlaceResponse cafeResponse = kakaoLocalService.searchCafe(centerLat, centerLng);
+        KakaoPlaceDocument cafeDoc = cafeResponse.documents().stream().findFirst().orElse(null);
+
+        KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng);
+        KakaoPlaceDocument restaurantDoc = restaurantResponse.documents().stream().findFirst().orElse(null);
+
+        // 5. 코스 마스터 엔티티 생성
+        Course course = Course.create(
+                member, request.title(), request.description(), request.courseType(),
+                request.startDate(), request.endDate(), request.baseArea(), request.companionType(),
+                null, null, "AI 추천 행사 및 주변 장소 기반 코스"
+        );
+
+        // 취향 저격용 추천 사유 베이스 문구 생성
+        String userPreferenceText = String.format("%s에서 %s와(과) 함께 즐기는 %s 코스",
+                request.baseArea(), request.companionType(), request.courseType());
 
         int order = 1;
-        for (Long placeId : request.placeIds()) {
-            Place place = placeMap.get(placeId);
-            if (place == null) {
-                log.warn("코스 생성 실패: 존재하지 않는 장소입니다. memberId={}, placeId={}", memberId, placeId);
-                throw new IllegalArgumentException("장소가 존재하지 않습니다.");
-            }
 
+        // ① AI 추천 행사들을 코스 장소 리스트에 추가
+        for (Event event : events) {
             CoursePlace coursePlace = CoursePlace.create(
                     course,
-                    place,
-                    null,
+                    event.getPlace(),
+                    event,
                     order++,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
+                    null, null, null, null, null, null,
+                    String.format("[%s] 맞춤 추천 행사입니다.", userPreferenceText)
             );
-
             course.addCoursePlace(coursePlace);
         }
 
+        // ② 주변 추천 식당 추가 (Kakao -> Place 변환 및 저장 로직 적용)
+        if (restaurantDoc != null) {
+            Category restaurantCategory = categoryRepository.findByName("맛집")
+                    .orElseThrow(() -> new IllegalArgumentException("'맛집' 카테고리가 초기화되지 않았습니다."));
+
+            Place restaurantPlace = placeRepository
+                    .findByNameAndAddressAndIsActiveTrue(
+                            restaurantDoc.placeName(),
+                            restaurantDoc.addressName()
+                    )
+                    .orElseGet(() -> placeRepository.save(
+                            Place.builder()
+                                    .name(restaurantDoc.placeName())
+                                    .address(restaurantDoc.addressName())
+                                    .roadAddress(restaurantDoc.roadAddressName())
+                                    .phone(restaurantDoc.phone())
+                                    .latitude(BigDecimal.valueOf(Double.parseDouble(restaurantDoc.y())))
+                                    .longitude(BigDecimal.valueOf(Double.parseDouble(restaurantDoc.x())))
+                                    .category(restaurantCategory)
+                                    // 💡 DB 제약조건 통과를 위해 직접 현재 시간 주입!
+                                    .createdAt(java.time.LocalDateTime.now())
+                                    .updatedAt(java.time.LocalDateTime.now())
+                                    .isActive(true) // 💡 혹시 isActive도 Not Null 이라면 안전하게 미리 세팅!
+                                    .source("KAKAO")
+                                    .build()
+                    ));
+
+            CoursePlace restaurantCoursePlace = CoursePlace.create(
+                    course,
+                    restaurantPlace,
+                    null,
+                    order++,
+                    null, null, null, null, null, null,
+                    String.format("추천 행사 주변 맛집입니다. (%s 취향 반영)", userPreferenceText)
+            );
+            course.addCoursePlace(restaurantCoursePlace);
+        }
+
+        // ③ 주변 추천 카페 추가
+        if (cafeDoc != null) {
+            Category cafeCategory = categoryRepository.findByName("카페")
+                    .orElseThrow(() -> new IllegalArgumentException("'카페' 카테고리가 초기화되지 않았습니다."));
+
+            Place cafePlace = placeRepository
+                    .findByNameAndAddressAndIsActiveTrue(
+                            cafeDoc.placeName(),
+                            cafeDoc.addressName()
+                    )
+                    .orElseGet(() -> placeRepository.save(
+                            Place.builder()
+                                    .name(cafeDoc.placeName())
+                                    .address(cafeDoc.addressName())
+                                    .roadAddress(cafeDoc.roadAddressName())
+                                    .phone(cafeDoc.phone())
+                                    .latitude(BigDecimal.valueOf(Double.parseDouble(cafeDoc.y())))
+                                    .longitude(BigDecimal.valueOf(Double.parseDouble(cafeDoc.x())))
+                                    .category(cafeCategory)
+                                    // 💡 카페도 동일하게 시간 데이터 완비!
+                                    .createdAt(java.time.LocalDateTime.now())
+                                    .updatedAt(java.time.LocalDateTime.now())
+                                    .isActive(true)
+                                    .source("KAKAO")
+                                    .build()
+                    ));
+
+            CoursePlace cafeCoursePlace = CoursePlace.create(
+                    course,
+                    cafePlace,
+                    null,
+                    order++,
+                    null, null, null, null, null, null,
+                    String.format("코스의 마무리를 장식할 추천 카페입니다. (%s 취향 반영)", userPreferenceText)
+            );
+            course.addCoursePlace(cafeCoursePlace);
+        }
+
         courseRepository.save(course);
-
-        log.info("코스 생성 처리 완료: memberId={}, courseId={}, placeCount={}", memberId, course.getId(), request.placeIds().size());
-
         return course.getId();
     }
 
-    //코스 상세조회 - 조회만 하기 때문에 readOnly
+    // 코스 상세조회
     @Transactional(readOnly = true)
     public CourseDetailResponse getCourse(Long courseId) {
         log.info("코스 단건 조회 처리 시작: courseId={}", courseId);
 
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> {
-                    log.warn("코스 단건 조회 실패: 존재하지 않는 코스입니다. courseId={}", courseId);
-                    return new IllegalArgumentException("존재하지 않는 코스입니다.");
-                });
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
 
         List<CoursePlaceResponse> places =
                 coursePlaceRepository.findDetailByCourseId(courseId)
                         .stream()
-                        .map(cp -> new CoursePlaceResponse(
-                                cp.getPlace().getId(),
-                                cp.getPlace().getName(),
-                                cp.getVisitOrder(),
-                                cp.getRecommendationReason()
-                        ))
+                        .map(cp -> {
+                            Long placeId = null;
+                            String placeName = "알 수 없는 장소";
+
+                            // 💡 [수정] 이름 매핑 우선순위 필터링 개조
+                            if (cp.getEvent() != null) {
+                                // 1. 코스 장소에 '행사(Event)'가 꽂혀있는 경우 -> 행사 정보가 최우선!
+                                placeName = cp.getEvent().getTitle(); // 🎯 행사명을 바로 대입!
+                                if (cp.getEvent().getPlace() != null) {
+                                    placeId = cp.getEvent().getPlace().getId();
+                                }
+                            } else if (cp.getPlace() != null) {
+                                // 2. 카카오 API로 받아온 식당/카페처럼 일반 장소('Place')만 꽂혀있는 경우
+                                placeId = cp.getPlace().getId();
+                                placeName = cp.getPlace().getName();
+                            }
+
+                            return new CoursePlaceResponse(
+                                    placeId,
+                                    placeName,
+                                    cp.getVisitOrder(),
+                                    cp.getRecommendationReason()
+                            );
+                        })
                         .toList();
 
-        log.info("코스 장소 상세 조회 완료: courseId={}, placeCount={}", courseId, places.size());
-
-        CourseDetailResponse response = new CourseDetailResponse(
-                course.getId(),
-                course.getTitle(),
-                course.getDescription(),
-                course.getCourseType(),
-                course.getStartDate(),
-                course.getEndDate(),
-                course.getBaseArea(),
-                course.getCompanionType(),
+        return new CourseDetailResponse(
+                course.getId(), course.getTitle(), course.getDescription(), course.getCourseType(),
+                course.getStartDate(), course.getEndDate(), course.getBaseArea(), course.getCompanionType(),
                 places,
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
         );
-
-        log.info("코스 단건 조회 처리 완료: courseId={}", courseId);
-        return response;
     }
 
     // 코스 목록 조회
     @Transactional(readOnly = true)
     public List<CourseListResponse> getCourses() {
-        log.info("코스 목록 조회 처리 시작");
-
-        List<CourseListResponse> courses = courseRepository.findAll()
+        return courseRepository.findAll()
                 .stream()
                 .map(course -> new CourseListResponse(
-                        course.getId(),
-                        course.getTitle(),
-                        course.getCourseType(),
-                        course.getBaseArea(),
-                        course.getStartDate()
+                        course.getId(), course.getTitle(), course.getCourseType(),
+                        course.getBaseArea(), course.getStartDate()
                 ))
                 .toList();
-
-        log.info("코스 목록 조회 처리 완료: resultCount={}", courses.size());
-        return courses;
     }
 
-    //코스 삭제
+    // 코스 삭제
     @Transactional
-    public void deleteCourse(
-            Long memberId,
-            Long courseId
-    ) {
-        log.info("코스 삭제 처리 시작: memberId={}, courseId={}", memberId, courseId);
-
+    public void deleteCourse(Long memberId, Long courseId) {
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> {
-                    log.warn("코스 삭제 실패: 존재하지 않는 코스입니다. memberId={}, courseId={}", memberId, courseId);
-                    return new IllegalArgumentException("존재하지 않는 코스입니다.");
-                });
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
 
         if (!course.getMember().getId().equals(memberId)) {
-            log.warn("코스 삭제 실패: 권한이 없습니다. requestMemberId={}, courseOwnerId={}, courseId={}", memberId, course.getMember().getId(), courseId);
             throw new IllegalArgumentException("해당 코스를 삭제할 권한이 없습니다.");
         }
 
         coursePlaceRepository.deleteByCourseId(courseId);
-        log.info("코스 장소 연결 삭제 완료: courseId={}", courseId);
-
         courseRepository.delete(course);
-        log.info("코스 삭제 처리 완료: memberId={}, courseId={}", memberId, courseId);
     }
-
 }

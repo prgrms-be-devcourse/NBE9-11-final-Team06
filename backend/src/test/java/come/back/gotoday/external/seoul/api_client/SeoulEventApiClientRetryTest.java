@@ -21,7 +21,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.times;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
+        "crowd.scheduler.enabled=false"
+})
 public class SeoulEventApiClientRetryTest {
 
     @Autowired

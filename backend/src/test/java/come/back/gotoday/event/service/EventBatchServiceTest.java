@@ -1,7 +1,5 @@
 package come.back.gotoday.event.service;
 
-import come.back.gotoday.category.entity.Category;
-import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.external.seoul.api_client.SeoulEventApiClient;
@@ -12,7 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +21,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
+        "crowd.scheduler.enabled=false"
+})
 @Transactional
 class EventBatchServiceTest {
 
