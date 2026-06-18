@@ -25,6 +25,12 @@ public record SeoulCrowdResponse(
             /** 서울시 실시간 도시데이터 API에서 사용하는 핫스팟 코드입니다. 예: POI068 */
             String AREA_CD,
 
+            /** 해당 핫스팟의 위도입니다. */
+            String LAT,
+
+            /** 해당 핫스팟의 경도입니다. */
+            String LNG,
+
             /** 해당 핫스팟의 실시간 인구현황 목록입니다. */
             List<LivePopulationStatus> LIVE_PPLTN_STTS
     ) {

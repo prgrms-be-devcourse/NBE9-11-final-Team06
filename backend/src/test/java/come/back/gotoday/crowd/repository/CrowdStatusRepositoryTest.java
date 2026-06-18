@@ -82,6 +82,73 @@ class CrowdStatusRepositoryTest {
                 .containsOnly(areaName);
     }
 
+    @Test
+    @DisplayName("좌표가 있는 각 지역의 최신 혼잡도 데이터만 조회한다")
+    void findLatestByArea() {
+        // given
+        LocalDateTime baseTime = LocalDateTime.of(2026, 6, 18, 9, 0);
+
+        CrowdStatus oldGangnam = createCrowdStatus(
+                "강남역",
+                baseTime.minusHours(1),
+                1_000,
+                2_000,
+                CongestionLevel.RELAXED
+        );
+        crowdStatusRepository.saveAndFlush(oldGangnam);
+
+        CrowdStatus latestGangnam = createCrowdStatus(
+                "강남역",
+                baseTime,
+                2_000,
+                3_000,
+                CongestionLevel.NORMAL
+        );
+        CrowdStatus latestHongdae = createCrowdStatus(
+                "홍대 관광특구",
+                baseTime,
+                3_000,
+                4_000,
+                CongestionLevel.CROWDED
+        );
+        CrowdStatus noCoordinate = CrowdStatus.create(
+                null,
+                "좌표 없는 지역",
+                "POI999",
+                null,
+                null,
+                CongestionLevel.RELAXED,
+                500,
+                1_000,
+                "좌표 없는 테스트 데이터",
+                baseTime
+        );
+
+        crowdStatusRepository.saveAll(List.of(
+                latestGangnam,
+                latestHongdae,
+                noCoordinate
+        ));
+        crowdStatusRepository.flush();
+
+        // when
+        List<CrowdStatus> result = crowdStatusRepository.findLatestByArea();
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result)
+                .extracting(CrowdStatus::getAreaName)
+                .containsExactlyInAnyOrder("강남역", "홍대 관광특구");
+        assertThat(result)
+                .filteredOn(crowdStatus -> crowdStatus.getAreaName().equals("강남역"))
+                .singleElement()
+                .extracting(CrowdStatus::getMeasuredAt)
+                .isEqualTo(baseTime);
+        assertThat(result)
+                .extracting(CrowdStatus::getAreaName)
+                .doesNotContain("좌표 없는 지역");
+    }
+
     private CrowdStatus createCrowdStatus(
             String areaName,
             LocalDateTime measuredAt,
@@ -93,6 +160,8 @@ class CrowdStatusRepositoryTest {
                 null,
                 areaName,
                 "POI001",
+                37.4979,
+                127.0276,
                 congestionLevel,
                 populationMin,
                 populationMax,
