@@ -1,14 +1,14 @@
 package come.back.gotoday.event.repository;
+
 import come.back.gotoday.event.entity.Event;
-import come.back.gotoday.event.enums.EventStatus;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -39,16 +39,16 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findAllByIdsWithCategoryAndPlace(@Param("ids") List<Long> ids);
 
 
-    // [추가] 지역, 기간, 카테고리까지 완벽 일치하는 행사를 찾을 때 사용 (1단계)
-    @Query("SELECT e FROM Event e JOIN FETCH e.category WHERE e.area = :area " +
+    // 지역, 기간, 매핑된 EVENT 카테고리 ID가 일치하는 행사 조회 (1단계)
+    @Query("SELECT e FROM Event e JOIN FETCH e.category c WHERE e.area = :area " +
             "AND e.endDate >= :startDate " +
             "AND e.startDate <= :endDate " +
-            "AND e.category.name IN :categories")
-    List<Event> findRecommendedEventsWithCategory(
+            "AND c.id IN :categoryIds")
+    List<Event> findRecommendedEventsWithCategoryIds(
             @Param("area") String area,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
-            @Param("categories") List<String> categories
+            @Param("categoryIds") Collection<Long> categoryIds
     );
 
     // [기존 유지] 카테고리 상관없이 지역/기간만 맞으면 가져옴 (2단계/Fallback용)

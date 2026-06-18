@@ -1,5 +1,7 @@
 package come.back.gotoday.recommend.service;
 
+import come.back.gotoday.category.repository.PreferenceEventCategoryMappingRepository;
+
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.repository.CourseRepository;
@@ -43,6 +45,7 @@ public class RecommendationService {
 
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserPreferenceCategoryRepository userPreferenceCategoryRepository;
+    private final PreferenceEventCategoryMappingRepository preferenceEventCategoryMappingRepository;
     private final EventRepository eventRepository;
     private final MemberRepository memberRepository;
     private final CourseRepository courseRepository;
@@ -55,6 +58,7 @@ public class RecommendationService {
 
     public RecommendationService(UserPreferenceRepository userPreferenceRepository,
                                  UserPreferenceCategoryRepository userPreferenceCategoryRepository,
+                                 PreferenceEventCategoryMappingRepository preferenceEventCategoryMappingRepository,
                                  EventRepository eventRepository,
                                  MemberRepository memberRepository,
                                  CourseRepository courseRepository,
@@ -65,6 +69,7 @@ public class RecommendationService {
                                  VectorEmbeddingEngine vectorEngine) {
         this.userPreferenceRepository = userPreferenceRepository;
         this.userPreferenceCategoryRepository = userPreferenceCategoryRepository;
+        this.preferenceEventCategoryMappingRepository = preferenceEventCategoryMappingRepository;
         this.eventRepository = eventRepository;
         this.memberRepository = memberRepository;
         this.courseRepository = courseRepository;
@@ -94,6 +99,11 @@ public class RecommendationService {
                 ? request.categories()
                 : savedCategories;
 
+        Set<Long> preferredEventCategoryIds = selectedCategories.isEmpty()
+                ? Collections.emptySet()
+                : new HashSet<>(preferenceEventCategoryMappingRepository
+                        .findEventCategoryIdsByPreferenceCategoryNames(selectedCategories));
+
         String selectedCompanionType = hasText(request.companionType())
                 ? request.companionType()
                 : preferenceOptional
@@ -114,7 +124,7 @@ public class RecommendationService {
 
         List<Long> recommendedEventIds = getRecommendedEventIds(
                 selectedArea,
-                selectedCategories,
+                preferredEventCategoryIds,
                 queryText,
                 request.startDate(),
                 request.endDate(),
@@ -155,7 +165,11 @@ public class RecommendationService {
 
         for (Event event : recommendedEvents) {
             Place place = getOrCreatePlaceFromEvent(event);
-            String reason = createRecommendationReason(event, selectedArea, selectedCategories);
+            String reason = createRecommendationReason(
+                    event,
+                    selectedArea,
+                    preferredEventCategoryIds
+            );
 
             CoursePlace coursePlace = CoursePlace.create(
                     course,
@@ -232,10 +246,14 @@ public class RecommendationService {
         return BigDecimal.valueOf(coordinate);
     }
 
-    private String createRecommendationReason(Event event, String preferredArea, List<String> preferredCategories) {
+    private String createRecommendationReason(
+            Event event,
+            String preferredArea,
+            Set<Long> preferredEventCategoryIds
+    ) {
         boolean areaMatched = preferredArea != null && preferredArea.equals(event.getArea());
         boolean categoryMatched = event.getCategory() != null
-                && preferredCategories.contains(event.getCategory().getName());
+                && preferredEventCategoryIds.contains(event.getCategory().getId());
 
         if (areaMatched && categoryMatched) {
             return "선택한 지역과 카테고리에 모두 부합하는 행사입니다.";
@@ -257,11 +275,16 @@ public class RecommendationService {
         var preference = userPreferenceRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND));
 
-        List<String> preferredCategories = userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId());
+        List<Long> preferenceCategoryIds = userPreferenceCategoryRepository
+                .findCategoryIdsByPreferenceId(preference.getId());
+        Set<Long> preferredEventCategoryIds = preferenceCategoryIds.isEmpty()
+                ? Collections.emptySet()
+                : new HashSet<>(preferenceEventCategoryMappingRepository
+                        .findEventCategoryIdsByPreferenceCategoryIds(preferenceCategoryIds));
         boolean avoidCrowds = Boolean.TRUE.equals(preference.getAvoidCrowded());
         return getRecommendedEventIds(
                 preference.getPreferredArea(),
-                preferredCategories,
+                preferredEventCategoryIds,
                 queryText,
                 searchStart,
                 searchEnd,
@@ -274,7 +297,7 @@ public class RecommendationService {
 
     private List<Long> getRecommendedEventIds(
             String targetArea,
-            List<String> preferredCategories,
+            Set<Long> preferredEventCategoryIds,
             String queryText,
             LocalDate searchStart,
             LocalDate searchEnd,
@@ -283,8 +306,14 @@ public class RecommendationService {
             boolean avoidCrowds,
             int topK
     ) {
-        List<Event> candidateEvents = eventRepository.findRecommendedEventsWithCategory(
-                targetArea, searchStart, searchEnd, preferredCategories);
+        List<Event> candidateEvents = preferredEventCategoryIds.isEmpty()
+                ? Collections.emptyList()
+                : eventRepository.findRecommendedEventsWithCategoryIds(
+                        targetArea,
+                        searchStart,
+                        searchEnd,
+                        preferredEventCategoryIds
+                );
 
         if (candidateEvents.isEmpty()) {
             log.info("2단계 결과 없음: 카테고리 제약 해제하여 재검색+기한은 유지");
@@ -366,7 +395,9 @@ public class RecommendationService {
         }
 
         for (var event : candidateEvents) {
-            if (rrfScores.containsKey(event.getId()) && preferredCategories.contains(event.getCategory().getName())) {
+            if (rrfScores.containsKey(event.getId())
+                    && event.getCategory() != null
+                    && preferredEventCategoryIds.contains(event.getCategory().getId())) {
                 double currentScore = rrfScores.get(event.getId());
                 rrfScores.put(event.getId(), currentScore * categoryBoost);
             }
