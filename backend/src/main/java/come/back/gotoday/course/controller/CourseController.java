@@ -108,7 +108,7 @@ public class CourseController {
     @PostMapping("/preview")
     public ResponseEntity<ApiResponse<CoursePreviewResponse>> previewCourse(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody CourseCreateRequest request
+            @RequestBody CoursePreviewRequest request
     ) {
         log.info(
                 "코스 프리뷰 요청: memberId={}, baseArea={}",

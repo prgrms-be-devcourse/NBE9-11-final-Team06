@@ -10,7 +10,6 @@ import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
-import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.member.entity.Member;
@@ -122,9 +121,9 @@ public class CourseService {
         return course.getId();
     }
 
-
+    // 행사 데이터를 바탕으로, 주변
     @Transactional
-    public CoursePreviewResponse previewCourse(Long memberId, CourseCreateRequest request) {
+    public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
 
         String queryText = recommendationService.createQueryText(
                 request.baseArea(),
@@ -156,9 +155,15 @@ public class CourseService {
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(centerLat, centerLng);
 
-        //기본값 한식 설정
-        KakaoPlaceResponse restaurantResponse =
-                kakaoLocalService.searchRestaurant(centerLat, centerLng, RestaurantType.KOREAN);
+
+        // 타입을 먼저 찾고 -> 들어온게 없으면 한식으로 고정
+        RestaurantType restaurantType =
+                request.restaurantType() != null
+                        ? request.restaurantType()
+                        : RestaurantType.KOREAN;
+
+        //
+        KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
 
         Category restaurantCategory = categoryRepository.findByName("맛집")
                 .orElseThrow(() -> new IllegalArgumentException("맛집 카테고리 없음"));
