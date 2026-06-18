@@ -286,12 +286,16 @@ public class CrowdService {
         log.info("혼잡도 등급 변환 완료: areaName={}, congestionLevel={}", areaName, congestionLevel);
         Integer populationMin = parseInteger(populationStatus.AREA_PPLTN_MIN());
         Integer populationMax = parseInteger(populationStatus.AREA_PPLTN_MAX());
+        Double latitude = parseDouble(cityData.LAT());
+        Double longitude = parseDouble(cityData.LNG());
         LocalDateTime measuredAt = parseDateTime(populationStatus.PPLTN_TIME());
 
         CrowdStatus crowdStatus = CrowdStatus.create(
                 null,
                 cityData.AREA_NM(),
                 cityData.AREA_CD(),
+                latitude,
+                longitude,
                 congestionLevel,
                 populationMin,
                 populationMax,
@@ -381,6 +385,24 @@ public class CrowdService {
         }
 
         return Integer.parseInt(value.replace(",", ""));
+    }
+
+    /**
+     * 서울시 API에서 문자열로 내려주는 위도·경도 값을 Double로 변환합니다.
+     *
+     * 값이 비어 있으면 null을 반환하고,
+     * 숫자 앞뒤의 공백을 제거한 뒤 변환합니다.
+     *
+     * @param value 서울시 API에서 받은 좌표 문자열
+     * @return 변환된 Double 값
+     */
+    private Double parseDouble(String value) {
+        if (value == null || value.isBlank()) {
+            log.debug("혼잡도 좌표 파싱 스킵: value={}", value);
+            return null;
+        }
+
+        return Double.parseDouble(value.trim());
     }
 
     /**
