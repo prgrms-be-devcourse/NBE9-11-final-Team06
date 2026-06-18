@@ -78,6 +78,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             "and (:keyword is null or e.title like %:keyword%) " +
             "and (" +
             "    :status is null " +
+            "    or (:status = 'UPCOMING' and e.startDate > :now) " +
             "    or (:status = 'ING' and e.startDate <= :now and e.endDate >= :now) " +
             "    or (:status = 'END' and e.endDate < :now)" +
             ")")

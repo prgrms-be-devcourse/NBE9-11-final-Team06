@@ -156,6 +156,12 @@ export default async function HomePage() {
                 >
                   장소 둘러보기
                 </Link>
+                <Link
+                  href="/events"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  행사 둘러보기
+                </Link>
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
