@@ -85,6 +85,73 @@ WHERE NOT EXISTS (SELECT 1 FROM `category` WHERE `name` = '전시/미술');
 -- =================================================================================
 -- 1. 기초 인프라 데이터 (회원, 선호도, 카테고리 선호, 장소) 삽입
 -- =================================================================================
+-- 18. 전시
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '전시', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '전시' AND `type` = 'PREFERENCE'
+);
+
+-- 19. 공연
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '공연', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '공연' AND `type` = 'PREFERENCE'
+);
+
+-- 20. 축제
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '축제', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '축제' AND `type` = 'PREFERENCE'
+);
+
+-- 21. 체험
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '체험', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '체험' AND `type` = 'PREFERENCE'
+);
+
+-- 22. 식당
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '식당', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '식당' AND `type` = 'PREFERENCE'
+);
+
+-- 23. 카페
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '카페', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '카페' AND `type` = 'PREFERENCE'
+);
+
+-- 24. 산책
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '산책', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '산책' AND `type` = 'PREFERENCE'
+);
+
+-- 25. 문화시설
+INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
+SELECT '문화시설', 'PREFERENCE', NOW(), NOW() FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `category`
+    WHERE `name` = '문화시설' AND `type` = 'PREFERENCE'
+);
+-- =================================================================================
+-- Preference Categories
+-- 회원가입 / 온보딩 / 마이페이지 선호정보 선택용 카테고리
+-- =================================================================================
 
 INSERT INTO `member` (`id`, `email`, `password`, `nickname`, `profile_image_url`, `role`, `status`, `created_at`, `updated_at`)
 SELECT 1, 'seoul_culture_lover@gotoday.com', 'hashed_pass_456', '영등포마포러버', 'http://example.com/profile.jpg', 'USER', 'ACTIVE', NOW(), NOW()
