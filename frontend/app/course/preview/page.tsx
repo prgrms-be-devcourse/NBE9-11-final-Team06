@@ -77,11 +77,6 @@ function extractCourse(result: any): CoursePreviewResponse | null {
     null
   )
 }
-
-
-/* ---------------- toggle ---------------- */
-
-
 /* ---------------- page ---------------- */
 
 export default function CourseDetailPage() {
@@ -90,6 +85,9 @@ export default function CourseDetailPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
   const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
+  const [request, setRequest] = useState<any>(null)
+
+
   function toggleRestaurant(id: number) {
     setSelectedRestaurantId(prev => (prev === id ? null : id))
   }
@@ -127,9 +125,13 @@ export default function CourseDetailPage() {
         // )
   
         //console.log("SAVE:", requestBody)
-        const requestBody = JSON.parse(savedRequest)
+        const requestBody = JSON.parse(
+          decodeURIComponent(savedRequest)
+        )
+
+        setRequest(requestBody)
   
-        console.log("preview request:", requestBody)
+        //console.log("preview request:", requestBody)
   
 
 
@@ -325,27 +327,79 @@ export default function CourseDetailPage() {
             <Button
             className="mt-10 w-full"
             disabled={!selectedRestaurantId || !selectedCafeId}
-            onClick={() => {
+            onClick={async () => {
               const selectedRestaurant = restaurants.find(
                 r => r.id === selectedRestaurantId
               )
-
+            
               const selectedCafe = cafes.find(
                 c => c.id === selectedCafeId
               )
-
-              const result = {
-                restaurant: selectedRestaurant,
-                cafe: selectedCafe,
-              }
-
-              localStorage.setItem(
-                "selectedCourse",
-                JSON.stringify(result)
-              )
+            
+              if (!selectedRestaurant || !selectedCafe || !course) return
+            
+              // 🔥 핵심: preview 요청 기반 + 선택값 합치기
+              const payload = {
+                title: "추천 코스",
+                description: "맛집과 카페를 함께 즐기는 코스",
               
-
-              window.location.href = "/course/result"
+                courseType: request.courseType,
+                startDate: request.startDate,
+                endDate: request.endDate,
+                baseArea: request.baseArea,
+                companionType: request.companionType,
+              
+                eventIds: course.eventIds,
+              
+                restaurantId: selectedRestaurant.id,
+                cafeId: selectedCafe.id,
+              }
+            
+              try {
+                const accessToken = getAccessToken()
+            
+                const res = await fetch(`${API_BASE_URL}/api/courses`, {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                  },
+                  body: JSON.stringify(payload),
+                })
+                
+                const text = await res.text()
+                
+                console.log("status:", res.status)
+                console.log("raw response:", text)
+                
+                if (!res.ok) {
+                  console.error("API ERROR:", text)
+                  alert("코스 생성 실패")
+                  return
+                }
+                
+                let data
+                try {
+                  data = JSON.parse(text)
+                } catch (e) {
+                  console.error("JSON 아님:", text)
+                  alert("서버 응답이 JSON이 아님")
+                  return
+                }
+                
+                const courseId = data?.data
+                
+                if (!courseId) {
+                  alert("courseId 없음")
+                  return
+                }
+                
+                window.location.href = `/course/${courseId}`
+              } catch (e) {
+                console.error(e)
+                alert("코스 생성 중 에러")
+              }
             }}
           >
             선택 완료

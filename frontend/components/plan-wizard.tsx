@@ -437,7 +437,7 @@ export function PlanWizard() {
                   <button
                     key={c.value}
                     type="button"
-                    onClick={() => setCompanion(c.value)}
+                    onClick={() => setCompanion(c.value as Companion)}
                     className={cn(
                       "flex flex-col gap-1 rounded-2xl border p-4 text-left transition-all",
                       companion === c.value
@@ -445,7 +445,7 @@ export function PlanWizard() {
                         : "border-border hover:border-primary/50",
                     )}
                   >
-                    <span className="font-semibold">{c.value}</span>
+                    <span className="font-semibold">{c.label}</span>
                     <span className="text-sm text-muted-foreground">{c.desc}</span>
                   </button>
                 ))}

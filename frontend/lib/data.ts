@@ -8,7 +8,7 @@ export type Category =
   | "산책"
   | "문화시설"
 
-export type Companion = "혼자" | "친구" | "가족" | "커플"
+export type Companion = "SOLO" | "COUPLE" | "FRIEND" | "FAMILY" | "PARENT"
 
 export type RestaurantType =
   | "KOREAN"
@@ -82,12 +82,13 @@ export const CATEGORIES: { value: Category; emoji: string; label: string }[] = [
   { value: "문화시설", emoji: "🏛", label: "문화시설" },
 ]
 
-export const COMPANIONS: { value: Companion; desc: string }[] = [
-  { value: "혼자", desc: "조용하고 여유로운 코스" },
-  { value: "친구", desc: "활동형 · 핫플 중심" },
-  { value: "가족", desc: "체험형 · 편안한 동선" },
-  { value: "커플", desc: "전시 · 카페 · 산책" },
+export const COMPANIONS = [
+  { value: "SOLO", label: "혼자", desc: "조용하고 여유로운 코스" },
+  { value: "FRIEND", label: "친구", desc: "활동형 · 핫플 중심" },
+  { value: "FAMILY", label: "가족", desc: "체험형 · 편안한 동선" },
+  { value: "COUPLE", label: "커플", desc: "전시 · 카페 · 산책" },
 ]
+
 
 export const SEOUL_AREAS = [
   { name: "성수", lat: 37.5446, lng: 127.0559, crowd: "혼잡" as CrowdLevel },
@@ -260,7 +261,7 @@ export const SAMPLE_COURSE: Course = {
   area: "성수",
   description:
     "전시와 카페, 산책이 균형 있게 어우러진 커플 추천 코스예요. 실내 전시로 시작해 노을 무렵 서울숲 산책으로 마무리합니다.",
-  companion: "커플",
+  companion: "COUPLE",
   categories: ["전시", "카페", "산책", "식당"],
   totalDuration: "약 6시간",
   totalDistance: "2.4km",
@@ -309,7 +310,7 @@ export const SAVED_COURSES: Course[] = [
     id: "c2",
     title: "연남동 브런치 산책 코스",
     area: "연남동",
-    companion: "친구",
+    companion: "FRIEND",
     description: "경의선숲길을 따라 걷는 여유로운 친구 코스예요.",
     totalDuration: "약 5시간",
     totalDistance: "1.8km",
