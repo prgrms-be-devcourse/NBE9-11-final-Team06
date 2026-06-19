@@ -106,32 +106,28 @@ export default function CourseDetailPage() {
 
         const search = typeof window !== "undefined" ? window.location.search : ""
         const params = new URLSearchParams(search)
-        
-        const requestFromUrl = params.get("request")
-        
-        const savedRequest =
-          requestFromUrl ??
-          localStorage.getItem("coursePreviewRequest")
-  
 
-          
-        if (!savedRequest) {
+        const requestFromUrl = params.get("request")
+        const localRequest = localStorage.getItem("coursePreviewRequest")
+
+        const rawRequest = requestFromUrl || localRequest
+
+        if (!rawRequest) {
           setErrorMessage("추천 조건 정보를 찾을 수 없습니다.")
           return
         }
 
-        // const requestBody = JSON.parse(
-        //   decodeURIComponent(savedRequest)
-        // )
-  
-        //console.log("SAVE:", requestBody)
-        const requestBody = JSON.parse(
-          decodeURIComponent(savedRequest)
-        )
+        let requestBody: any
+
+        try {
+          requestBody = JSON.parse(rawRequest)
+        } catch (e) {
+          console.error("request JSON 깨짐:", rawRequest)
+          setErrorMessage("추천 조건 정보가 깨졌습니다.")
+          return
+        }
 
         setRequest(requestBody)
-  
-        //console.log("preview request:", requestBody)
   
 
 
@@ -153,7 +149,6 @@ export default function CourseDetailPage() {
         console.log("status:", res.status)
         console.log("content-type:", res.headers.get("content-type"))
         console.log("raw body:", text.substring(0, 500))
-        console.log("savedRequest:", savedRequest)
         console.log("requestBody:", requestBody)
         console.log("status:", res.status)
         console.log("raw body:", text.substring(0, 500))
