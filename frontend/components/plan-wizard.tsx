@@ -198,6 +198,19 @@ export function PlanWizard() {
 
     const params = new URLSearchParams()
     const selectedDate = formatDate(date)
+    const coursePreviewRequest = {
+      courseType: "DAILY",
+      startDate: selectedDate,
+      endDate: selectedDate,
+      baseArea: area ?? selectedLocation.name,
+      companionType: companion,
+      restaurantType: restaurantType,
+    }
+
+    sessionStorage.setItem(
+      "coursePreviewRequest",
+      JSON.stringify(coursePreviewRequest)
+    )
 
     params.set("date", selectedDate)
     params.set("area", area ?? selectedLocation.name)
