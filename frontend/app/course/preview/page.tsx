@@ -66,7 +66,15 @@ function getAccessToken() {
 /* ---------------- api helper ---------------- */
 
 function extractCourse(result: any): CoursePreviewResponse | null {
-  return result?.data ?? null
+  return (
+    result?.data ??
+    result?.result ??
+    result?.body ??
+    result?.content ??
+    result?.response ??
+    result ??
+    null
+  )
 }
 
 /* ---------------- page ---------------- */
@@ -78,60 +86,87 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     let isMounted = true
-
+  
     async function fetchCourse() {
       setIsLoading(true)
       setErrorMessage(null)
-
+  
       try {
+        const savedRequest =
+          sessionStorage.getItem("coursePreviewRequest")
+  
+        if (!savedRequest) {
+          setErrorMessage("추천 조건 정보를 찾을 수 없습니다.")
+          return
+        }
+  
+        const requestBody = JSON.parse(savedRequest)
+  
+        console.log("preview request:", requestBody)
+  
+
+
         const accessToken = getAccessToken()
 
-        const res = await fetch(
-          `${API_BASE_URL}/api/courses/preview`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(accessToken
-                ? { Authorization: `Bearer ${accessToken}` }
-                : {}),
-            },
-            body: JSON.stringify({
-              courseType: "DAILY",
-              startDate: "2026-06-15",
-              endDate: "2026-06-20",
-              baseArea: "강동구",
-              companionType: "FRIEND",
-              restaurantType: "JAPANESE",
-            }),
-          }
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/courses/preview`, {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: JSON.stringify(requestBody),
+        })
+
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`
+        }
+        console.log("accessToken:", getAccessToken())
+
+        console.log(
+          `${API_BASE_URL}/api/courses/preview`
         )
 
-        
-        const result = await res.json().catch(() => null)
+  
+        const text = await res.text()
         console.log("status:", res.status)
-        console.log("ok:", res.ok)
-        console.log("result:", result)
-
+        console.log("content-type:", res.headers.get("content-type"))
+        console.log("raw body:", text.substring(0, 500))
+  
+        let result = null
+  
+        try {
+          result = text ? JSON.parse(text) : null
+        } catch (e) {
+          console.error("json parse 실패", e)
+        }
+  
         if (!res.ok) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
           return
         }
-
+  
         const fetched = extractCourse(result)
-
-        if (isMounted) setCourse(fetched)
-      } catch {
+  
+        console.log("fetched:", fetched)
+  
+        if (isMounted) {
+          setCourse(fetched)
+        }
+      } catch (e) {
+        console.error(e)
         setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
       } finally {
-        if (isMounted) setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
-
-
     }
-
+  
     fetchCourse()
-
+  
     return () => {
       isMounted = false
     }
