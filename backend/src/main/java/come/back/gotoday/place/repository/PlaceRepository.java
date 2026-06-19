@@ -21,7 +21,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     Optional<Place> findByIdAndIsActiveTrue(Long id);
 
-    Optional<Place> findByNameAndAddressAndIsActiveTrue(
+    Optional<Place> findFirstByNameAndAddressAndIsActiveTrueOrderByIdAsc(
             String name,
             String address
     );
