@@ -10,6 +10,12 @@ export type Category =
 
 export type Companion = "혼자" | "친구" | "가족" | "커플"
 
+export type RestaurantType =
+  | "KOREAN"
+  | "WESTERN"
+  | "JAPANESE"
+  | "CHINESE"
+
 export type CrowdLevel = "여유" | "보통" | "혼잡" | "매우혼잡"
 
 export type Place = {

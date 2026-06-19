@@ -1,5 +1,6 @@
 package come.back.gotoday.external.kakao.controller;
 
+import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,9 @@ public class KakaoTestController {
     @GetMapping("/test/restaurant")
     public KakaoPlaceResponse restaurant(
             @RequestParam double lat,
-            @RequestParam double lon
+            @RequestParam double lon,
+            @RequestParam RestaurantType restaurantType
     ) {
-        return kakaoLocalService.searchRestaurant(lat, lon);
+        return kakaoLocalService.searchRestaurant(lat, lon,restaurantType);
     }
 }

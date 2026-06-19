@@ -401,12 +401,21 @@ function RecommendContent() {
               </div>
 
               {displayCourseId ? (
-                <Button asChild className="w-fit gap-2">
-                  <Link href={`/course/${displayCourseId}`}>
-                    코스 상세 · 지도 보기
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild className="gap-2">
+                    <Link href={`/course/${displayCourseId}`}>
+                      코스 상세 · 지도 보기
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+
+                  <Button asChild variant="outline" className="gap-2">
+                    <Link href={`/course/preview`}>
+                      식당 · 카페 추천
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
               ) : null}
             </div>
           </Card>
