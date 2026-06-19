@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import Script from "next/script"
 import {
   ArrowLeft,
   CalendarDays,
@@ -16,6 +17,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { NaverSimpleMap } from "@/components/naver-simple-map"
+
+
 
 type CoursePlace = {
   id?: number
@@ -257,7 +261,24 @@ export default function CourseDetailPage() {
   const companion = course?.companionType ?? "동행 미정"
   const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
 
+  const mapPoints = coursePlaces
+  .filter(
+    (place) =>
+      place.latitude !== undefined &&
+      place.longitude !== undefined
+  )
+  .map((place) => ({
+    lat: Number(place.latitude),
+    lng: Number(place.longitude),
+  }))
+
   return (
+    <>
+    <Script
+      src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
+      strategy="afterInteractive"
+    />
+    
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
@@ -384,11 +405,9 @@ export default function CourseDetailPage() {
                       <MapPin className="size-4 text-primary" />
                       지도 보기
                     </p>
-                    <div className="flex aspect-square items-center justify-center rounded-2xl bg-secondary/60 text-center text-sm text-muted-foreground">
-                      지도 영역입니다.
-                      <br />
-                      추후 Naver Map 마커 연동 가능
-                    </div>
+                    <div className="overflow-hidden rounded-2xl">
+                    <NaverSimpleMap points={mapPoints} />
+                  </div>
                   </Card>
                 </div>
               ) : (
@@ -402,5 +421,6 @@ export default function CourseDetailPage() {
       </main>
       <SiteFooter />
     </div>
+    </>
   )
 }
