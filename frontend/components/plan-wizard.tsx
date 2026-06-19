@@ -206,7 +206,7 @@ export function PlanWizard() {
       restaurantType: restaurantType,
     }
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       "coursePreviewRequest",
       JSON.stringify(coursePreviewRequest)
     )
@@ -278,7 +278,7 @@ export function PlanWizard() {
 
       params.set("courseId", String(courseId))
 
-      router.push(`/recommend?${params.toString()}`)
+      router.push(`/recommend?request=${encodeURIComponent(JSON.stringify(coursePreviewRequest))}`)
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "코스 추천 생성에 실패했습니다.")
     } finally {

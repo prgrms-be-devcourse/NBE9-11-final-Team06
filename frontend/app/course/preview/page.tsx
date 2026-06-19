@@ -10,6 +10,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 
+
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -77,13 +78,25 @@ function extractCourse(result: any): CoursePreviewResponse | null {
   )
 }
 
+
+/* ---------------- toggle ---------------- */
+
+
 /* ---------------- page ---------------- */
 
 export default function CourseDetailPage() {
   const [course, setCourse] = useState<CoursePreviewResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
+  const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
+  function toggleRestaurant(id: number) {
+    setSelectedRestaurantId(prev => (prev === id ? null : id))
+  }
+  
+  function toggleCafe(id: number) {
+    setSelectedCafeId(prev => (prev === id ? null : id))
+  }
   useEffect(() => {
     let isMounted = true
   
@@ -92,14 +105,28 @@ export default function CourseDetailPage() {
       setErrorMessage(null)
   
       try {
+
+        const search = typeof window !== "undefined" ? window.location.search : ""
+        const params = new URLSearchParams(search)
+        
+        const requestFromUrl = params.get("request")
+        
         const savedRequest =
-          sessionStorage.getItem("coursePreviewRequest")
+          requestFromUrl ??
+          localStorage.getItem("coursePreviewRequest")
   
+
+          
         if (!savedRequest) {
           setErrorMessage("추천 조건 정보를 찾을 수 없습니다.")
           return
         }
+
+        // const requestBody = JSON.parse(
+        //   decodeURIComponent(savedRequest)
+        // )
   
+        //console.log("SAVE:", requestBody)
         const requestBody = JSON.parse(savedRequest)
   
         console.log("preview request:", requestBody)
@@ -119,20 +146,14 @@ export default function CourseDetailPage() {
           headers,
           body: JSON.stringify(requestBody),
         })
-
-        if (accessToken) {
-          headers.Authorization = `Bearer ${accessToken}`
-        }
-        console.log("accessToken:", getAccessToken())
-
-        console.log(
-          `${API_BASE_URL}/api/courses/preview`
-        )
-
   
         const text = await res.text()
         console.log("status:", res.status)
         console.log("content-type:", res.headers.get("content-type"))
+        console.log("raw body:", text.substring(0, 500))
+        console.log("savedRequest:", savedRequest)
+        console.log("requestBody:", requestBody)
+        console.log("status:", res.status)
         console.log("raw body:", text.substring(0, 500))
   
         let result = null
@@ -237,7 +258,12 @@ export default function CourseDetailPage() {
 
               <div className="mt-5 space-y-4">
                 {restaurants.map((place) => (
-                  <Card key={place.id} className="p-5">
+                  <Card
+                  key={place.id}
+                  onClick={() => toggleRestaurant(place.id)}
+                  className={`p-5 cursor-pointer transition border
+                    ${selectedRestaurantId === place.id ? "border-blue-500 bg-blue-50" : ""}`}
+                >
                     <h3 className="text-xl font-bold">{place.name}</h3>
 
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -267,7 +293,12 @@ export default function CourseDetailPage() {
 
               <div className="mt-5 space-y-4">
                 {cafes.map((place) => (
-                  <Card key={place.id} className="p-5">
+                  <Card
+                  key={place.id}
+                  onClick={() => toggleCafe(place.id)}
+                  className={`p-5 cursor-pointer transition border
+                    ${selectedCafeId === place.id ? "border-green-500 bg-green-50" : ""}`}
+                >
                     <h3 className="text-xl font-bold">{place.name}</h3>
 
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -290,6 +321,35 @@ export default function CourseDetailPage() {
                 ))}
               </div>
             </section>
+
+            <Button
+            className="mt-10 w-full"
+            disabled={!selectedRestaurantId || !selectedCafeId}
+            onClick={() => {
+              const selectedRestaurant = restaurants.find(
+                r => r.id === selectedRestaurantId
+              )
+
+              const selectedCafe = cafes.find(
+                c => c.id === selectedCafeId
+              )
+
+              const result = {
+                restaurant: selectedRestaurant,
+                cafe: selectedCafe,
+              }
+
+              localStorage.setItem(
+                "selectedCourse",
+                JSON.stringify(result)
+              )
+              
+
+              window.location.href = "/course/result"
+            }}
+          >
+            선택 완료
+          </Button>
           </>
         )}
       </main>
