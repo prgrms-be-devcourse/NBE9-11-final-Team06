@@ -2,7 +2,7 @@
 
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.51.0
     container_name: go-today-prometheus
     ports:
       - "9090:9090"
@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.0
     container_name: go-today-grafana
     ports:
       - "3001:3000"
