@@ -1,6 +1,7 @@
 import http from "k6/http"
 import { check, group, sleep } from "k6"
 import { SharedArray } from "k6/data"
+import exec from "k6/execution"
 
 export const options = {
     scenarios: {
@@ -50,8 +51,6 @@ export const options = {
     },
 
     thresholds: {
-        // Spike Test는 순간 트래픽 급증 상황에서 장애 여부를 보는 테스트이므로
-        // 일반 Load Test보다 기준을 완화한다.
         http_req_failed: ["rate<0.2"],
 
         "http_req_duration{scenario:public_browse_spike}": ["p(95)<3000"],
@@ -64,6 +63,8 @@ const BASE_URL = __ENV.BASE_URL || "http://127.0.0.1:8080"
 const RECOMMEND_ENDPOINT =
     __ENV.RECOMMEND_ENDPOINT || "/api/recommendations/courses"
 
+const REQUIRED_ACCOUNT_COUNT = 85
+
 const accounts = new SharedArray("accounts", function () {
     return JSON.parse(open("./accounts.json"))
 })
@@ -72,6 +73,29 @@ const jsonHeaders = {
     headers: {
         "Content-Type": "application/json",
     },
+}
+
+// k6 전역 변수는 VU 단위로 독립적으로 유지된다.
+// 각 VU가 최초 1회 로그인하고, 이후 반복에서는 저장한 Cookie 헤더를 재사용한다.
+let loggedIn = false
+let authCookieHeader = ""
+
+let loginFailureLogCount = 0
+let myInfoFailureLogCount = 0
+let myPreferenceFailureLogCount = 0
+let recommendFailureLogCount = 0
+
+export function setup() {
+    if (accounts.length === 0) {
+        throw new Error("accounts.json에 테스트 계정이 없습니다.")
+    }
+
+    if (accounts.length < REQUIRED_ACCOUNT_COUNT) {
+        console.warn(
+            `[WARN] accounts.json 계정 수가 부족합니다. 현재 ${accounts.length}개, 권장 최소 ${REQUIRED_ACCOUNT_COUNT}개입니다. ` +
+            "계정 수가 부족하면 여러 VU가 동일 계정을 공유하여 실제 운영 환경과 다른 결과가 나올 수 있습니다."
+        )
+    }
 }
 
 export function publicBrowseFlow() {
@@ -112,20 +136,46 @@ export function publicBrowseFlow() {
 
 export function authenticatedReadFlow() {
     group("인증 사용자 조회 API 스파이크", function () {
-        const loggedIn = login()
-
-        if (!loggedIn) {
+        if (!ensureLoggedIn()) {
             return
         }
 
-        const myInfoResponse = http.get(`${BASE_URL}/api/members/me`)
+        const myInfoResponse = http.get(
+            `${BASE_URL}/api/members/me`,
+            authRequestOptions()
+        )
+
+        if (!isSuccess(myInfoResponse) && myInfoFailureLogCount < 5) {
+            myInfoFailureLogCount++
+
+            console.log("========== 내 정보 조회 실패 ==========")
+            console.log(`status=${myInfoResponse.status}`)
+            console.log(`url=${BASE_URL}/api/members/me`)
+            console.log(`body=${myInfoResponse.body}`)
+            console.log(`vuId=${exec.vu.idInTest}`)
+            console.log("===================================")
+        }
 
         check(myInfoResponse, {
             "my info status is 200": (res) => res.status === 200,
             "my info success is true": (res) => isSuccess(res),
         })
 
-        const myPreferenceResponse = http.get(`${BASE_URL}/api/preferences/me`)
+        const myPreferenceResponse = http.get(
+            `${BASE_URL}/api/preferences/me`,
+            authRequestOptions()
+        )
+
+        if (!isSuccess(myPreferenceResponse) && myPreferenceFailureLogCount < 5) {
+            myPreferenceFailureLogCount++
+
+            console.log("========== 내 선호정보 조회 실패 ==========")
+            console.log(`status=${myPreferenceResponse.status}`)
+            console.log(`url=${BASE_URL}/api/preferences/me`)
+            console.log(`body=${myPreferenceResponse.body}`)
+            console.log(`vuId=${exec.vu.idInTest}`)
+            console.log("===================================")
+        }
 
         check(myPreferenceResponse, {
             "my preference status is 200": (res) => res.status === 200,
@@ -138,9 +188,7 @@ export function authenticatedReadFlow() {
 
 export function recommendationCreateFlow() {
     group("추천 코스 생성 API 스파이크", function () {
-        const loggedIn = login()
-
-        if (!loggedIn) {
+        if (!ensureLoggedIn()) {
             return
         }
 
@@ -148,7 +196,7 @@ export function recommendationCreateFlow() {
         const endDate = formatDate(addDays(new Date(), 14))
 
         const requestBody = {
-            title: `스파이크테스트 추천 코스 ${__VU}-${Date.now()}`,
+            title: `스파이크테스트 추천 코스 ${exec.vu.idInTest}-${Date.now()}`,
             area: "마포구",
 
             // 현재 추천 로직은 EVENT 카테고리명을 기준으로 필터링한다.
@@ -165,15 +213,18 @@ export function recommendationCreateFlow() {
         const recommendResponse = http.post(
             `${BASE_URL}${RECOMMEND_ENDPOINT}`,
             JSON.stringify(requestBody),
-            jsonHeaders
+            authJsonRequestOptions()
         )
 
-        if (recommendResponse.status !== 201 && __ITER < 2) {
+        if (recommendResponse.status !== 201 && recommendFailureLogCount < 5) {
+            recommendFailureLogCount++
+
             console.log("========== 추천 API 실패 ==========")
             console.log(`status=${recommendResponse.status}`)
             console.log(`url=${BASE_URL}${RECOMMEND_ENDPOINT}`)
             console.log(`body=${recommendResponse.body}`)
             console.log(`requestBody=${JSON.stringify(requestBody)}`)
+            console.log(`vuId=${exec.vu.idInTest}`)
             console.log("===================================")
         }
 
@@ -187,7 +238,11 @@ export function recommendationCreateFlow() {
     sleep(2)
 }
 
-function login() {
+function ensureLoggedIn() {
+    if (loggedIn && authCookieHeader !== "") {
+        return true
+    }
+
     const account = getAccount()
 
     const loginResponse = http.post(
@@ -199,23 +254,86 @@ function login() {
         jsonHeaders
     )
 
-    if (loginResponse.status !== 200 && __ITER < 2) {
+    const cookieHeader = buildAuthCookieHeader(loginResponse)
+
+    if ((loginResponse.status !== 200 || cookieHeader === "") && loginFailureLogCount < 5) {
+        loginFailureLogCount++
+
         console.log("========== 로그인 API 실패 ==========")
         console.log(`status=${loginResponse.status}`)
         console.log(`url=${BASE_URL}/api/auth/login`)
         console.log(`body=${loginResponse.body}`)
         console.log(`email=${account.email}`)
+        console.log(`vuId=${exec.vu.idInTest}`)
+        console.log(`setCookie=${loginResponse.headers["Set-Cookie"]}`)
         console.log("===================================")
     }
 
-    return check(loginResponse, {
+    const success = check(loginResponse, {
         "login status is 200": (res) => res.status === 200,
         "login success is true": (res) => isSuccess(res),
+        "accessToken cookie exists": () => cookieHeader.includes("accessToken="),
+        "refreshToken cookie exists": () => cookieHeader.includes("refreshToken="),
     })
+
+    if (success) {
+        loggedIn = true
+        authCookieHeader = cookieHeader
+    }
+
+    return loggedIn
 }
 
 function getAccount() {
-    return accounts[(__VU - 1) % accounts.length]
+    const vuId = exec.vu.idInTest
+    const accountIndex = (vuId - 1) % accounts.length
+
+    return accounts[accountIndex]
+}
+
+function authRequestOptions() {
+    return {
+        headers: {
+            Cookie: authCookieHeader,
+        },
+    }
+}
+
+function authJsonRequestOptions() {
+    return {
+        headers: {
+            "Content-Type": "application/json",
+            Cookie: authCookieHeader,
+        },
+    }
+}
+
+function buildAuthCookieHeader(response) {
+    const setCookieHeader = response.headers["Set-Cookie"]
+
+    if (!setCookieHeader) {
+        return ""
+    }
+
+    const accessToken = extractCookieValue(setCookieHeader, "accessToken")
+    const refreshToken = extractCookieValue(setCookieHeader, "refreshToken")
+
+    if (!accessToken || !refreshToken) {
+        return ""
+    }
+
+    return `accessToken=${accessToken}; refreshToken=${refreshToken}`
+}
+
+function extractCookieValue(setCookieHeader, cookieName) {
+    const pattern = new RegExp(`${cookieName}=([^;]+)`)
+    const matched = setCookieHeader.match(pattern)
+
+    if (!matched) {
+        return ""
+    }
+
+    return matched[1]
 }
 
 function isSuccess(response) {
