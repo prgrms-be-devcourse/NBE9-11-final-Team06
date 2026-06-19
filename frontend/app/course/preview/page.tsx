@@ -10,6 +10,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 
+
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -76,14 +77,24 @@ function extractCourse(result: any): CoursePreviewResponse | null {
     null
   )
 }
-
 /* ---------------- page ---------------- */
 
 export default function CourseDetailPage() {
   const [course, setCourse] = useState<CoursePreviewResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
+  const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
+  const [request, setRequest] = useState<any>(null)
 
+
+  function toggleRestaurant(id: number) {
+    setSelectedRestaurantId(prev => (prev === id ? null : id))
+  }
+  
+  function toggleCafe(id: number) {
+    setSelectedCafeId(prev => (prev === id ? null : id))
+  }
   useEffect(() => {
     let isMounted = true
   
@@ -92,17 +103,31 @@ export default function CourseDetailPage() {
       setErrorMessage(null)
   
       try {
-        const savedRequest =
-          sessionStorage.getItem("coursePreviewRequest")
-  
-        if (!savedRequest) {
+
+        const search = typeof window !== "undefined" ? window.location.search : ""
+        const params = new URLSearchParams(search)
+
+        const requestFromUrl = params.get("request")
+        const localRequest = localStorage.getItem("coursePreviewRequest")
+
+        const rawRequest = requestFromUrl || localRequest
+
+        if (!rawRequest) {
           setErrorMessage("추천 조건 정보를 찾을 수 없습니다.")
           return
         }
-  
-        const requestBody = JSON.parse(savedRequest)
-  
-        console.log("preview request:", requestBody)
+
+        let requestBody: any
+
+        try {
+          requestBody = JSON.parse(rawRequest)
+        } catch (e) {
+          console.error("request JSON 깨짐:", rawRequest)
+          setErrorMessage("추천 조건 정보가 깨졌습니다.")
+          return
+        }
+
+        setRequest(requestBody)
   
 
 
@@ -119,20 +144,13 @@ export default function CourseDetailPage() {
           headers,
           body: JSON.stringify(requestBody),
         })
-
-        if (accessToken) {
-          headers.Authorization = `Bearer ${accessToken}`
-        }
-        console.log("accessToken:", getAccessToken())
-
-        console.log(
-          `${API_BASE_URL}/api/courses/preview`
-        )
-
   
         const text = await res.text()
         console.log("status:", res.status)
         console.log("content-type:", res.headers.get("content-type"))
+        console.log("raw body:", text.substring(0, 500))
+        console.log("requestBody:", requestBody)
+        console.log("status:", res.status)
         console.log("raw body:", text.substring(0, 500))
   
         let result = null
@@ -237,7 +255,12 @@ export default function CourseDetailPage() {
 
               <div className="mt-5 space-y-4">
                 {restaurants.map((place) => (
-                  <Card key={place.id} className="p-5">
+                  <Card
+                  key={place.id}
+                  onClick={() => toggleRestaurant(place.id)}
+                  className={`p-5 cursor-pointer transition border
+                    ${selectedRestaurantId === place.id ? "border-blue-500 bg-blue-50" : ""}`}
+                >
                     <h3 className="text-xl font-bold">{place.name}</h3>
 
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -267,7 +290,12 @@ export default function CourseDetailPage() {
 
               <div className="mt-5 space-y-4">
                 {cafes.map((place) => (
-                  <Card key={place.id} className="p-5">
+                  <Card
+                  key={place.id}
+                  onClick={() => toggleCafe(place.id)}
+                  className={`p-5 cursor-pointer transition border
+                    ${selectedCafeId === place.id ? "border-green-500 bg-green-50" : ""}`}
+                >
                     <h3 className="text-xl font-bold">{place.name}</h3>
 
                     <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -290,6 +318,87 @@ export default function CourseDetailPage() {
                 ))}
               </div>
             </section>
+
+            <Button
+            className="mt-10 w-full"
+            disabled={!selectedRestaurantId || !selectedCafeId}
+            onClick={async () => {
+              const selectedRestaurant = restaurants.find(
+                r => r.id === selectedRestaurantId
+              )
+            
+              const selectedCafe = cafes.find(
+                c => c.id === selectedCafeId
+              )
+            
+              if (!selectedRestaurant || !selectedCafe || !course) return
+            
+              // 🔥 핵심: preview 요청 기반 + 선택값 합치기
+              const payload = {
+                title: "추천 코스",
+                description: "맛집과 카페를 함께 즐기는 코스",
+              
+                courseType: request.courseType,
+                startDate: request.startDate,
+                endDate: request.endDate,
+                baseArea: request.baseArea,
+                companionType: request.companionType,
+              
+                eventIds: course.eventIds,
+              
+                restaurantId: selectedRestaurant.id,
+                cafeId: selectedCafe.id,
+              }
+            
+              try {
+                const accessToken = getAccessToken()
+            
+                const res = await fetch(`${API_BASE_URL}/api/courses`, {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                  },
+                  body: JSON.stringify(payload),
+                })
+                
+                const text = await res.text()
+                
+                console.log("status:", res.status)
+                console.log("raw response:", text)
+                
+                if (!res.ok) {
+                  console.error("API ERROR:", text)
+                  alert("코스 생성 실패")
+                  return
+                }
+                
+                let data
+                try {
+                  data = JSON.parse(text)
+                } catch (e) {
+                  console.error("JSON 아님:", text)
+                  alert("서버 응답이 JSON이 아님")
+                  return
+                }
+                
+                const courseId = data?.data
+                
+                if (!courseId) {
+                  alert("courseId 없음")
+                  return
+                }
+                
+                window.location.href = `/course/${courseId}`
+              } catch (e) {
+                console.error(e)
+                alert("코스 생성 중 에러")
+              }
+            }}
+          >
+            선택 완료
+          </Button>
           </>
         )}
       </main>
