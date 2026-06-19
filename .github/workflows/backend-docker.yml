@@ -116,7 +116,7 @@ jobs:
             docker compose up -d
 
             for i in {1..12}; do
-              if curl -f http://localhost/actuator/health; then
+              if docker exec gotoday-nginx wget -qO- http://localhost/actuator/health; then
                 echo "Health check succeeded"
                 exit 0
               fi
