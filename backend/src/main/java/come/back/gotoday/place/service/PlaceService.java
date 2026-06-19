@@ -2,8 +2,6 @@ package come.back.gotoday.place.service;
 
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
-import come.back.gotoday.course.entity.Course;
-import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
 import come.back.gotoday.external.naver.dto.NaverLocalSearchResponse;
@@ -146,7 +144,7 @@ public class PlaceService {
     public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
 
         return placeRepository
-                .findByNameAndAddressAndIsActiveTrue(
+                .findFirstByNameAndAddressAndIsActiveTrueOrderByIdAsc(
                         doc.placeName(),
                         doc.addressName()
                 )
