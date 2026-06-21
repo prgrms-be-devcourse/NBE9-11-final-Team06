@@ -94,7 +94,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy/docker-compose.ec2.yml,deploy/nginx/default.conf,deploy/nginx/backend-upstream.conf"
+          source: "deploy/docker-compose.ec2.yml,deploy/nginx/default.conf,deploy/nginx/backend-upstream.conf.inc"
           target: "~/gotoday-upload"
 
       - name: Deploy to EC2
@@ -109,8 +109,12 @@ jobs:
             cp ~/gotoday-upload/deploy/docker-compose.ec2.yml ~/gotoday/docker-compose.yml
             cp ~/gotoday-upload/deploy/nginx/default.conf ~/gotoday/nginx/default.conf
 
-            if [ ! -f ~/gotoday/nginx/backend-upstream.conf ]; then
-              cp ~/gotoday-upload/deploy/nginx/backend-upstream.conf ~/gotoday/nginx/backend-upstream.conf
+            # 기존 .conf 파일이 남아 있으면 Nginx가 자동 로드하여 upstream 중복 오류가 발생할 수 있으므로 삭제
+            rm -f ~/gotoday/nginx/backend-upstream.conf
+
+            # 최초 배포 시에만 초기 upstream 설정 파일 복사
+            if [ ! -f ~/gotoday/nginx/backend-upstream.conf.inc ]; then
+              cp ~/gotoday-upload/deploy/nginx/backend-upstream.conf.inc ~/gotoday/nginx/backend-upstream.conf.inc
             fi
 
             rm -rf ~/gotoday-upload
@@ -122,7 +126,7 @@ jobs:
 
             docker compose up -d mysql frontend
 
-            if grep -q "backend-blue" ./nginx/backend-upstream.conf; then
+            if grep -q "backend-blue" ./nginx/backend-upstream.conf.inc; then
               CURRENT="blue"
               NEXT="green"
             else
@@ -140,8 +144,8 @@ jobs:
 
             if ! docker ps --format '{{.Names}}' | grep -q '^gotoday-nginx$'; then
               docker compose up -d --no-deps nginx
-            elif ! docker exec gotoday-nginx test -f /etc/nginx/conf.d/backend-upstream.conf; then
-              echo "Recreating nginx to apply backend-upstream.conf mount..."
+            elif ! docker exec gotoday-nginx test -f /etc/nginx/conf.d/backend-upstream.conf.inc; then
+              echo "Recreating nginx to apply backend-upstream.conf.inc mount..."
               docker compose up -d --no-deps --force-recreate nginx
             fi
 
@@ -186,7 +190,7 @@ jobs:
               sleep 5
             done
 
-            printf 'upstream backend {\n    server backend-%s:8080;\n}\n' "$NEXT" > ./nginx/backend-upstream.conf
+            printf 'upstream backend {\n    server backend-%s:8080;\n}\n' "$NEXT" > ./nginx/backend-upstream.conf.inc
 
             docker exec gotoday-nginx nginx -t
             docker exec gotoday-nginx nginx -s reload

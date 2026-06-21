@@ -5,8 +5,7 @@ services:
     expose:
       - "80"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/backend-upstream.conf:/etc/nginx/conf.d/backend-upstream.conf
+      - ./nginx:/etc/nginx/conf.d:ro
     depends_on:
       - frontend
     restart: unless-stopped
