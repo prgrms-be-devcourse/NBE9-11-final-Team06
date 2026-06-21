@@ -44,13 +44,6 @@ type CoursePlace = {
   reason?: string
 }
 
-// type CoursePlace = {
-//   placeId: number
-//   placeName: string
-//   visitOrder: number
-//   recommendationReason: string
-// }
-
 type Place = {
   id: number
   name: string
@@ -227,31 +220,6 @@ function extractPlace(result: any) {
   return result?.data ?? result?.result ?? result?.body ?? result?.content ?? result
 }
 
-// async function fetchPlaceDetails(placeIds: number[]) {
-//   const accessToken = getAccessToken()
-
-//   const headers: HeadersInit = {}
-//   if (accessToken) {
-//     headers.Authorization = `Bearer ${accessToken}`
-//   }
-
-//   const results = await Promise.all(
-//     placeIds.map(async (id) => {
-//       const res = await fetch(`${API_BASE_URL}/api/places/${id}`, {
-//         headers,
-//         credentials: "include",
-//       })
-
-//       if (!res.ok) return null
-
-//       const json = await res.json()
-//       return extractPlace(json)
-//     })
-//   )
-
-//   return results.filter(Boolean)
-// }
-
 
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
@@ -259,7 +227,6 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  //const [placeDetails, setPlaceDetails] = useState<PlaceDetail[]>([])
 
   useEffect(() => {
     const savedCourse = getSavedRecommendedCourse(courseId)
@@ -310,25 +277,6 @@ export default function CourseDetailPage() {
     }
   }, [courseId])
 
-
-  // useEffect(() => {
-  //   if (!course) return
-  
-  //   setPlaceDetails([])
-
-  //   async function loadPlaces() {
-  //     const ids = getCoursePlaces(course)
-  //       .map(p => p.placeId)
-  //       .filter((id): id is number => !!id)
-  
-  //     const details = await fetchPlaceDetails(ids)
-  
-  //     setPlaceDetails(details)
-  //   }
-  
-  //   loadPlaces()
-  // }, [course])
-
   const coursePlaces = getCoursePlaces(course)
   const title = course?.title ?? "코스 상세"
   const description = course?.description ?? "추천 알고리즘으로 생성된 코스입니다."
@@ -341,44 +289,6 @@ export default function CourseDetailPage() {
   const placeIds = coursePlaces
   .map(p => p.placeId)
   .filter((id): id is number => !!id)
-
-
-  // const mapPoints = coursePlaces
-  // .filter(
-  //   (place) =>
-  //     place.latitude &&
-  //     place.longitude
-  // )
-  // .sort(
-  //   (a, b) =>
-  //     getVisitOrder(a, 0) -
-  //     getVisitOrder(b, 0)
-  // )
-  // .map((place, index) => ({
-  //   title: getPlaceTitle(place),
-  //   latitude: Number(place.latitude),
-  //   longitude: Number(place.longitude),
-  //   order: getVisitOrder(place, index),
-  // }))
-
-  // const mapPoints = placeDetails
-  // .filter(p => p.latitude && p.longitude)
-  // .map((p, index) => ({
-  //   title: p.name,
-  //   latitude: Number(p.latitude),
-  //   longitude: Number(p.longitude),
-  //   order: index + 1,
-  // }))
-
-  // const mapPoints = coursePlaces
-  // .filter(p => p.latitude && p.longitude)
-  // .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
-  // .map((p) => ({
-  //   title: p.placeName,
-  //   latitude: Number(p.latitude),
-  //   longitude: Number(p.longitude),
-  //   order: p.visitOrder ?? 0,
-  // }))
 
   const mapPoints = coursePlaces
   .filter(p => p.latitude && p.longitude)
