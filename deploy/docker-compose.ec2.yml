@@ -5,9 +5,8 @@ services:
     expose:
       - "80"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx:/etc/nginx/conf.d:ro
     depends_on:
-      - backend
       - frontend
     restart: unless-stopped
 
@@ -27,8 +26,29 @@ services:
       - nginx
     restart: unless-stopped
 
-  backend:
-    container_name: gotoday-backend
+  backend-blue:
+    container_name: gotoday-backend-blue
+    image: ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SEOUL_API_KEY: ${SEOUL_API_KEY:-dummy}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:?MYSQL_DATABASE is required}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:?MYSQL_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend-green:
+    container_name: gotoday-backend-green
     image: ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
     expose:
       - "8080"
