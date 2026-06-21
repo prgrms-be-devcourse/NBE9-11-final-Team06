@@ -77,7 +77,7 @@ public class CourseService {
                             event,
                             order++,
                             null, null, null, null, null, null,
-                            "이벤트 기반 추천"
+                            "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
                     )
             );
         }
@@ -236,11 +236,32 @@ public class CourseService {
                                 placeName = cp.getPlace().getName();
                             }
 
+                            Place placeEntity = cp.getPlace();
+                            Event eventEntity = cp.getEvent();
+
+                            BigDecimal lat = null;
+                            BigDecimal lng = null;
+                            String address = null;
+
+                            if (placeEntity != null) {
+                                lat = placeEntity.getLatitude();
+                                lng = placeEntity.getLongitude();
+                                address = placeEntity.getAddress();
+                            } else if (eventEntity != null && eventEntity.getPlace() != null) {
+                                lat = eventEntity.getPlace().getLatitude();
+                                lng = eventEntity.getPlace().getLongitude();
+                                address = eventEntity.getPlace().getAddress();
+                            }
+
+
                             return new CoursePlaceResponse(
                                     placeId,
                                     placeName,
                                     cp.getVisitOrder(),
-                                    cp.getRecommendationReason()
+                                    cp.getRecommendationReason(),
+                                    lat,
+                                    lng,
+                                    address
                             );
                         })
                         .toList();

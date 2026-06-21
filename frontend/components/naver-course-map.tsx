@@ -20,12 +20,19 @@ declare global {
 }
 
 export function NaverCourseMap({ points }: Props) {
+  console.log("NaverCourseMap render", points)
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!window.naver || !containerRef.current || points.length === 0) return
 
+    console.log("effect start")
+    console.log("window.naver", window.naver)
+    console.log("points", points)
+    if (!window.naver || !containerRef.current || points.length === 0) {
+      console.log("return")
+      return
+    }
     const naver = window.naver
 
     const center = new naver.maps.LatLng(

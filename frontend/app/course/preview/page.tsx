@@ -366,7 +366,7 @@ export default function CourseDetailPage() {
                 const accessToken = getAccessToken()
             
                 console.log("payload:", payload)
-                const res = await fetch(`${API_BASE_URL}/api/courses`, {
+                const response = await fetch(`${API_BASE_URL}/api/courses`, {
                   method: "POST",
                   credentials: "include",
                   headers: {
@@ -376,27 +376,21 @@ export default function CourseDetailPage() {
                   body: JSON.stringify(payload),
                 })
                 
-                const text = await res.text()
+                const result = await response.json().catch(() => null)
                 
-                console.log("status:", res.status)
-                console.log("raw response:", text)
+                console.log("status:", result.status)
+                console.log("raw response:", result)
                 
-                if (!res.ok) {
-                  console.error("API ERROR:", text)
-                  alert("코스 생성 실패")
-                  return
+                if (response.status === 0 || response.status === 302 || response.type === "opaqueredirect") {
+                  throw new Error("로그인 인증이 만료되었거나 토큰이 전달되지 않았습니다. 다시 로그인해주세요.")
+                }
+
+                if (!response.ok) {
+                  throw new Error(result?.message ?? result?.error ?? "코스 추천 생성에 실패했습니다.")
                 }
                 
-                let data
-                try {
-                  data = JSON.parse(text)
-                } catch (e) {
-                  console.error("JSON 아님:", text)
-                  alert("서버 응답이 JSON이 아님")
-                  return
-                }
                 
-                const courseId = data?.data
+                const courseId = result?.data
                 
                 if (!courseId) {
                   alert("courseId 없음")

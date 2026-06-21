@@ -198,7 +198,7 @@ export function PlanWizard() {
     const params = new URLSearchParams()
     const selectedDate = formatDate(date)
     const coursePreviewRequest = {
-      courseType: "DAILY",
+      courseType: "RECOMMENDATION",
       startDate: selectedDate,
       endDate: selectedDate,
       baseArea: area ?? selectedLocation.name,
@@ -273,8 +273,6 @@ export function PlanWizard() {
         "recommendedEventIds",
         JSON.stringify(eventIds)
       )
-
-
 
 
       console.log("추천 코스 생성 응답:", result)

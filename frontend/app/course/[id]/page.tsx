@@ -18,6 +18,10 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { NaverCourseMap } from "@/components/naver-course-map"
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
+
+
 type CoursePlace = {
   id?: number
   placeId?: number
@@ -38,6 +42,32 @@ type CoursePlace = {
   memo?: string
   recommendationReason?: string
   reason?: string
+}
+
+// type CoursePlace = {
+//   placeId: number
+//   placeName: string
+//   visitOrder: number
+//   recommendationReason: string
+// }
+
+type Place = {
+  id: number
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  url?: string
+  categoryId: number
+}
+
+type PlaceDetail = {
+  id: number
+  name: string
+  latitude: number
+  longitude: number
+  address?: string
+  categoryId?: number
 }
 
 type CourseDetail = {
@@ -193,12 +223,43 @@ function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
 }
 
+function extractPlace(result: any) {
+  return result?.data ?? result?.result ?? result?.body ?? result?.content ?? result
+}
+
+// async function fetchPlaceDetails(placeIds: number[]) {
+//   const accessToken = getAccessToken()
+
+//   const headers: HeadersInit = {}
+//   if (accessToken) {
+//     headers.Authorization = `Bearer ${accessToken}`
+//   }
+
+//   const results = await Promise.all(
+//     placeIds.map(async (id) => {
+//       const res = await fetch(`${API_BASE_URL}/api/places/${id}`, {
+//         headers,
+//         credentials: "include",
+//       })
+
+//       if (!res.ok) return null
+
+//       const json = await res.json()
+//       return extractPlace(json)
+//     })
+//   )
+
+//   return results.filter(Boolean)
+// }
+
+
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
   const courseId = params.id
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  //const [placeDetails, setPlaceDetails] = useState<PlaceDetail[]>([])
 
   useEffect(() => {
     const savedCourse = getSavedRecommendedCourse(courseId)
@@ -218,7 +279,7 @@ export default function CourseDetailPage() {
           headers.Authorization = `Bearer ${accessToken}`
         }
 
-        const response = await fetch(`/api/courses/${courseId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
           method: "GET",
           credentials: "include",
           headers,
@@ -249,6 +310,25 @@ export default function CourseDetailPage() {
     }
   }, [courseId])
 
+
+  // useEffect(() => {
+  //   if (!course) return
+  
+  //   setPlaceDetails([])
+
+  //   async function loadPlaces() {
+  //     const ids = getCoursePlaces(course)
+  //       .map(p => p.placeId)
+  //       .filter((id): id is number => !!id)
+  
+  //     const details = await fetchPlaceDetails(ids)
+  
+  //     setPlaceDetails(details)
+  //   }
+  
+  //   loadPlaces()
+  // }, [course])
+
   const coursePlaces = getCoursePlaces(course)
   const title = course?.title ?? "코스 상세"
   const description = course?.description ?? "추천 알고리즘으로 생성된 코스입니다."
@@ -258,24 +338,59 @@ export default function CourseDetailPage() {
   const companion = course?.companionType ?? "동행 미정"
   const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
 
+  const placeIds = coursePlaces
+  .map(p => p.placeId)
+  .filter((id): id is number => !!id)
+
+
+  // const mapPoints = coursePlaces
+  // .filter(
+  //   (place) =>
+  //     place.latitude &&
+  //     place.longitude
+  // )
+  // .sort(
+  //   (a, b) =>
+  //     getVisitOrder(a, 0) -
+  //     getVisitOrder(b, 0)
+  // )
+  // .map((place, index) => ({
+  //   title: getPlaceTitle(place),
+  //   latitude: Number(place.latitude),
+  //   longitude: Number(place.longitude),
+  //   order: getVisitOrder(place, index),
+  // }))
+
+  // const mapPoints = placeDetails
+  // .filter(p => p.latitude && p.longitude)
+  // .map((p, index) => ({
+  //   title: p.name,
+  //   latitude: Number(p.latitude),
+  //   longitude: Number(p.longitude),
+  //   order: index + 1,
+  // }))
+
+  // const mapPoints = coursePlaces
+  // .filter(p => p.latitude && p.longitude)
+  // .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
+  // .map((p) => ({
+  //   title: p.placeName,
+  //   latitude: Number(p.latitude),
+  //   longitude: Number(p.longitude),
+  //   order: p.visitOrder ?? 0,
+  // }))
+
   const mapPoints = coursePlaces
-  .filter(
-    (place) =>
-      place.latitude &&
-      place.longitude
-  )
-  .sort(
-    (a, b) =>
-      getVisitOrder(a, 0) -
-      getVisitOrder(b, 0)
-  )
-  .map((place, index) => ({
-    title: getPlaceTitle(place),
-    latitude: Number(place.latitude),
-    longitude: Number(place.longitude),
-    order: getVisitOrder(place, index),
+  .filter(p => p.latitude && p.longitude)
+  .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
+  .map((p) => ({
+    title: p.placeName,
+    latitude: Number(p.latitude),
+    longitude: Number(p.longitude),
+    order: p.visitOrder ?? 0,
   }))
-  
+
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
