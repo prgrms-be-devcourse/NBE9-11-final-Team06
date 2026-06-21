@@ -43,7 +43,7 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
 
-    // 코스 저장 (생성)
+    // 코스 저장 (생성) // 카페, 식당 선택한 정보까지 포함되어 들어온다.
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
 
@@ -77,7 +77,7 @@ public class CourseService {
                             event,
                             order++,
                             null, null, null, null, null, null,
-                            "이벤트 기반 추천"
+                            "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
                     )
             );
         }
@@ -121,7 +121,7 @@ public class CourseService {
         return course.getId();
     }
 
-    // 행사 데이터를 바탕으로, 주변
+    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
 
@@ -236,11 +236,32 @@ public class CourseService {
                                 placeName = cp.getPlace().getName();
                             }
 
+                            Place placeEntity = cp.getPlace();
+                            Event eventEntity = cp.getEvent();
+
+                            BigDecimal lat = null;
+                            BigDecimal lng = null;
+                            String address = null;
+
+                            if (placeEntity != null) {
+                                lat = placeEntity.getLatitude();
+                                lng = placeEntity.getLongitude();
+                                address = placeEntity.getAddress();
+                            } else if (eventEntity != null && eventEntity.getPlace() != null) {
+                                lat = eventEntity.getPlace().getLatitude();
+                                lng = eventEntity.getPlace().getLongitude();
+                                address = eventEntity.getPlace().getAddress();
+                            }
+
+
                             return new CoursePlaceResponse(
                                     placeId,
                                     placeName,
                                     cp.getVisitOrder(),
-                                    cp.getRecommendationReason()
+                                    cp.getRecommendationReason(),
+                                    lat,
+                                    lng,
+                                    address
                             );
                         })
                         .toList();

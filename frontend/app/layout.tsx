@@ -4,6 +4,10 @@ import { Plus_Jakarta_Sans, Noto_Sans_KR } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
+
+import Script from "next/script"
+
+
 const jakarta = Plus_Jakarta_Sans({
   variable: '--font-jakarta',
   subsets: ['latin'],
@@ -34,7 +38,14 @@ export default function RootLayout({
     >
       <body className="font-sans antialiased">
         {children}
+
         <Toaster position="top-center" richColors />
+
+        <Script
+          strategy="afterInteractive"
+          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
+        />
+
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

@@ -198,7 +198,7 @@ export function PlanWizard() {
     const params = new URLSearchParams()
     const selectedDate = formatDate(date)
     const coursePreviewRequest = {
-      courseType: "DAILY",
+      courseType: "RECOMMENDATION",
       startDate: selectedDate,
       endDate: selectedDate,
       baseArea: area ?? selectedLocation.name,
@@ -263,6 +263,17 @@ export function PlanWizard() {
 
       const recommendedCourse = extractRecommendedCourse(result)
       const courseId = extractCourseId(result) ?? extractCourseId(recommendedCourse)
+
+      
+      //식당, 카페에 현재 알고리즘을 통해 나온 행사의 아이디를 넘겨주기 위해서 저장한다. 
+      const eventIds =
+          recommendedCourse?.places?.map((place: any) => place.eventId) ?? []
+
+      localStorage.setItem(
+        "recommendedEventIds",
+        JSON.stringify(eventIds)
+      )
+
 
       console.log("추천 코스 생성 응답:", result)
       console.log("추출된 추천 코스:", recommendedCourse)

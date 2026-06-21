@@ -16,6 +16,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { NaverCourseMap } from "@/components/naver-course-map"
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
+
 
 type CoursePlace = {
   id?: number
@@ -37,6 +42,25 @@ type CoursePlace = {
   memo?: string
   recommendationReason?: string
   reason?: string
+}
+
+type Place = {
+  id: number
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  url?: string
+  categoryId: number
+}
+
+type PlaceDetail = {
+  id: number
+  name: string
+  latitude: number
+  longitude: number
+  address?: string
+  categoryId?: number
 }
 
 type CourseDetail = {
@@ -192,6 +216,11 @@ function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
 }
 
+function extractPlace(result: any) {
+  return result?.data ?? result?.result ?? result?.body ?? result?.content ?? result
+}
+
+
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
   const courseId = params.id
@@ -217,7 +246,7 @@ export default function CourseDetailPage() {
           headers.Authorization = `Bearer ${accessToken}`
         }
 
-        const response = await fetch(`/api/courses/${courseId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
           method: "GET",
           credentials: "include",
           headers,
@@ -256,6 +285,21 @@ export default function CourseDetailPage() {
   const baseArea = course?.baseArea ?? "지역 미정"
   const companion = course?.companionType ?? "동행 미정"
   const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
+
+  const placeIds = coursePlaces
+  .map(p => p.placeId)
+  .filter((id): id is number => !!id)
+
+  const mapPoints = coursePlaces
+  .filter(p => p.latitude && p.longitude)
+  .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
+  .map((p) => ({
+    title: p.placeName,
+    latitude: Number(p.latitude),
+    longitude: Number(p.longitude),
+    order: p.visitOrder ?? 0,
+  }))
+
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -384,11 +428,7 @@ export default function CourseDetailPage() {
                       <MapPin className="size-4 text-primary" />
                       지도 보기
                     </p>
-                    <div className="flex aspect-square items-center justify-center rounded-2xl bg-secondary/60 text-center text-sm text-muted-foreground">
-                      지도 영역입니다.
-                      <br />
-                      추후 Naver Map 마커 연동 가능
-                    </div>
+                    <NaverCourseMap points={mapPoints} />
                   </Card>
                 </div>
               ) : (
