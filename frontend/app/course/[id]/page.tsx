@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { NaverCourseMap } from "@/components/naver-course-map"
 
 type CoursePlace = {
   id?: number
@@ -257,6 +258,24 @@ export default function CourseDetailPage() {
   const companion = course?.companionType ?? "동행 미정"
   const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
 
+  const mapPoints = coursePlaces
+  .filter(
+    (place) =>
+      place.latitude &&
+      place.longitude
+  )
+  .sort(
+    (a, b) =>
+      getVisitOrder(a, 0) -
+      getVisitOrder(b, 0)
+  )
+  .map((place, index) => ({
+    title: getPlaceTitle(place),
+    latitude: Number(place.latitude),
+    longitude: Number(place.longitude),
+    order: getVisitOrder(place, index),
+  }))
+  
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -384,11 +403,7 @@ export default function CourseDetailPage() {
                       <MapPin className="size-4 text-primary" />
                       지도 보기
                     </p>
-                    <div className="flex aspect-square items-center justify-center rounded-2xl bg-secondary/60 text-center text-sm text-muted-foreground">
-                      지도 영역입니다.
-                      <br />
-                      추후 Naver Map 마커 연동 가능
-                    </div>
+                    <NaverCourseMap points={mapPoints} />
                   </Card>
                 </div>
               ) : (
