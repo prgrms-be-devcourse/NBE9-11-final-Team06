@@ -43,7 +43,7 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
 
-    // 코스 저장 (생성)
+    // 코스 저장 (생성) // 카페, 식당 선택한 정보까지 포함되어 들어온다.
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
 
@@ -121,7 +121,7 @@ public class CourseService {
         return course.getId();
     }
 
-    // 행사 데이터를 바탕으로, 주변
+    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
 

@@ -128,7 +128,6 @@ export default function CourseDetailPage() {
         }
 
         setRequest(requestBody)
-  
 
 
         const accessToken = getAccessToken()
@@ -333,6 +332,19 @@ export default function CourseDetailPage() {
             
               if (!selectedRestaurant || !selectedCafe || !course) return
             
+              const eventIds = (() => {
+                try {
+                  return JSON.parse(
+                    localStorage.getItem("recommendedEventIds") ?? "[]"
+                  )
+                } catch {
+                  return []
+                }
+              })()
+
+              console.log("recommendedEventIds:", eventIds)
+
+
               // 🔥 핵심: preview 요청 기반 + 선택값 합치기
               const payload = {
                 title: "추천 코스",
@@ -344,7 +356,7 @@ export default function CourseDetailPage() {
                 baseArea: request.baseArea,
                 companionType: request.companionType,
               
-                eventIds: course.eventIds,
+                eventIds: eventIds,
               
                 restaurantId: selectedRestaurant.id,
                 cafeId: selectedCafe.id,
@@ -353,6 +365,7 @@ export default function CourseDetailPage() {
               try {
                 const accessToken = getAccessToken()
             
+                console.log("payload:", payload)
                 const res = await fetch(`${API_BASE_URL}/api/courses`, {
                   method: "POST",
                   credentials: "include",
