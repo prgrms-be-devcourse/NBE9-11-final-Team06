@@ -136,22 +136,6 @@ jobs:
             if ! docker ps --format '{{.Names}}' | grep -q "^gotoday-backend-$CURRENT$"; then
               echo "Current backend container does not exist. Starting backend-$CURRENT first..."
               docker compose up -d --no-deps backend-$CURRENT
-
-              for i in {1..24}; do
-                if docker exec gotoday-nginx wget -qO- http://backend-$CURRENT:8080/actuator/health 2>/dev/null | grep -q "UP"; then
-                  echo "backend-$CURRENT is healthy"
-                  break
-                fi
-
-                if [ "$i" -eq 24 ]; then
-                  echo "backend-$CURRENT health check failed"
-                  docker logs --tail=100 gotoday-backend-$CURRENT || true
-                  exit 1
-                fi
-
-                echo "Waiting for backend-$CURRENT..."
-                sleep 5
-              done
             fi
 
             if ! docker ps --format '{{.Names}}' | grep -q '^gotoday-nginx$'; then
@@ -162,6 +146,24 @@ jobs:
             fi
 
             docker exec gotoday-nginx nginx -t
+
+            echo "Checking current backend-$CURRENT health..."
+
+            for i in {1..24}; do
+              if docker exec gotoday-nginx wget -qO- http://backend-$CURRENT:8080/actuator/health 2>/dev/null | grep -q "UP"; then
+                echo "backend-$CURRENT is healthy"
+                break
+              fi
+
+              if [ "$i" -eq 24 ]; then
+                echo "backend-$CURRENT health check failed"
+                docker logs --tail=100 gotoday-backend-$CURRENT || true
+                exit 1
+              fi
+
+              echo "Waiting for backend-$CURRENT..."
+              sleep 5
+            done
 
             docker compose up -d --no-deps --force-recreate backend-$NEXT
 
