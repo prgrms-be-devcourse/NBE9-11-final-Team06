@@ -121,10 +121,18 @@ jobs:
 
             cd ~/gotoday
 
+            echo "=== Cleanup unused Docker resources ==="
+            docker container prune -f || true
+            docker image prune -af || true
+            docker builder prune -af || true
+
             docker pull ghcr.io/prgrms-be-devcourse/gotoday-backend:latest
             docker pull ghcr.io/prgrms-be-devcourse/gotoday-frontend:latest || true
 
             docker compose up -d mysql frontend
+
+            echo "=== Remove legacy single backend container before Blue-Green deployment ==="
+            docker rm -f gotoday-backend || true
 
             if grep -q "backend-blue" ./nginx/backend-upstream.conf.inc; then
               CURRENT="blue"
@@ -174,7 +182,7 @@ jobs:
             echo "Waiting for backend-$NEXT health check..."
 
             for i in {1..24}; do
-              if docker exec gotoday-nginx wget -qO- http://backend-$NEXT:8080/actuator/health | grep -q "UP"; then
+              if docker exec gotoday-nginx wget -qO- http://backend-$NEXT:8080/actuator/health 2>/dev/null | grep -q "UP"; then                
                 echo "backend-$NEXT health check succeeded"
                 break
               fi
@@ -202,4 +210,4 @@ jobs:
 
             echo "Blue-Green deployment completed. Active backend: $NEXT"
 
-            curl -f https://gotoday.site/actuator/health
+            curl --max-time 20 -f https://gotoday.site/actuator/health
