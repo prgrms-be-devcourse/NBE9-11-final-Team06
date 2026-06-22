@@ -135,13 +135,25 @@ public class CourseService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
 
+        if (request.eventIds() == null || request.eventIds().size() < 3) {
+            throw new IllegalArgumentException("이벤트는 최소 3개 필요");
+        }
+
+        List<Event> fetchedEvents = eventRepository.findAllById(request.eventIds());
+        java.util.Map<Long, Event> eventMap = fetchedEvents.stream()
+                .collect(java.util.stream.Collectors.toMap(Event::getId, event -> event));
+
         List<Event> events = request.eventIds().stream()
-                .map(id -> eventRepository.findById(id)
-                        .orElseThrow())
+                .map(id -> java.util.Optional.ofNullable(eventMap.get(id))
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이벤트 ID: " + id)))
                 .toList();
 
         if (events.size() < 3) {
             throw new IllegalArgumentException("이벤트는 최소 3개 필요");
+        }
+
+        if (request.restaurantId() == null || request.cafeId() == null) {
+            throw new IllegalArgumentException("식당과 카페 ID는 필수입니다.");
         }
 
         Place restaurant = placeRepository.findById(request.restaurantId())
@@ -178,6 +190,12 @@ public class CourseService {
         // -------------------------
         // 2. 식당 삽입
         // -------------------------
+
+        if (restaurant.getLatitude() == null || restaurant.getLongitude() == null ||
+                cafe.getLatitude() == null || cafe.getLongitude() == null) {
+            throw new IllegalArgumentException("식당 또는 카페의 위치 정보가 없습니다.");
+        }
+
         int restaurantIndex = findInsertIndex(
                 route,
                 restaurant.getLatitude().doubleValue(),
@@ -272,8 +290,8 @@ public class CourseService {
         // =========================
         // 1. 출발지 기준 (request에 담겨 있는 시작 위경도 받아옴)
         // =========================
-        double startLat = request.startLatitude() != null ? request.startLatitude() : 0.0;
-        double startLng = request.startLongitude() != null ? request.startLongitude() : 0.0;
+        double startLat = request.startLatitude();
+        double startLng = request.startLongitude();
 
 
         // =========================
@@ -284,8 +302,12 @@ public class CourseService {
         Event event2 = events.get(1);
         Event event3 = events.get(2);
 
-        double midLat = (event2.getLatitude() + event3.getLatitude()) / 2.0;
-        double midLng = (event2.getLongitude() + event3.getLongitude()) / 2.0;
+        double lat2 = event2.getLatitude() != null ? event2.getLatitude() : 0.0;
+        double lat3 = event3.getLatitude() != null ? event3.getLatitude() : 0.0;
+        double lng2 = event2.getLongitude() != null ? event2.getLongitude() : 0.0;
+        double lng3 = event3.getLongitude() != null ? event3.getLongitude() : 0.0;
+        double midLat = (lat2 + lat3) / 2.0;
+        double midLng = (lng2 + lng3) / 2.0;
 
         // =========================
         // 3. POI 검색 (event2,event3사이의 식당, 카페 추천)
