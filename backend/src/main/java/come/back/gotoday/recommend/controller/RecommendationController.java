@@ -3,7 +3,7 @@ package come.back.gotoday.recommend.controller;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
 import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
-import come.back.gotoday.recommend.service.RecommendationService;
+import come.back.gotoday.course.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,14 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recommendations")
 public class RecommendationController {
 
-    private final RecommendationService recommendationService;
+    private final CourseService courseService;
 
     @PostMapping("/courses")
     public ResponseEntity<ApiResponse<RecommendationCourseResponse>> createRecommendedCourse(
             @AuthenticationPrincipal(expression = "memberId") Long memberId,
             @Valid @RequestBody RecommendationCourseCreateRequest request
     ) {
-        RecommendationCourseResponse response = recommendationService.createRecommendedCourse(memberId, request);
+        RecommendationCourseResponse response = courseService.createRecommendedCourse(memberId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "추천 코스 생성 성공"));
     }

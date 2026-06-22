@@ -2,6 +2,8 @@ package come.back.gotoday.course.controller;
 
 import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.service.CourseService;
+import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
+import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,35 @@ public class CourseController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(courseId, "코스 생성에 성공했습니다.")
+        );
+    }
+
+    // 추천 코스 생성
+    @PostMapping("/recommendations")
+    public ResponseEntity<ApiResponse<RecommendationCourseResponse>> createRecommendedCourse(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody RecommendationCourseCreateRequest request
+    ) {
+        log.info(
+                "추천 코스 생성 요청: memberId={}, area={}, topK={}",
+                userDetails.getMemberId(),
+                request.area(),
+                request.getTopKOrDefault()
+        );
+
+        RecommendationCourseResponse response = courseService.createRecommendedCourse(
+                userDetails.getMemberId(),
+                request
+        );
+
+        log.info(
+                "추천 코스 생성 응답: memberId={}, courseId={}",
+                userDetails.getMemberId(),
+                response.courseId()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "추천 코스 생성에 성공했습니다.")
         );
     }
 

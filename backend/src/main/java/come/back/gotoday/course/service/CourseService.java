@@ -18,6 +18,9 @@ import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.place.service.PlaceService;
 import come.back.gotoday.recommend.service.RecommendationService;
+import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
+import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
+import come.back.gotoday.recommend.dto.RecommendedCoursePlaceResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -119,6 +122,116 @@ public class CourseService {
         courseRepository.save(course);
 
         return course.getId();
+    }
+
+    /**
+     * 추천 서비스가 산출한 추천 결과를 실제 코스로 저장합니다.
+     * 추천 후보 선정과 추천 이유 생성은 RecommendationService가 담당하고,
+     * Course 및 CoursePlace 생성·저장은 CourseService가 담당합니다.
+     */
+    @Transactional
+    public RecommendationCourseResponse createRecommendedCourse(
+            Long memberId,
+            RecommendationCourseCreateRequest request
+    ) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
+
+        RecommendationService.RecommendedCourseDraft draft =
+                recommendationService.recommendCourse(memberId, request);
+
+        Course course = Course.create(
+                member,
+                draft.title(),
+                "추천 알고리즘으로 생성된 코스입니다.",
+                "RECOMMENDATION",
+                draft.startDate(),
+                draft.endDate(),
+                draft.baseArea(),
+                draft.companionType(),
+                null,
+                null,
+                "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+        );
+
+        java.util.Map<Long, Event> eventMap = eventRepository.findAllById(
+                        draft.events().stream()
+                                .map(RecommendationService.RecommendedEvent::eventId)
+                                .toList()
+                ).stream()
+                .collect(java.util.stream.Collectors.toMap(Event::getId, event -> event));
+
+        List<RecommendedCoursePlaceResponse> places = new java.util.ArrayList<>();
+        for (RecommendationService.RecommendedEvent recommendedEvent : draft.events()) {
+            Event event = eventMap.get(recommendedEvent.eventId());
+            if (event == null) {
+                continue;
+            }
+
+            Place place = getOrCreatePlaceFromEvent(event);
+            course.addCoursePlace(CoursePlace.create(
+                    course,
+                    place,
+                    event,
+                    recommendedEvent.visitOrder(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    recommendedEvent.reason()
+            ));
+
+            places.add(new RecommendedCoursePlaceResponse(
+                    event.getId(),
+                    place.getId(),
+                    event.getTitle(),
+                    event.getCategory().getName(),
+                    event.getArea(),
+                    event.getStartDate(),
+                    event.getEndDate(),
+                    place.getLatitude(),
+                    place.getLongitude(),
+                    recommendedEvent.visitOrder(),
+                    recommendedEvent.reason()
+            ));
+        }
+
+        Course savedCourse = courseRepository.save(course);
+
+        return new RecommendationCourseResponse(
+                savedCourse.getId(),
+                savedCourse.getTitle(),
+                savedCourse.getStartDate(),
+                savedCourse.getEndDate(),
+                places
+        );
+    }
+
+    private Place getOrCreatePlaceFromEvent(Event event) {
+        if (event.getPlace() != null) {
+            return event.getPlace();
+        }
+
+        Place place = Place.create(
+                event.getCategory(),
+                event.getTitle(),
+                event.getArea(),
+                null,
+                event.getLatitude() != null ? BigDecimal.valueOf(event.getLatitude()) : null,
+                event.getLongitude() != null ? BigDecimal.valueOf(event.getLongitude()) : null,
+                null,
+                event.getHomepageUrl(),
+                event.getDescription(),
+                String.valueOf(event.getSource()),
+                event.getExternalId(),
+                true
+        );
+
+        Place savedPlace = placeRepository.save(place);
+        event.updatePlace(savedPlace);
+        return savedPlace;
     }
 
     // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
