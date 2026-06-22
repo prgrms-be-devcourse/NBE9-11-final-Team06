@@ -100,3 +100,7 @@ app:
 
 crypto:
   secret-key: ${CRYPTO_SECRET_KEY:dummy-key}
+
+toss:
+  payments:
+    secret-key: ${TOSS_SECRET_KEY:dummy-key}
