@@ -1,6 +1,7 @@
 package come.back.gotoday.payment.billing.entity;
 
 import come.back.gotoday.member.entity.Member;
+import come.back.gotoday.payment.billing.config.BillingKeyConverter;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -8,7 +9,12 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "billing_info")
+@Table(
+        name = "billing_info",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_billing_key", columnNames = {"billingKey"})
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BillingInfo {
@@ -22,11 +28,12 @@ public class BillingInfo {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String customerKey; // 토스 API 요청 시 필수인 고객 식별키
 
+    @Convert(converter = BillingKeyConverter.class)
     @Column(nullable = false, length = 512)
-    private String billingKey; // 토스 승인용 대리 결제 비밀키
+    private String billingKey;
 
     @Column(nullable = false)
     private String cardCompany; // 카드사 이름 (화면 표시용)
