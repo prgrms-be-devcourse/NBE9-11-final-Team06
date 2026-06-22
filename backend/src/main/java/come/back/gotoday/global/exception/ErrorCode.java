@@ -36,7 +36,36 @@ public enum ErrorCode {
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "EXTERNAL_API_ERROR", "외부 API 서버와의 통신 중 오류가 발생했습니다."),
     EXTERNAL_API_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "EXTERNAL_API_TIMEOUT", "외부 API 서버 응답 시간이 초과되었습니다."),
 
-    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "이벤트를 찾을 수 없습니다.");
+    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND", "이벤트를 찾을 수 없습니다."),
+
+
+
+    ALREADY_PROCESSED_PAYMENT(HttpStatus.BAD_REQUEST,"ALREADY_PROCESSED_PAYMENT","이미 진행중인 결제입니다"),
+
+    // 400 Bad Request 관련
+    INVALID_CARD_NUMBER(HttpStatus.BAD_REQUEST, "INVALID_CARD_NUMBER", "카드번호를 다시 확인해주세요."),
+    NOT_SUPPORTED_CARD_TYPE(HttpStatus.BAD_REQUEST, "NOT_SUPPORTED_CARD_TYPE", "지원되지 않는 카드 종류입니다."),
+    INVALID_CARD_PASSWORD(HttpStatus.BAD_REQUEST, "INVALID_CARD_PASSWORD", "카드 정보를 다시 확인해주세요. (비밀번호)"),
+    INVALID_CARD_EXPIRATION(HttpStatus.BAD_REQUEST, "INVALID_CARD_EXPIRATION", "카드 정보를 다시 확인해주세요. (유효기간)"),
+    INVALID_CARD_IDENTITY(HttpStatus.BAD_REQUEST, "INVALID_CARD_IDENTITY", "입력하신 주민번호/사업자번호가 카드 소유주 정보와 일치하지 않습니다."),
+    INVALID_REJECT_CARD(HttpStatus.BAD_REQUEST, "INVALID_REJECT_CARD", "카드 사용이 거절되었습니다. 카드사 문의가 필요합니다."),
+    INVALID_STOPPED_CARD(HttpStatus.BAD_REQUEST, "INVALID_STOPPED_CARD", "정지된 카드 입니다."),
+    INVALID_BIRTH_DAY_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_BIRTH_DAY_FORMAT", "생년월일 정보는 6자리의 yyMMdd 형식이어야 합니다. 사업자등록번호는 10자리의 숫자여야 합니다."),
+    NOT_REGISTERED_CARD_COMPANY(HttpStatus.BAD_REQUEST, "NOT_REGISTERED_CARD_COMPANY", "카드를 사용 등록 후 이용해주세요."),
+    INVALID_EMAIL(HttpStatus.BAD_REQUEST, "INVALID_EMAIL", "유효하지 않은 이메일 주소 형식입니다."),
+    NOT_SUPPORTED_METHOD(HttpStatus.BAD_REQUEST, "NOT_SUPPORTED_METHOD", "지원되지 않는 결제 수단입니다."),
+    // INVALID_REQUEST는 상단에 이미 존재하므로 공통 사용
+
+    // 403 Forbidden 관련
+    EXCEED_MAX_AUTH_COUNT(HttpStatus.FORBIDDEN, "EXCEED_MAX_AUTH_COUNT", "최대 인증 횟수를 초과했습니다. 카드사로 문의해주세요."),
+    REJECT_CARD_COMPANY(HttpStatus.FORBIDDEN, "REJECT_CARD_COMPANY", "결제 승인이 거절되었습니다."),
+    REJECT_ACCOUNT_PAYMENT(HttpStatus.FORBIDDEN, "REJECT_ACCOUNT_PAYMENT", "잔액부족으로 결제에 실패했습니다."),
+    FORBIDDEN_REQUEST(HttpStatus.FORBIDDEN, "FORBIDDEN_REQUEST", "허용되지 않은 요청입니다."),
+
+    // 500 Internal Server Error 관련
+    COMMON_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_ERROR", "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다."),
+    NETWORK_ERROR_FINAL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "NETWORK_ERROR_FINAL_FAILED", "결제 시스템과의 통신이 원활하지 않아 요청이 최종 실패했습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String code;
