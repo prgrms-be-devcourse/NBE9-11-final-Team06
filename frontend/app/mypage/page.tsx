@@ -83,27 +83,52 @@ export default function MyPage() {
   const [isPreferenceSaving, setIsPreferenceSaving] = useState(false)
   const [isPreferenceDeleting, setIsPreferenceDeleting] = useState(false)
 
-  const fetchSavedCourses = useCallback(async (page = 0) => {
-    setIsSavedCoursesLoading(true)
+  const fetchSavedCourses = useCallback(
+    async (page = 0, showErrorToast = false) => {
+      setIsSavedCoursesLoading(true)
 
-    try {
-      const response = await courseBookmarkApi.getSavedCourses(page)
+      try {
+        const response = await courseBookmarkApi.getSavedCourses(page)
 
-      if (!response.success || !response.data) {
-        toast.error(response.message ?? "북마크한 코스를 불러오지 못했습니다.")
-        return
+        if (!response.success || !response.data) {
+          if (page === 0) {
+            setSavedCourses([])
+            setSavedCoursePage(0)
+            setTotalSavedCoursePages(0)
+            setTotalSavedCourseCount(0)
+          }
+
+          if (showErrorToast) {
+            toast.error(response.message ?? "북마크한 코스를 불러오지 못했습니다.")
+          }
+
+          console.warn("북마크한 코스 조회 실패:", response)
+          return
+        }
+
+        setSavedCourses(response.data.content)
+        setSavedCoursePage(response.data.page)
+        setTotalSavedCoursePages(response.data.totalPages)
+        setTotalSavedCourseCount(response.data.totalElements)
+      } catch (error) {
+        if (page === 0) {
+          setSavedCourses([])
+          setSavedCoursePage(0)
+          setTotalSavedCoursePages(0)
+          setTotalSavedCourseCount(0)
+        }
+
+        if (showErrorToast) {
+          toast.error("북마크한 코스를 불러오는 중 오류가 발생했습니다.")
+        }
+
+        console.warn("북마크한 코스 조회 중 오류:", error)
+      } finally {
+        setIsSavedCoursesLoading(false)
       }
-
-      setSavedCourses(response.data.content)
-      setSavedCoursePage(response.data.page)
-      setTotalSavedCoursePages(response.data.totalPages)
-      setTotalSavedCourseCount(response.data.totalElements)
-    } catch {
-      toast.error("북마크한 코스를 불러오는 중 오류가 발생했습니다.")
-    } finally {
-      setIsSavedCoursesLoading(false)
-    }
-  }, [])
+    },
+    [],
+  )
 
   useEffect(() => {
     let ignore = false
@@ -394,7 +419,8 @@ export default function MyPage() {
 
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge variant="secondary" className="gap-1">
-                  <Heart className="size-3" /> {totalSavedCourseCount}개 코스 북마크
+                  <Heart className="size-3" /> {totalSavedCourseCount}개 코스
+                  북마크
                 </Badge>
               </div>
             </div>
@@ -435,7 +461,7 @@ export default function MyPage() {
                 </p>
 
                 <Button asChild className="mt-5">
-                  <Link href="/recommend">코스 추천 받기</Link>
+                  <Link href="/plan">코스 추천 받기</Link>
                 </Button>
               </Card>
             ) : (
@@ -492,7 +518,9 @@ export default function MyPage() {
                       type="button"
                       variant="outline"
                       disabled={savedCoursePage === 0 || isSavedCoursesLoading}
-                      onClick={() => fetchSavedCourses(savedCoursePage - 1)}
+                      onClick={() =>
+                        fetchSavedCourses(savedCoursePage - 1, true)
+                      }
                     >
                       이전
                     </Button>
@@ -508,7 +536,9 @@ export default function MyPage() {
                         savedCoursePage >= totalSavedCoursePages - 1 ||
                         isSavedCoursesLoading
                       }
-                      onClick={() => fetchSavedCourses(savedCoursePage + 1)}
+                      onClick={() =>
+                        fetchSavedCourses(savedCoursePage + 1, true)
+                      }
                     >
                       다음
                     </Button>
