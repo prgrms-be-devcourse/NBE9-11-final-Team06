@@ -306,31 +306,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Popular places */}
-          <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-            <div className="mb-8 flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-balance text-3xl font-bold tracking-tight">
-                  지금 뜨는 성수 장소
-                </h2>
-                <p className="mt-2 text-muted-foreground">
-                  실시간 혼잡도와 함께 확인해보세요.
-                </p>
-              </div>
-              <Link
-                  href="/explore"
-                  className="inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-              >
-                전체보기
-                <ArrowRight className="size-4" />
-              </Link>
-            </div>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {PLACES.slice(0, 3).map((p) => (
-                  <PlaceCard key={p.id} place={p} />
-              ))}
-            </div>
-          </section>
+
 
           {/* Features */}
           <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
