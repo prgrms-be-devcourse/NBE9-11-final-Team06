@@ -102,5 +102,5 @@ crypto:
   secret-key: ${CRYPTO_SECRET_KEY:dummy-key}
 
 toss:
-  payment:
+  payments:
     secret-key: ${TOSS_SECRET_KEY:dummy-key}
