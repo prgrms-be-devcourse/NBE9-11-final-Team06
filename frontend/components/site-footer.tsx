@@ -9,7 +9,7 @@ export function SiteFooter() {
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Compass className="size-4" />
           </span>
-          <span className="font-bold">하루서울</span>
+          <span className="font-bold">오늘 어디가?</span>
         </div>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
           날짜, 위치, 동행, 취향만 고르면 실시간 혼잡도까지 반영한 서울 하루 여행
@@ -18,9 +18,6 @@ export function SiteFooter() {
         <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
           <Link href="/plan" className="hover:text-foreground">
             코스 추천
-          </Link>
-          <Link href="/explore" className="hover:text-foreground">
-            둘러보기
           </Link>
           <Link href="/mypage" className="hover:text-foreground">
             마이페이지
@@ -32,7 +29,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-border/60 py-4">
         <p className="text-center text-xs text-muted-foreground">
-          © 2026 하루서울 · 서울 실시간 도시데이터 기반 여행 코스 추천 서비스
+          © 2026 오늘 어디가? · 서울 실시간 도시데이터 기반 여행 코스 추천 서비스
         </p>
       </div>
     </footer>
