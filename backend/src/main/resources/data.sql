@@ -218,72 +218,72 @@ WHERE NOT EXISTS (
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
-JOIN `category` e
-  ON e.name = '전시/미술'
- AND e.type = 'EVENT'
+         JOIN `category` e
+              ON e.name = '전시/미술'
+                  AND e.type = 'EVENT'
 WHERE p.name = '전시'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
-      SELECT 1
-      FROM `preference_event_category_mapping` m
-      WHERE m.preference_category_id = p.id
-        AND m.event_category_id = e.id
-  );
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
 
 -- 공연 → 무용, 국악, 연극, 독주/독창회, 뮤지컬/오페라, 콘서트, 클래식
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
-JOIN `category` e
-  ON e.name IN ('무용', '국악', '연극', '독주/독창회', '뮤지컬/오페라', '콘서트', '클래식')
- AND e.type = 'EVENT'
+         JOIN `category` e
+              ON e.name IN ('무용', '국악', '연극', '독주/독창회', '뮤지컬/오페라', '콘서트', '클래식')
+                  AND e.type = 'EVENT'
 WHERE p.name = '공연'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
-      SELECT 1
-      FROM `preference_event_category_mapping` m
-      WHERE m.preference_category_id = p.id
-        AND m.event_category_id = e.id
-  );
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
 
 -- 축제 → 축제 계열 EVENT 카테고리
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
-JOIN `category` e
-  ON e.name IN (
-      '축제-기타',
-      '축제-자연/경관',
-      '축제-관광/체육',
-      '축제-문화/예술',
-      '축제-전통/역사',
-      '축제-시민화합'
-  )
- AND e.type = 'EVENT'
+         JOIN `category` e
+              ON e.name IN (
+                            '축제-기타',
+                            '축제-자연/경관',
+                            '축제-관광/체육',
+                            '축제-문화/예술',
+                            '축제-전통/역사',
+                            '축제-시민화합'
+                  )
+                  AND e.type = 'EVENT'
 WHERE p.name = '축제'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
-      SELECT 1
-      FROM `preference_event_category_mapping` m
-      WHERE m.preference_category_id = p.id
-        AND m.event_category_id = e.id
-  );
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
 
 -- 체험 → 교육/체험
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
-JOIN `category` e
-  ON e.name = '교육/체험'
- AND e.type = 'EVENT'
+         JOIN `category` e
+              ON e.name = '교육/체험'
+                  AND e.type = 'EVENT'
 WHERE p.name = '체험'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
-      SELECT 1
-      FROM `preference_event_category_mapping` m
-      WHERE m.preference_category_id = p.id
-        AND m.event_category_id = e.id
-  );
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
 
 -- =================================================================================
 -- 1. 기초 인프라 데이터 (회원, 선호도, 카테고리 선호, 장소) 삽입
