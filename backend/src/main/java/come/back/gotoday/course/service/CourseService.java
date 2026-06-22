@@ -60,9 +60,19 @@ public class CourseService {
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         Member member = getMemberOrThrow(memberId);
 
-        List<Event> events = request.eventIds() != null
-                ? eventRepository.findAllById(request.eventIds())
-                : List.of();
+        List<Event> events = List.of();
+
+        if (request.eventIds() != null && !request.eventIds().isEmpty()) {
+            Map<Long, Event> eventMap = eventRepository.findAllById(request.eventIds())
+                    .stream()
+                    .collect(Collectors.toMap(Event::getId, event -> event));
+
+            events = request.eventIds()
+                    .stream()
+                    .map(eventMap::get)
+                    .filter(event -> event != null)
+                    .toList();
+        }
 
         Course course = Course.create(
                 member,
