@@ -1,0 +1,4 @@
+weather:
+  kma:
+    service-key: dummy
+    base-url: https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst

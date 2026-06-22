@@ -15,6 +15,11 @@ import come.back.gotoday.preference.repository.UserPreferenceRepository;
 import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
 import come.back.gotoday.recommend.engine.SearchUtils;
 import come.back.gotoday.recommend.engine.VectorEmbeddingEngine;
+import come.back.gotoday.weather.model.WeatherCondition;
+import come.back.gotoday.weather.service.EventIndoorOutdoorPolicy;
+import come.back.gotoday.weather.service.WeatherConditionClassifier;
+import come.back.gotoday.weather.service.WeatherForecastService;
+import come.back.gotoday.weather.service.WeatherScoreCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +33,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RecommendationService {
 
-    private static final double AVOID_CROWD_PREFERENCE_WEIGHT = 0.5;
-    private static final double AVOID_CROWD_WEIGHT = 0.3;
+    private static final double AVOID_CROWD_PREFERENCE_WEIGHT = 0.4;
+    private static final double AVOID_CROWD_WEIGHT = 0.25;
     private static final double AVOID_CROWD_DISTANCE_WEIGHT = 0.2;
-    private static final double INDIFFERENT_PREFERENCE_WEIGHT = 0.7;
+    private static final double AVOID_CROWD_WEATHER_WEIGHT = 0.15;
+    private static final double INDIFFERENT_PREFERENCE_WEIGHT = 0.55;
     private static final double INDIFFERENT_DISTANCE_WEIGHT = 0.3;
+    private static final double INDIFFERENT_WEATHER_WEIGHT = 0.15;
     private static final double DEFAULT_CROWD_SCORE = 0.5;
+    private static final double DEFAULT_WEATHER_SCORE = 0.5;
     private static final int DEFAULT_BEAM_WIDTH = 5;
 
     private final UserPreferenceRepository userPreferenceRepository;
@@ -46,6 +54,10 @@ public class RecommendationService {
     private final EventScheduleMatcher eventScheduleMatcher;
     private final SearchUtils searchUtils;
     private final VectorEmbeddingEngine vectorEngine;
+    private final WeatherForecastService weatherForecastService;
+    private final WeatherConditionClassifier weatherConditionClassifier;
+    private final WeatherScoreCalculator weatherScoreCalculator;
+    private final EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy;
 
     public RecommendationService(UserPreferenceRepository userPreferenceRepository,
                                  UserPreferenceCategoryRepository userPreferenceCategoryRepository,
@@ -55,7 +67,11 @@ public class RecommendationService {
                                  CrowdScoreCalculator crowdScoreCalculator,
                                  EventScheduleMatcher eventScheduleMatcher,
                                  SearchUtils searchUtils,
-                                 VectorEmbeddingEngine vectorEngine) {
+                                 VectorEmbeddingEngine vectorEngine,
+                                 WeatherForecastService weatherForecastService,
+                                 WeatherConditionClassifier weatherConditionClassifier,
+                                 WeatherScoreCalculator weatherScoreCalculator,
+                                 EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy) {
         this.userPreferenceRepository = userPreferenceRepository;
         this.userPreferenceCategoryRepository = userPreferenceCategoryRepository;
         this.preferenceEventCategoryMappingRepository = preferenceEventCategoryMappingRepository;
@@ -65,6 +81,10 @@ public class RecommendationService {
         this.eventScheduleMatcher = eventScheduleMatcher;
         this.searchUtils = searchUtils;
         this.vectorEngine = vectorEngine;
+        this.weatherForecastService = weatherForecastService;
+        this.weatherConditionClassifier = weatherConditionClassifier;
+        this.weatherScoreCalculator = weatherScoreCalculator;
+        this.eventIndoorOutdoorPolicy = eventIndoorOutdoorPolicy;
     }
 
     @Transactional(readOnly = true)
@@ -335,6 +355,7 @@ public class RecommendationService {
         return selectBeamSearchEventIds(
                 candidateEvents,
                 rrfScores,
+                searchStart,
                 startLatitude,
                 startLongitude,
                 avoidCrowds,
@@ -354,6 +375,7 @@ public class RecommendationService {
     private List<Long> selectBeamSearchEventIds(
             List<Event> candidateEvents,
             Map<Long, Double> preferenceScores,
+            LocalDate searchStart,
             Double startLatitude,
             Double startLongitude,
             boolean avoidCrowds,
@@ -377,7 +399,8 @@ public class RecommendationService {
                                 preferenceScores.getOrDefault(event.getId(), 0.0),
                                 maxPreferenceScore
                         ),
-                        avoidCrowds ? calculateCrowdScore(event) : 0.0
+                        avoidCrowds ? calculateCrowdScore(event) : 0.0,
+                        calculateWeatherScore(event, searchStart)
                 ))
                 .toList();
 
@@ -455,11 +478,49 @@ public class RecommendationService {
         if (avoidCrowds) {
             return (candidate.preferenceScore() * AVOID_CROWD_PREFERENCE_WEIGHT)
                     + (candidate.crowdScore() * AVOID_CROWD_WEIGHT)
-                    + (distanceScore * AVOID_CROWD_DISTANCE_WEIGHT);
+                    + (distanceScore * AVOID_CROWD_DISTANCE_WEIGHT)
+                    + (candidate.weatherScore() * AVOID_CROWD_WEATHER_WEIGHT);
         }
 
         return (candidate.preferenceScore() * INDIFFERENT_PREFERENCE_WEIGHT)
-                + (distanceScore * INDIFFERENT_DISTANCE_WEIGHT);
+                + (distanceScore * INDIFFERENT_DISTANCE_WEIGHT)
+                + (candidate.weatherScore() * INDIFFERENT_WEATHER_WEIGHT);
+    }
+
+    private double calculateWeatherScore(Event event, LocalDate targetDate) {
+        if (event == null || targetDate == null || !hasCoordinate(event)) {
+            log.info(
+                    "날씨 점수 중립 처리: eventId={}, targetDate={}, weatherScore={}",
+                    event != null ? event.getId() : null,
+                    targetDate,
+                    DEFAULT_WEATHER_SCORE
+            );
+            return DEFAULT_WEATHER_SCORE;
+        }
+
+        WeatherCondition weatherCondition = weatherForecastService.getRepresentativeForecast(
+                        targetDate,
+                        event.getLatitude(),
+                        event.getLongitude()
+                )
+                .map(weatherConditionClassifier::classify)
+                .orElse(WeatherCondition.UNKNOWN);
+
+        Boolean indoorEvent = eventIndoorOutdoorPolicy.isIndoor(event);
+        double weatherScore = weatherScoreCalculator.calculate(weatherCondition, indoorEvent);
+
+        log.info(
+                "행사 위치 기준 날씨 점수 계산: eventId={}, title={}, latitude={}, longitude={}, indoor={}, condition={}, weatherScore={}",
+                event.getId(),
+                event.getTitle(),
+                event.getLatitude(),
+                event.getLongitude(),
+                indoorEvent,
+                weatherCondition,
+                weatherScore
+        );
+
+        return weatherScore;
     }
 
     private double calculateCrowdScore(Event event) {
@@ -508,7 +569,8 @@ public class RecommendationService {
     private record EventCandidate(
             Event event,
             double preferenceScore,
-            double crowdScore
+            double crowdScore,
+            double weatherScore
     ) {
     }
 
