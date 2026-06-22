@@ -99,7 +99,7 @@ app:
       failure-url: ${OAUTH2_FAILURE_REDIRECT_URL:http://localhost:3000/login?error=oauth}
 
 crypto:
-  secret-key: ${CRYPTO_SECRET_KEY:dummy-key}
+  secret-key: ${CRYPTO_SECRET_KEY:myG0T0daySecretK}
 
 toss:
   payments:
