@@ -76,8 +76,6 @@ export const CATEGORIES: { value: Category; emoji: string; label: string }[] = [
   { value: "공연", emoji: "🎭", label: "공연" },
   { value: "축제", emoji: "🎪", label: "축제" },
   { value: "체험", emoji: "🧗", label: "체험" },
-  { value: "식당", emoji: "🍽", label: "식당" },
-  { value: "카페", emoji: "☕", label: "카페" },
   { value: "산책", emoji: "🌳", label: "산책" },
   { value: "문화시설", emoji: "🏛", label: "문화시설" },
 ]

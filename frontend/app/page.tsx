@@ -291,16 +291,15 @@ export default function HomePage() {
               </p>
               <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {CATEGORIES.map((c) => (
-                    <Link
+                    <div
                         key={c.value}
-                        href="/plan"
                         className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
                     >
                   <span className="text-2xl" aria-hidden>
                     {c.emoji}
                   </span>
                       <span className="font-semibold">{c.label}</span>
-                    </Link>
+                    </div>
                 ))}
               </div>
             </div>
