@@ -30,7 +30,7 @@ export function NaverCourseMap({ points }: Props) {
     console.log("window.naver", window.naver)
     console.log("points", points)
     if (!window.naver || !containerRef.current || points.length === 0) {
-      console.log("return")
+      
       return
     }
     const naver = window.naver
@@ -51,16 +51,17 @@ export function NaverCourseMap({ points }: Props) {
 
     const path: any[] = []
 
-    points.forEach((point) => {
+    points.forEach((point, index) => {
       const position = new naver.maps.LatLng(
         point.latitude,
         point.longitude
       )
-
+    
+      const isStart = index === 0
+    
       bounds.extend(position)
-
       path.push(position)
-
+    
       const marker = new naver.maps.Marker({
         position,
         map,
@@ -71,7 +72,7 @@ export function NaverCourseMap({ points }: Props) {
                 width:32px;
                 height:32px;
                 border-radius:50%;
-                background:#2563eb;
+                background:${isStart ? "#16a34a" : "#2563eb"};
                 color:white;
                 display:flex;
                 align-items:center;
@@ -80,13 +81,13 @@ export function NaverCourseMap({ points }: Props) {
                 border:2px solid white;
               "
             >
-              ${point.order}
+              ${isStart ? "S" : point.order}
             </div>
           `,
           anchor: new naver.maps.Point(16, 16),
         },
       })
-
+    
       const infoWindow = new naver.maps.InfoWindow({
         content: `
           <div style="padding:10px;min-width:220px">
@@ -98,7 +99,7 @@ export function NaverCourseMap({ points }: Props) {
           </div>
         `,
       })
-
+    
       naver.maps.Event.addListener(marker, "click", () => {
         infoWindow.open(map, marker)
       })

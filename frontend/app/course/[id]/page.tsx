@@ -67,6 +67,8 @@ type CourseDetail = {
   id?: number
   courseId?: number
   title?: string
+  startLatitude?: number
+  startLongitude?: number
   description?: string
   courseType?: string
   startDate?: string
@@ -290,16 +292,28 @@ export default function CourseDetailPage() {
   .map(p => p.placeId)
   .filter((id): id is number => !!id)
 
-  const mapPoints = coursePlaces
-  .filter(p => p.latitude && p.longitude)
-  .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
-  .map((p) => ({
-    title: p.placeName,
-    latitude: Number(p.latitude),
-    longitude: Number(p.longitude),
-    order: p.visitOrder ?? 0,
-  }))
-
+  const mapPoints = [
+    ...(course?.startLatitude && course?.startLongitude
+      ? [
+          {
+            title: "출발 위치",
+            latitude: Number(course.startLatitude),
+            longitude: Number(course.startLongitude),
+            order: 0,
+          },
+        ]
+      : []),
+  
+    ...coursePlaces
+      .filter((p) => p.latitude && p.longitude)
+      .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
+      .map((p) => ({
+        title: getPlaceTitle(p),
+        latitude: Number(p.latitude),
+        longitude: Number(p.longitude),
+        order: p.visitOrder ?? 0,
+      })),
+  ]
 
   return (
     <div className="flex min-h-screen flex-col">

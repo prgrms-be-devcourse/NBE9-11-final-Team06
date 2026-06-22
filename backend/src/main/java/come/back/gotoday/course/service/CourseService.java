@@ -275,7 +275,7 @@ public class CourseService {
         double startLat = request.startLatitude() != null ? request.startLatitude() : 0.0;
         double startLng = request.startLongitude() != null ? request.startLongitude() : 0.0;
 
-        
+
         // =========================
         // 2. 중간 지점 계산 (null 안전)
         // =========================
@@ -421,6 +421,8 @@ public class CourseService {
         return new CourseDetailResponse(
                 course.getId(), course.getTitle(), course.getDescription(), course.getCourseType(),
                 course.getStartDate(), course.getEndDate(), course.getBaseArea(), course.getCompanionType(),
+                course.getStartLatitude(),
+                course.getStartLongitude(),
                 places,
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
