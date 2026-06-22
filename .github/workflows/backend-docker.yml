@@ -202,10 +202,13 @@ jobs:
 
             docker exec gotoday-nginx nginx -t
             docker exec gotoday-nginx nginx -s reload
+            
+            echo "=== Wait for old Nginx workers and in-flight requests to drain ==="
+            sleep 15
 
             docker rm -f gotoday-backend-$CURRENT || true
-            docker rm -f gotoday-backend || true
-
+            docker rm -f gotoday-backend 2>/dev/null || true
+            
             docker compose up -d --no-deps npm
 
             echo "Blue-Green deployment completed. Active backend: $NEXT"
