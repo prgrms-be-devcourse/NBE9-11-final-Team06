@@ -10,6 +10,8 @@ import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.member.entity.Member;
@@ -27,7 +29,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -51,7 +56,7 @@ public class CourseService {
     public Long createCourse(Long memberId, CourseCreateRequest request) {
 
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         List<Event> events = request.eventIds() != null ? eventRepository.findAllById(request.eventIds()) : List.of();
 
@@ -154,14 +159,14 @@ public class CourseService {
                 "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
         );
 
-        java.util.Map<Long, Event> eventMap = eventRepository.findAllById(
+        Map<Long, Event> eventMap = eventRepository.findAllById(
                         draft.events().stream()
                                 .map(RecommendationService.RecommendedEvent::eventId)
                                 .toList()
                 ).stream()
-                .collect(java.util.stream.Collectors.toMap(Event::getId, event -> event));
+                .collect(Collectors.toMap(Event::getId, event -> event));
 
-        List<RecommendedCoursePlaceResponse> places = new java.util.ArrayList<>();
+        List<RecommendedCoursePlaceResponse> places = new ArrayList<>();
         for (RecommendationService.RecommendedEvent recommendedEvent : draft.events()) {
             Event event = eventMap.get(recommendedEvent.eventId());
             if (event == null) {
@@ -224,7 +229,7 @@ public class CourseService {
                 null,
                 event.getHomepageUrl(),
                 event.getDescription(),
-                String.valueOf(event.getSource()),
+                event.getSource(),
                 event.getExternalId(),
                 true
         );

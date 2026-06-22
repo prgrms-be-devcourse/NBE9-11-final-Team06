@@ -8,6 +8,7 @@ import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -55,7 +56,7 @@ public class CourseController {
     @PostMapping("/recommendations")
     public ResponseEntity<ApiResponse<RecommendationCourseResponse>> createRecommendedCourse(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody RecommendationCourseCreateRequest request
+            @Valid @RequestBody RecommendationCourseCreateRequest request
     ) {
         log.info(
                 "추천 코스 생성 요청: memberId={}, area={}, topK={}",
