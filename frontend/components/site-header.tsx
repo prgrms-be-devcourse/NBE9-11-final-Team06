@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth"
 const NAV = [
   { href: "/", label: "홈" },
   { href: "/plan", label: "코스 추천받기" },
-  { href: "/explore", label: "둘러보기" },
+  { href: "/events", label: "행사 둘러보기" },
   { href: "/mypage", label: "마이페이지" },
 ]
 
@@ -32,7 +32,7 @@ export function SiteHeader() {
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Compass className="size-5" />
           </span>
-          <span className="text-lg font-bold tracking-tight">하루서울</span>
+          <span className="text-lg font-bold tracking-tight">오늘 어디가?</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
