@@ -4,6 +4,9 @@ import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.service.CourseService;
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
+import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
+import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -73,6 +76,35 @@ public class CourseController {
 
         return ResponseEntity.ok(
                 ApiResponse.success(response, "코스 프리뷰 생성에 성공했습니다.")
+        );
+    }
+
+    // 추천 코스 생성
+    @PostMapping("/recommendations")
+    public ResponseEntity<ApiResponse<RecommendationCourseResponse>> createRecommendedCourse(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody RecommendationCourseCreateRequest request
+    ) {
+        log.info(
+                "추천 코스 생성 요청: memberId={}, area={}, topK={}",
+                userDetails.getMemberId(),
+                request.area(),
+                request.getTopKOrDefault()
+        );
+
+        RecommendationCourseResponse response = courseService.createRecommendedCourse(
+                userDetails.getMemberId(),
+                request
+        );
+
+        log.info(
+                "추천 코스 생성 응답: memberId={}, courseId={}",
+                userDetails.getMemberId(),
+                response.courseId()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "추천 코스 생성에 성공했습니다.")
         );
     }
 

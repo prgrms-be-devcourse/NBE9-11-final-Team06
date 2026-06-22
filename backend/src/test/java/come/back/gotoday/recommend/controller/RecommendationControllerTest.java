@@ -1,7 +1,8 @@
 package come.back.gotoday.recommend.controller;
 
 import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
-import come.back.gotoday.recommend.service.RecommendationService;
+import come.back.gotoday.global.security.CustomUserDetails;
+import come.back.gotoday.course.service.CourseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,13 +35,13 @@ class RecommendationControllerTest {
     private static final Long MEMBER_ID = 1L;
 
     @Mock
-    private RecommendationService recommendationService;
+    private CourseService courseService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        RecommendationController controller = new RecommendationController(recommendationService);
+        RecommendationController controller = new RecommendationController(courseService);
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
@@ -52,7 +53,7 @@ class RecommendationControllerTest {
     void createRecommendedCourseReturnsCreated() throws Exception {
         LocalDate today = LocalDate.now();
 
-        given(recommendationService.createRecommendedCourse(
+        given(courseService.createRecommendedCourse(
                 eq(MEMBER_ID),
                 any(RecommendationCourseCreateRequest.class)
         )).willReturn(null);
@@ -77,7 +78,7 @@ class RecommendationControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("추천 코스 생성 성공"));
 
-        verify(recommendationService).createRecommendedCourse(
+        verify(courseService).createRecommendedCourse(
                 eq(MEMBER_ID),
                 any(RecommendationCourseCreateRequest.class)
         );
@@ -103,7 +104,7 @@ class RecommendationControllerTest {
                                 """.formatted(today, today)))
                 .andExpect(status().isBadRequest());
 
-        verify(recommendationService, never()).createRecommendedCourse(
+        verify(courseService, never()).createRecommendedCourse(
                 eq(MEMBER_ID),
                 any(RecommendationCourseCreateRequest.class)
         );
@@ -129,7 +130,7 @@ class RecommendationControllerTest {
                                 """.formatted(today.plusDays(2), today.plusDays(1))))
                 .andExpect(status().isBadRequest());
 
-        verify(recommendationService, never()).createRecommendedCourse(
+        verify(courseService, never()).createRecommendedCourse(
                 eq(MEMBER_ID),
                 any(RecommendationCourseCreateRequest.class)
         );
@@ -141,7 +142,8 @@ class RecommendationControllerTest {
         @Override
         public boolean supportsParameter(MethodParameter parameter) {
             return parameter.hasParameterAnnotation(AuthenticationPrincipal.class)
-                    && parameter.getParameterType().equals(Long.class);
+                    && (parameter.getParameterType().equals(Long.class)
+                    || parameter.getParameterType().equals(CustomUserDetails.class));
         }
 
         @Override
@@ -151,7 +153,16 @@ class RecommendationControllerTest {
                 NativeWebRequest webRequest,
                 org.springframework.web.bind.support.WebDataBinderFactory binderFactory
         ) {
-            return MEMBER_ID;
+            if (parameter.getParameterType().equals(Long.class)) {
+                return MEMBER_ID;
+            }
+
+            return org.mockito.Mockito.mock(CustomUserDetails.class, invocation -> {
+                if (invocation.getMethod().getName().equals("getMemberId")) {
+                    return MEMBER_ID;
+                }
+                return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+            });
         }
     }
 }

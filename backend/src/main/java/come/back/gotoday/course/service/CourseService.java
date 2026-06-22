@@ -14,11 +14,16 @@ import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.place.service.PlaceService;
+import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
+import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
+import come.back.gotoday.recommend.dto.RecommendedCoursePlaceResponse;
 import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -50,7 +58,6 @@ public class CourseService {
     // 코스 저장 (생성) // 카페, 식당 선택한 정보까지 포함되어 들어온다.
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
-
         Member member = getMemberOrThrow(memberId);
 
         List<Event> events = request.eventIds() != null
@@ -90,7 +97,7 @@ public class CourseService {
         // 2. 식당 (ID 기반)
         if (request.restaurantId() != null) {
             Place restaurant = placeRepository.findById(request.restaurantId())
-                    .orElseThrow(() -> new IllegalArgumentException("식당 없음"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
 
             course.addCoursePlace(
                     CoursePlace.create(
@@ -107,7 +114,7 @@ public class CourseService {
         // 3. 카페 (ID 기반)
         if (request.cafeId() != null) {
             Place cafe = placeRepository.findById(request.cafeId())
-                    .orElseThrow(() -> new IllegalArgumentException("카페 없음"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
 
             course.addCoursePlace(
                     CoursePlace.create(
@@ -126,10 +133,127 @@ public class CourseService {
         return course.getId();
     }
 
+    /**
+     * 추천 서비스가 산출한 추천 결과를 실제 코스로 저장합니다.
+     * 추천 후보 선정과 추천 이유 생성은 RecommendationService가 담당하고,
+     * Course 및 CoursePlace 생성·저장은 CourseService가 담당합니다.
+     */
+    @Transactional
+    public RecommendationCourseResponse createRecommendedCourse(
+            Long memberId,
+            RecommendationCourseCreateRequest request
+    ) {
+        Member member = getMemberOrThrow(memberId);
+
+        RecommendationService.RecommendedCourseDraft draft =
+                recommendationService.recommendCourse(memberId, request);
+
+        Course course = Course.create(
+                member,
+                draft.title(),
+                "추천 알고리즘으로 생성된 코스입니다.",
+                "RECOMMENDATION",
+                draft.startDate(),
+                draft.endDate(),
+                draft.baseArea(),
+                draft.companionType(),
+                null,
+                null,
+                "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+        );
+
+        Map<Long, Event> eventMap = eventRepository.findAllById(
+                        draft.events().stream()
+                                .map(RecommendationService.RecommendedEvent::eventId)
+                                .toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(Event::getId, event -> event));
+
+        List<RecommendedCoursePlaceResponse> places = new ArrayList<>();
+
+        for (RecommendationService.RecommendedEvent recommendedEvent : draft.events()) {
+            Event event = eventMap.get(recommendedEvent.eventId());
+
+            if (event == null) {
+                continue;
+            }
+
+            Place place = getOrCreatePlaceFromEvent(event);
+
+            course.addCoursePlace(
+                    CoursePlace.create(
+                            course,
+                            place,
+                            event,
+                            recommendedEvent.visitOrder(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            recommendedEvent.reason()
+                    )
+            );
+
+            places.add(
+                    new RecommendedCoursePlaceResponse(
+                            event.getId(),
+                            place.getId(),
+                            event.getTitle(),
+                            event.getCategory().getName(),
+                            event.getArea(),
+                            event.getStartDate(),
+                            event.getEndDate(),
+                            place.getLatitude(),
+                            place.getLongitude(),
+                            recommendedEvent.visitOrder(),
+                            recommendedEvent.reason()
+                    )
+            );
+        }
+
+        Course savedCourse = courseRepository.save(course);
+
+        return new RecommendationCourseResponse(
+                savedCourse.getId(),
+                savedCourse.getTitle(),
+                savedCourse.getStartDate(),
+                savedCourse.getEndDate(),
+                places
+        );
+    }
+
+    private Place getOrCreatePlaceFromEvent(Event event) {
+        if (event.getPlace() != null) {
+            return event.getPlace();
+        }
+
+        Place place = Place.create(
+                event.getCategory(),
+                event.getTitle(),
+                event.getArea(),
+                null,
+                event.getLatitude() != null ? BigDecimal.valueOf(event.getLatitude()) : null,
+                event.getLongitude() != null ? BigDecimal.valueOf(event.getLongitude()) : null,
+                null,
+                event.getHomepageUrl(),
+                event.getDescription(),
+                event.getSource(),
+                event.getExternalId(),
+                true
+        );
+
+        Place savedPlace = placeRepository.save(place);
+        event.updatePlace(savedPlace);
+
+        return savedPlace;
+    }
+
     // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
-
         String queryText = recommendationService.createQueryText(
                 request.baseArea(),
                 request.courseType(),
@@ -171,10 +295,10 @@ public class CourseService {
                 kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
 
         Category restaurantCategory = categoryRepository.findByName("맛집")
-                .orElseThrow(() -> new IllegalArgumentException("맛집 카테고리 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
 
         Category cafeCategory = categoryRepository.findByName("카페")
-                .orElseThrow(() -> new IllegalArgumentException("카페 카테고리 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
 
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
@@ -377,11 +501,11 @@ public class CourseService {
 
     private Member getMemberOrThrow(Long memberId) {
         return memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 
     private Course getCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코스입니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
     }
 }
