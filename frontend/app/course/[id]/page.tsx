@@ -17,10 +17,10 @@ import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { NaverCourseMap } from "@/components/naver-course-map"
+import { CourseActions } from "@/components/course-actions"
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
-
 
 type CoursePlace = {
   id?: number
@@ -42,25 +42,6 @@ type CoursePlace = {
   memo?: string
   recommendationReason?: string
   reason?: string
-}
-
-type Place = {
-  id: number
-  name: string
-  address: string
-  latitude: number
-  longitude: number
-  url?: string
-  categoryId: number
-}
-
-type PlaceDetail = {
-  id: number
-  name: string
-  latitude: number
-  longitude: number
-  address?: string
-  categoryId?: number
 }
 
 type CourseDetail = {
@@ -91,7 +72,7 @@ function normalizeAccessToken(value: string | null | undefined) {
   return token
 }
 
-function findAccessToken(value: any): string | null {
+function findAccessToken(value: unknown): string | null {
   if (!value) return null
 
   if (typeof value === "string") {
@@ -101,15 +82,17 @@ function findAccessToken(value: any): string | null {
 
   if (typeof value !== "object") return null
 
+  const record = value as Record<string, unknown>
+
   const directToken =
-    normalizeAccessToken(value.accessToken) ??
-    normalizeAccessToken(value.access_token) ??
-    normalizeAccessToken(value.token) ??
-    normalizeAccessToken(value.jwt)
+    normalizeAccessToken(record.accessToken as string | undefined) ??
+    normalizeAccessToken(record.access_token as string | undefined) ??
+    normalizeAccessToken(record.token as string | undefined) ??
+    normalizeAccessToken(record.jwt as string | undefined)
 
   if (directToken) return directToken
 
-  for (const nestedValue of Object.values(value)) {
+  for (const nestedValue of Object.values(record)) {
     const token = findAccessToken(nestedValue)
     if (token) return token
   }
@@ -154,13 +137,15 @@ function getAccessToken() {
   return null
 }
 
-function extractCourse(result: any) {
+function extractCourse(result: unknown) {
+  const record = result as Record<string, unknown> | null
+
   return (
-    result?.data ??
-    result?.result ??
-    result?.body ??
-    result?.content ??
-    result?.response ??
+    record?.data ??
+    record?.result ??
+    record?.body ??
+    record?.content ??
+    record?.response ??
     result
   ) as CourseDetail | null
 }
@@ -201,7 +186,13 @@ function getCoursePlaces(course: CourseDetail | null) {
 }
 
 function getPlaceTitle(place: CoursePlace) {
-  return place.title ?? place.placeName ?? place.eventTitle ?? place.name ?? "추천 장소"
+  return (
+    place.title ??
+    place.placeName ??
+    place.eventTitle ??
+    place.name ??
+    "추천 장소"
+  )
 }
 
 function getPlaceCategory(place: CoursePlace) {
@@ -209,27 +200,30 @@ function getPlaceCategory(place: CoursePlace) {
 }
 
 function getPlaceReason(place: CoursePlace) {
-  return place.recommendationReason ?? place.reason ?? place.memo ?? "사용자 선호 정보와 행사 유사도를 기반으로 추천되었습니다."
+  return (
+    place.recommendationReason ??
+    place.reason ??
+    place.memo ??
+    "사용자 선호 정보와 행사 유사도를 기반으로 추천되었습니다."
+  )
 }
 
 function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
 }
 
-function extractPlace(result: any) {
-  return result?.data ?? result?.result ?? result?.body ?? result?.content ?? result
-}
-
-
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
   const courseId = params.id
+  const numericCourseId = Number(courseId)
+
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const savedCourse = getSavedRecommendedCourse(courseId)
+
     if (savedCourse) {
       setCourse(savedCourse)
     }
@@ -279,31 +273,36 @@ export default function CourseDetailPage() {
 
   const coursePlaces = getCoursePlaces(course)
   const title = course?.title ?? "코스 상세"
-  const description = course?.description ?? "추천 알고리즘으로 생성된 코스입니다."
+  const description =
+    course?.description ?? "추천 알고리즘으로 생성된 코스입니다."
   const startDate = formatDate(course?.startDate)
   const endDate = formatDate(course?.endDate)
   const baseArea = course?.baseArea ?? "지역 미정"
   const companion = course?.companionType ?? "동행 미정"
-  const recommendationReason = course?.recommendationReason ?? course?.reason ?? "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
+  const recommendationReason =
+    course?.recommendationReason ??
+    course?.reason ??
+    "사용자 선호 지역, 카테고리, 행사 유사도를 함께 고려해 추천했어요."
 
-  const placeIds = coursePlaces
-  .map(p => p.placeId)
-  .filter((id): id is number => !!id)
+  const actionCourseId =
+    Number.isFinite(numericCourseId) && numericCourseId > 0
+      ? numericCourseId
+      : course?.id ?? course?.courseId
 
   const mapPoints = coursePlaces
-  .filter(p => p.latitude && p.longitude)
-  .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
-  .map((p) => ({
-    title: p.placeName,
-    latitude: Number(p.latitude),
-    longitude: Number(p.longitude),
-    order: p.visitOrder ?? 0,
-  }))
-
+    .filter((place) => place.latitude && place.longitude)
+    .sort((a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0))
+    .map((place, index) => ({
+      title: getPlaceTitle(place),
+      latitude: Number(place.latitude),
+      longitude: Number(place.longitude),
+      order: getVisitOrder(place, index),
+    }))
 
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <Button asChild variant="ghost" size="sm" className="mb-6 gap-2">
           <Link href="/recommend">
@@ -322,7 +321,8 @@ export default function CourseDetailPage() {
           <Card className="border-destructive/30 bg-destructive/5 p-6">
             <p className="font-semibold text-destructive">{errorMessage}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              courseId={courseId} 조회에 실패했습니다. 백엔드 서버 실행 상태와 API 주소를 확인해주세요.
+              courseId={courseId} 조회에 실패했습니다. 백엔드 서버 실행 상태와
+              API 주소를 확인해주세요.
             </p>
           </Card>
         )}
@@ -332,34 +332,55 @@ export default function CourseDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                 <CalendarDays className="size-3.5" />
-                {course?.startDate && course?.endDate ? `${startDate} ~ ${endDate}` : startDate}
+                {course?.startDate && course?.endDate
+                  ? `${startDate} ~ ${endDate}`
+                  : startDate}
               </Badge>
+
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                 <MapPin className="size-3.5" />
                 {baseArea}
               </Badge>
+
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                 <Users className="size-3.5" />
                 {companion}
               </Badge>
+
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                 <Route className="size-3.5" />
                 {coursePlaces.length}개 장소
               </Badge>
             </div>
 
-            <h1 className="mt-6 text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
-              {title}
-            </h1>
-            <p className="mt-3 max-w-3xl leading-relaxed text-muted-foreground">
-              {description}
-            </p>
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
+                  {title}
+                </h1>
+
+                <p className="mt-3 max-w-3xl leading-relaxed text-muted-foreground">
+                  {description}
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                {actionCourseId ? (
+                  <CourseActions courseId={actionCourseId} title={title} />
+                ) : (
+                  <Button type="button" disabled className="gap-2">
+                    코스 북마크
+                  </Button>
+                )}
+              </div>
+            </div>
 
             <Card className="mt-6 p-6">
               <p className="mb-2 flex items-center gap-1.5 font-semibold">
                 <Sparkles className="size-4 text-accent" />
                 이 코스를 추천하는 이유
               </p>
+
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {recommendationReason}
               </p>
@@ -367,6 +388,7 @@ export default function CourseDetailPage() {
 
             <section className="mt-10">
               <h2 className="text-2xl font-bold tracking-tight">방문 순서</h2>
+
               <p className="mt-1 text-muted-foreground">
                 실제 생성된 코스의 CoursePlace 목록입니다.
               </p>
@@ -376,17 +398,26 @@ export default function CourseDetailPage() {
                   <div className="space-y-4">
                     {coursePlaces
                       .slice()
-                      .sort((a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0))
+                      .sort(
+                        (a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0),
+                      )
                       .map((place, index) => (
-                        <Card key={`${place.placeId ?? place.eventId ?? index}`} className="p-5">
+                        <Card
+                          key={`${place.placeId ?? place.eventId ?? index}`}
+                          className="p-5"
+                        >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <Badge>{getVisitOrder(place, index)}번째</Badge>
+
                               <h3 className="mt-3 text-xl font-bold leading-tight">
                                 {getPlaceTitle(place)}
                               </h3>
                             </div>
-                            <Badge variant="secondary">{getPlaceCategory(place)}</Badge>
+
+                            <Badge variant="secondary">
+                              {getPlaceCategory(place)}
+                            </Badge>
                           </div>
 
                           <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
@@ -396,12 +427,14 @@ export default function CourseDetailPage() {
                                 {place.area}
                               </p>
                             )}
+
                             {place.address && (
                               <p className="flex items-center gap-1.5">
                                 <MapPin className="size-3.5" />
                                 {place.address}
                               </p>
                             )}
+
                             {place.latitude && place.longitude && (
                               <p className="flex items-center gap-1.5">
                                 <MapPin className="size-3.5" />
@@ -415,6 +448,7 @@ export default function CourseDetailPage() {
                               <Sparkles className="size-4 text-accent" />
                               추천 이유
                             </p>
+
                             <p className="text-sm leading-relaxed text-muted-foreground">
                               {getPlaceReason(place)}
                             </p>
@@ -428,6 +462,7 @@ export default function CourseDetailPage() {
                       <MapPin className="size-4 text-primary" />
                       지도 보기
                     </p>
+
                     <NaverCourseMap points={mapPoints} />
                   </Card>
                 </div>
@@ -440,6 +475,7 @@ export default function CourseDetailPage() {
           </>
         )}
       </main>
+
       <SiteFooter />
     </div>
   )

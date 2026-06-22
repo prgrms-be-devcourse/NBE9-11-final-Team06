@@ -15,6 +15,7 @@ public record SavedCourseResponse(
         LocalDate startDate,
         LocalDateTime savedAt
 ) {
+
     public static SavedCourseResponse from(SavedCourse savedCourse) {
         Course course = savedCourse.getCourse();
 
@@ -22,7 +23,7 @@ public record SavedCourseResponse(
                 savedCourse.getId(),
                 course.getId(),
                 course.getTitle(),
-                course.getCourseType(),
+                course.getCourseType() != null ? String.valueOf(course.getCourseType()) : null,
                 course.getBaseArea(),
                 course.getStartDate(),
                 savedCourse.getCreatedAt()

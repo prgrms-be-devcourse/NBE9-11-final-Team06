@@ -108,61 +108,6 @@ public class CourseController {
         );
     }
 
-    // 코스 단건 조회
-    @GetMapping("/{courseId}")
-    public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourse(
-            @PathVariable Long courseId
-    ) {
-        log.info("코스 단건 조회 요청: courseId={}", courseId);
-
-        CourseDetailResponse response = courseService.getCourse(courseId);
-
-        log.info("코스 단건 조회 응답: courseId={}", courseId);
-
-        return ResponseEntity.ok(
-                ApiResponse.success(response, "코스 조회에 성공했습니다.")
-        );
-    }
-
-    // 코스 다건 조회
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<CourseListResponse>>> getCourses() {
-        log.info("코스 목록 조회 요청");
-
-        List<CourseListResponse> response = courseService.getCourses();
-
-        log.info("코스 목록 조회 응답: resultCount={}", response.size());
-
-        return ResponseEntity.ok(
-                ApiResponse.success(response, "코스 목록 조회에 성공했습니다.")
-        );
-    }
-
-    // 코스 삭제
-    @DeleteMapping("/{courseId}")
-    public ResponseEntity<ApiResponse<Void>> deleteCourse(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long courseId
-    ) {
-        log.info(
-                "코스 삭제 요청: memberId={}, courseId={}",
-                userDetails.getMemberId(),
-                courseId
-        );
-
-        courseService.deleteCourse(userDetails.getMemberId(), courseId);
-
-        log.info(
-                "코스 삭제 응답: memberId={}, courseId={}",
-                userDetails.getMemberId(),
-                courseId
-        );
-
-        return ResponseEntity.ok(
-                ApiResponse.success(null, "코스 삭제에 성공했습니다.")
-        );
-    }
-
     // 코스 북마크 등록/해제
     @PostMapping("/{courseId}/bookmark")
     public ResponseEntity<ApiResponse<CourseBookmarkResponse>> toggleBookmark(
@@ -225,28 +170,88 @@ public class CourseController {
         );
     }
 
-    // 내가 북마크한 코스 목록 조회
+    // 내가 북마크한 코스 목록 조회 - 10개 페이징
     @GetMapping("/bookmarks")
-    public ResponseEntity<ApiResponse<List<SavedCourseResponse>>> getSavedCourses(
-            @AuthenticationPrincipal CustomUserDetails userDetails
+    public ResponseEntity<ApiResponse<SavedCoursePageResponse>> getSavedCourses(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page
     ) {
         log.info(
-                "북마크한 코스 목록 조회 요청: memberId={}",
-                userDetails.getMemberId()
+                "북마크한 코스 목록 조회 요청: memberId={}, page={}",
+                userDetails.getMemberId(),
+                page
         );
 
-        List<SavedCourseResponse> response = courseService.getSavedCourses(
-                userDetails.getMemberId()
+        SavedCoursePageResponse response = courseService.getSavedCourses(
+                userDetails.getMemberId(),
+                page
         );
 
         log.info(
-                "북마크한 코스 목록 조회 응답: memberId={}, resultCount={}",
+                "북마크한 코스 목록 조회 응답: memberId={}, page={}, resultCount={}, totalPages={}",
                 userDetails.getMemberId(),
-                response.size()
+                response.page(),
+                response.content().size(),
+                response.totalPages()
         );
 
         return ResponseEntity.ok(
                 ApiResponse.success(response, "북마크한 코스 목록 조회에 성공했습니다.")
+        );
+    }
+
+    // 코스 단건 조회
+    @GetMapping("/{courseId}")
+    public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourse(
+            @PathVariable Long courseId
+    ) {
+        log.info("코스 단건 조회 요청: courseId={}", courseId);
+
+        CourseDetailResponse response = courseService.getCourse(courseId);
+
+        log.info("코스 단건 조회 응답: courseId={}", courseId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "코스 조회에 성공했습니다.")
+        );
+    }
+
+    // 코스 다건 조회
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<CourseListResponse>>> getCourses() {
+        log.info("코스 목록 조회 요청");
+
+        List<CourseListResponse> response = courseService.getCourses();
+
+        log.info("코스 목록 조회 응답: resultCount={}", response.size());
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "코스 목록 조회에 성공했습니다.")
+        );
+    }
+
+    // 코스 삭제
+    @DeleteMapping("/{courseId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCourse(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long courseId
+    ) {
+        log.info(
+                "코스 삭제 요청: memberId={}, courseId={}",
+                userDetails.getMemberId(),
+                courseId
+        );
+
+        courseService.deleteCourse(userDetails.getMemberId(), courseId);
+
+        log.info(
+                "코스 삭제 응답: memberId={}, courseId={}",
+                userDetails.getMemberId(),
+                courseId
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(null, "코스 삭제에 성공했습니다.")
         );
     }
 }

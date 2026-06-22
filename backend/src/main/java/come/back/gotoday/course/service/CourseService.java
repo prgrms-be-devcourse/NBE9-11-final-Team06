@@ -28,6 +28,8 @@ import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CourseService {
 
+    private static final int SAVED_COURSE_PAGE_SIZE = 10;
+
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
     private final SavedCourseRepository savedCourseRepository;
@@ -55,7 +59,7 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
 
-    // 코스 저장 (생성) // 카페, 식당 선택한 정보까지 포함되어 들어온다.
+    // 코스 저장 (생성)
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         Member member = getMemberOrThrow(memberId);
@@ -80,7 +84,6 @@ public class CourseService {
 
         int order = 1;
 
-        // 1. 이벤트
         for (Event event : events) {
             course.addCoursePlace(
                     CoursePlace.create(
@@ -88,13 +91,17 @@ public class CourseService {
                             event.getPlace(),
                             event,
                             order++,
-                            null, null, null, null, null, null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
                             "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
                     )
             );
         }
 
-        // 2. 식당 (ID 기반)
         if (request.restaurantId() != null) {
             Place restaurant = placeRepository.findById(request.restaurantId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
@@ -105,13 +112,17 @@ public class CourseService {
                             restaurant,
                             null,
                             order++,
-                            null, null, null, null, null, null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
                             "추천 맛집"
                     )
             );
         }
 
-        // 3. 카페 (ID 기반)
         if (request.cafeId() != null) {
             Place cafe = placeRepository.findById(request.cafeId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
@@ -122,7 +133,12 @@ public class CourseService {
                             cafe,
                             null,
                             order++,
-                            null, null, null, null, null, null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
                             "추천 카페"
                     )
             );
@@ -464,15 +480,22 @@ public class CourseService {
         return savedCourseRepository.existsByMemberIdAndCourseId(memberId, courseId);
     }
 
-    // 내가 북마크한 코스 목록 조회
+    // 내가 북마크한 코스 목록 조회 - 10개 페이징
     @Transactional(readOnly = true)
-    public List<SavedCourseResponse> getSavedCourses(Long memberId) {
+    public SavedCoursePageResponse getSavedCourses(Long memberId, int page) {
         getMemberOrThrow(memberId);
 
-        return savedCourseRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
-                .stream()
-                .map(SavedCourseResponse::from)
-                .toList();
+        int safePage = Math.max(page, 0);
+
+        Page<SavedCourseResponse> savedCourses =
+                savedCourseRepository
+                        .findAllByMemberIdOrderByCreatedAtDesc(
+                                memberId,
+                                PageRequest.of(safePage, SAVED_COURSE_PAGE_SIZE)
+                        )
+                        .map(SavedCourseResponse::from);
+
+        return SavedCoursePageResponse.from(savedCourses);
     }
 
     private CourseBookmarkResponse saveBookmark(Member member, Course course) {
