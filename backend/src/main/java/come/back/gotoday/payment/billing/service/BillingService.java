@@ -30,7 +30,7 @@ public class BillingService {
     public BillingIssueResponse saveBillingInfo(Long memberId, TossBillingKeyResponse tossResponse) {
         // 1. 회원 조회
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+                .orElseThrow(() ->new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         // 2. 안전하게 카드사 이름 추출 (issuerCode 기반 변환)
         String cardCompany = "알 수 없는 카드사";
         String cardNumber = "****-****-****-****";
@@ -79,7 +79,7 @@ public class BillingService {
      */
     public BillingInfo getBillingInfoValidated(Long billingInfoId, Long memberId) {
         return billingInfoRepository.findByIdAndMemberId(billingInfoId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR));
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN_REQUEST));
         // 임의의 에러코드 매핑, 존재하지 않거나 본인 카드가 아닐 때 안전하게 차단
     }
 

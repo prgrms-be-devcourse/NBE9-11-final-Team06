@@ -54,10 +54,10 @@ public class BillingFacade {
 
             return response;
 
-        } catch (Throwable throwable) {
+        } catch (Exception e) {
             // 외부 토스 API 에러나 내부 비즈니스 로직 실패 시 명확하게 FAIL 상태로 변경 기록
-            idempotencyManager.updateToFail(idempotencyKeyEntity, 500, throwable.getMessage());
-            throw throwable;
+            idempotencyManager.updateToFail(idempotencyKeyEntity, 500, e.getMessage());
+            throw e;
         }
     }
 
