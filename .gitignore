@@ -111,5 +111,4 @@ cookies.txt
 *.tfstate
 *.tfstate.*
 *.tfvars
-*.pem
 *.pub

@@ -45,3 +45,9 @@ variable "key_name" {
   type        = string
   default     = "team06-key"
 }
+
+variable "ssh_allowed_cidrs" {
+  description = "Allowed CIDR blocks for SSH access"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

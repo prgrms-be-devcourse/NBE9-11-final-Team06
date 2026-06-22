@@ -78,7 +78,7 @@ resource "aws_security_group" "web" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.ssh_allowed_cidrs
   }
 
   ingress {
@@ -124,7 +124,7 @@ systemctl start docker
 usermod -aG docker ec2-user
 
 if [ ! -f /swapfile ]; then
-  fallocate -l 4G /swapfile
+  dd if=/dev/zero of=/swapfile bs=1M count=4096
   chmod 600 /swapfile
   mkswap /swapfile
   swapon /swapfile
