@@ -203,6 +203,8 @@ export function PlanWizard() {
       endDate: selectedDate,
       baseArea: area ?? selectedLocation.name,
       companionType: companion,
+      startLatitude : selectedLocation.latitude,
+      startLongitude : selectedLocation.longitude,
       restaurantType: restaurantType,
     }
 
@@ -385,10 +387,15 @@ export function PlanWizard() {
                       key={a.name}
                       type="button"
                       onClick={() => {
+                        const selectedArea = SEOUL_AREAS.find(a => a.name === a.name)
+                      
                         setArea(a.name)
                         setLocationKeyword("")
+                      
                         setSelectedLocation({
                           name: a.name,
+                          latitude: a.lat,
+                          longitude: a.lng,
                           source: "preset",
                         })
                       }}
