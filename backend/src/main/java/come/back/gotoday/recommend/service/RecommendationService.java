@@ -160,6 +160,8 @@ public class RecommendationService {
                 request.endDate(),
                 selectedArea,
                 selectedCompanionType,
+                request.latitude(),
+                request.longitude(),
                 null,
                 null,
                 "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."

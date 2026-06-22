@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -43,6 +45,89 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
 
+
+    private double distance(double lat1, double lng1, double lat2, double lng2) {
+        double R = 6371; // km
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+
+        double a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(Math.toRadians(lat1)) *
+                                Math.cos(Math.toRadians(lat2)) *
+                                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+    //삽입할 인덱스 위치 찾기
+    private int findInsertIndex(
+            List<Object> route,
+            double lat,
+            double lng
+    ) {
+
+        int bestIndex = route.size();
+        double bestScore = Double.MAX_VALUE;
+
+        for (int i = 0; i < route.size() - 1; i++) {
+
+            Double lat1 = getLat(route.get(i));
+            Double lng1 = getLng(route.get(i));
+
+            Double lat2 = getLat(route.get(i + 1));
+            Double lng2 = getLng(route.get(i + 1));
+
+            if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
+                continue;
+            }
+
+            double midLat = (lat1 + lat2) / 2;
+            double midLng = (lng1 + lng2) / 2;
+
+            double dist = distance(lat, lng, midLat, midLng);
+
+            if (dist < bestScore) {
+                bestScore = dist;
+                bestIndex = i + 1;
+            }
+        }
+
+        return bestIndex;
+    }
+
+    private Double getLat(Object obj) {
+
+        if (obj instanceof Event e) {
+            return e.getLatitude();
+        }
+
+        if (obj instanceof Place p) {
+            return p.getLatitude() != null
+                    ? p.getLatitude().doubleValue()
+                    : null;
+        }
+
+        return null;
+    }
+
+    private Double getLng(Object obj) {
+
+        if (obj instanceof Event e) {
+            return e.getLongitude();
+        }
+
+        if (obj instanceof Place p) {
+            return p.getLongitude() != null
+                    ? p.getLongitude().doubleValue()
+                    : null;
+        }
+
+        return null;
+    }
     // 코스 저장 (생성) // 카페, 식당 선택한 정보까지 포함되어 들어온다.
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
@@ -50,7 +135,20 @@ public class CourseService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 없음"));
 
-        List<Event> events = request.eventIds() != null ? eventRepository.findAllById(request.eventIds()) : List.of();
+        List<Event> events = request.eventIds().stream()
+                .map(id -> eventRepository.findById(id)
+                        .orElseThrow())
+                .toList();
+
+        if (events.size() < 3) {
+            throw new IllegalArgumentException("이벤트는 최소 3개 필요");
+        }
+
+        Place restaurant = placeRepository.findById(request.restaurantId())
+                .orElseThrow(() -> new IllegalArgumentException("식당 없음"));
+
+        Place cafe = placeRepository.findById(request.cafeId())
+                .orElseThrow(() -> new IllegalArgumentException("카페 없음"));
 
         Course course = Course.create(
                 member,
@@ -61,59 +159,83 @@ public class CourseService {
                 request.endDate(),
                 request.baseArea(),
                 request.companionType(),
+                request.startLatitude(),
+                request.startLongitude(),
                 null,
                 null,
                 "사용자 선택 코스"
         );
 
+        // -------------------------
+        // 1. 이벤트 먼저 담기
+        // -------------------------
+        List<Object> route = new ArrayList<>();
+
+        route.add(events.get(0));
+        route.add(events.get(1));
+        route.add(events.get(2));
+
+        // -------------------------
+        // 2. 식당 삽입
+        // -------------------------
+        int restaurantIndex = findInsertIndex(
+                route,
+                restaurant.getLatitude().doubleValue(),
+                restaurant.getLongitude().doubleValue()
+        );
+
+        route.add(restaurantIndex, restaurant);
+
+        // -------------------------
+        // 3. 카페 삽입
+        // -------------------------
+        int cafeIndex = findInsertIndex(
+                route,
+                cafe.getLatitude().doubleValue(),
+                cafe.getLongitude().doubleValue()
+        );
+
+        route.add(cafeIndex, cafe);
+
+        // -------------------------
+        // 4. visitOrder 부여하면서 저장
+        // -------------------------
         int order = 1;
 
-        // 1. 이벤트
-        for (Event event : events) {
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            event.getPlace(),
-                            event,
-                            order++,
-                            null, null, null, null, null, null,
-                            "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
-                    )
-            );
-        }
+        for (Object item : route) {
 
-        // 2. 식당 (ID 기반)
-        if (request.restaurantId() != null) {
-            Place restaurant = placeRepository.findById(request.restaurantId())
-                    .orElseThrow(() -> new IllegalArgumentException("식당 없음"));
+            if (item instanceof Event event) {
 
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            restaurant,
-                            null,
-                            order++,
-                            null, null, null, null, null, null,
-                            "추천 맛집"
-                    )
-            );
-        }
+                course.addCoursePlace(
+                        CoursePlace.create(
+                                course,
+                                event.getPlace(),
+                                event,
+                                order++,
+                                null, null, null, null, null, null,
+                                "행사"
+                        )
+                );
+            }
 
-        // 3. 카페 (ID 기반)
-        if (request.cafeId() != null) {
-            Place cafe = placeRepository.findById(request.cafeId())
-                    .orElseThrow(() -> new IllegalArgumentException("카페 없음"));
+            else if (item instanceof Place place) {
 
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            cafe,
-                            null,
-                            order++,
-                            null, null, null, null, null, null,
-                            "추천 카페"
-                    )
-            );
+                String reason =
+                        place.getId().equals(restaurant.getId())
+                                ? "추천 맛집"
+                                : "추천 카페";
+
+                course.addCoursePlace(
+                        CoursePlace.create(
+                                course,
+                                place,
+                                null,
+                                order++,
+                                null, null, null, null, null, null,
+                                reason
+                        )
+                );
+            }
         }
 
         courseRepository.save(course);
@@ -121,7 +243,7 @@ public class CourseService {
         return course.getId();
     }
 
-    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
+    //카페, 식당 리스트 해주는 메소드 previewCourse
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
 
@@ -133,37 +255,51 @@ public class CourseService {
 
         List<Long> recommendedEventIds =
                 recommendationService.getRecommendedEventIds(
-                        memberId, queryText,
+                        memberId,
+                        queryText,
                         request.startDate(),
                         request.endDate(),
                         3
                 );
 
+        // 추천된 이벤트 3개 저장함 events
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        double centerLat = events.stream()
-                .filter(e -> e.getLatitude() != null)
-                .mapToDouble(Event::getLatitude)
-                .average()
-                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
-        double centerLng = events.stream()
-                .filter(e -> e.getLongitude() != null)
-                .mapToDouble(Event::getLongitude)
-                .average()
-                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
+        if (events.isEmpty()) {
+            throw new IllegalArgumentException("추천 이벤트가 없습니다.");
+        }
 
+        // =========================
+        // 1. 출발지 기준 (request에 담겨 있는 시작 위경도 받아옴)
+        // =========================
+        double startLat = request.startLatitude() != null ? request.startLatitude() : 0.0;
+        double startLng = request.startLongitude() != null ? request.startLongitude() : 0.0;
+
+        
+        // =========================
+        // 2. 중간 지점 계산 (null 안전)
+        // =========================
+
+        Event event1 = events.get(0);
+        Event event2 = events.get(1);
+        Event event3 = events.get(2);
+
+        double midLat = (event2.getLatitude() + event3.getLatitude()) / 2.0;
+        double midLng = (event2.getLongitude() + event3.getLongitude()) / 2.0;
+
+        // =========================
+        // 3. POI 검색 (event2,event3사이의 식당, 카페 추천)
+        // =========================
         KakaoPlaceResponse cafeResponse =
-                kakaoLocalService.searchCafe(centerLat, centerLng);
+                kakaoLocalService.searchCafe(midLat, midLng);
 
-
-        // 타입을 먼저 찾고 -> 들어온게 없으면 한식으로 고정
         RestaurantType restaurantType =
                 request.restaurantType() != null
                         ? request.restaurantType()
                         : RestaurantType.KOREAN;
 
-        //
-        KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
+        KakaoPlaceResponse restaurantResponse =
+                kakaoLocalService.searchRestaurant(midLat, midLng, restaurantType);
 
         Category restaurantCategory = categoryRepository.findByName("맛집")
                 .orElseThrow(() -> new IllegalArgumentException("맛집 카테고리 없음"));
@@ -171,8 +307,9 @@ public class CourseService {
         Category cafeCategory = categoryRepository.findByName("카페")
                 .orElseThrow(() -> new IllegalArgumentException("카페 카테고리 없음"));
 
-
-        //DB 저장 Place
+        // =========================
+        // 4. Place 저장 (Entity 기준)
+        // =========================
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
                 .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
@@ -183,28 +320,43 @@ public class CourseService {
                 .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
                 .toList();
 
+        // =========================
+        // 5. DTO 변환
+        // =========================
+        List<PlacePreviewResponse> restaurantDtos = savedRestaurants.stream()
+                .map(p -> new PlacePreviewResponse(
+                        p.getId(),
+                        p.getName(),
+                        p.getAddress(),
+                        p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
+                        p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
+                        p.getPlaceUrl()
+                ))
+                .toList();
+
+        List<PlacePreviewResponse> cafeDtos = savedCafes.stream()
+                .map(p -> new PlacePreviewResponse(
+                        p.getId(),
+                        p.getName(),
+                        p.getAddress(),
+                        p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
+                        p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
+                        p.getPlaceUrl()
+                ))
+                .toList();
+
+        List<Long> eventIds = List.of(
+                event1.getId(),
+                event2.getId(),
+                event3.getId()
+        );
+
         return new CoursePreviewResponse(
-                recommendedEventIds,
-                savedRestaurants.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()   // ← 이거 없으면 아래 참고
-                        ))
-                        .toList(),
-                savedCafes.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()
-                        ))
-                        .toList()
+                eventIds,
+                restaurantDtos,
+                cafeDtos,
+                startLat,
+                startLng
         );
     }
 

@@ -14,6 +14,9 @@ public record CourseCreateRequest(
         String companionType,
         List<Long> eventIds,
         Long restaurantId,
-        Long cafeId
+        Long cafeId,
+        //지도에 표시할 시작 위경도
+        Double startLatitude,
+        Double startLongitude
 ) {
 }

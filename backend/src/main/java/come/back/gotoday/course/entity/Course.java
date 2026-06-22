@@ -60,8 +60,14 @@ public class Course {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "start_latitude")
+    private Double startLatitude;
+
+    @Column(name = "start_longitude")
+    private Double startLongitude;
+
     private Course(Member member, String title, String description, String courseType, LocalDate startDate,
-                   LocalDate endDate, String baseArea, String companionType, Integer totalDistance,
+                   LocalDate endDate, String baseArea, String companionType, Double startLatitude, Double startLongitude,Integer totalDistance,
                    Integer estimatedTime, String recommendationReason) {
         this.member = member;
         this.title = title;
@@ -71,6 +77,8 @@ public class Course {
         this.endDate = endDate;
         this.baseArea = baseArea;
         this.companionType = companionType;
+        this.startLatitude = startLatitude;
+        this.startLongitude = startLongitude;
         this.totalDistance = totalDistance;
         this.estimatedTime = estimatedTime;
         this.recommendationReason = recommendationReason;
@@ -80,9 +88,9 @@ public class Course {
 
     // [규칙 반영] 정적 팩토리 메서드
     public static Course create(Member member, String title, String description, String courseType, LocalDate startDate,
-                                LocalDate endDate, String baseArea, String companionType, Integer totalDistance,
+                                LocalDate endDate, String baseArea, String companionType,Double startLatitude, Double startLongitude, Integer totalDistance,
                                 Integer estimatedTime, String recommendationReason) {
-        return new Course(member, title, description, courseType, startDate, endDate, baseArea, companionType, totalDistance, estimatedTime, recommendationReason);
+        return new Course(member, title, description, courseType, startDate, endDate, baseArea, companionType, startLatitude,startLongitude,totalDistance, estimatedTime, recommendationReason);
     }
 
 
