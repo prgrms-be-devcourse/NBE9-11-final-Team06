@@ -49,7 +49,7 @@ public class CourseController {
         );
     }
 
-    // 코스 프리뷰 (식당/카페 미리 추천)
+    // 코스 프리뷰
     @PostMapping("/preview")
     public ResponseEntity<ApiResponse<CoursePreviewResponse>> previewCourse(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -138,24 +138,29 @@ public class CourseController {
         );
     }
 
-    // 내가 북마크한 코스 목록 조회
+    // 내가 북마크한 코스 목록 조회 - 10개 페이징
     @GetMapping("/bookmarks")
-    public ResponseEntity<ApiResponse<List<SavedCourseResponse>>> getSavedCourses(
-            @AuthenticationPrincipal CustomUserDetails userDetails
+    public ResponseEntity<ApiResponse<SavedCoursePageResponse>> getSavedCourses(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page
     ) {
         log.info(
-                "북마크한 코스 목록 조회 요청: memberId={}",
-                userDetails.getMemberId()
+                "북마크한 코스 목록 조회 요청: memberId={}, page={}",
+                userDetails.getMemberId(),
+                page
         );
 
-        List<SavedCourseResponse> response = courseService.getSavedCourses(
-                userDetails.getMemberId()
+        SavedCoursePageResponse response = courseService.getSavedCourses(
+                userDetails.getMemberId(),
+                page
         );
 
         log.info(
-                "북마크한 코스 목록 조회 응답: memberId={}, resultCount={}",
+                "북마크한 코스 목록 조회 응답: memberId={}, page={}, resultCount={}, totalPages={}",
                 userDetails.getMemberId(),
-                response.size()
+                response.page(),
+                response.content().size(),
+                response.totalPages()
         );
 
         return ResponseEntity.ok(

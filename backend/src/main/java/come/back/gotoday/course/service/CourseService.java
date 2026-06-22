@@ -23,6 +23,8 @@ import come.back.gotoday.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CourseService {
+
+    private static final int SAVED_COURSE_PAGE_SIZE = 10;
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -138,7 +142,7 @@ public class CourseService {
         return course.getId();
     }
 
-    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
+    // 코스 프리뷰
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
 
@@ -352,15 +356,22 @@ public class CourseService {
         return savedCourseRepository.existsByMemberIdAndCourseId(memberId, courseId);
     }
 
-    // 내가 북마크한 코스 목록 조회
+    // 내가 북마크한 코스 목록 조회 - 10개 페이징
     @Transactional(readOnly = true)
-    public List<SavedCourseResponse> getSavedCourses(Long memberId) {
+    public SavedCoursePageResponse getSavedCourses(Long memberId, int page) {
         getMemberOrThrow(memberId);
 
-        return savedCourseRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
-                .stream()
-                .map(SavedCourseResponse::from)
-                .toList();
+        int safePage = Math.max(page, 0);
+
+        Page<SavedCourseResponse> savedCourses =
+                savedCourseRepository
+                        .findAllByMemberIdOrderByCreatedAtDesc(
+                                memberId,
+                                PageRequest.of(safePage, SAVED_COURSE_PAGE_SIZE)
+                        )
+                        .map(SavedCourseResponse::from);
+
+        return SavedCoursePageResponse.from(savedCourses);
     }
 
     private CourseBookmarkResponse saveBookmark(Member member, Course course) {
