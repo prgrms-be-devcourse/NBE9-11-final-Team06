@@ -105,3 +105,11 @@ cookies.txt
 *.cookies
 .cookie
 .http-cookie*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.pem
+*.pub
