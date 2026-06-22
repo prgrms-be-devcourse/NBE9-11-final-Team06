@@ -26,6 +26,7 @@ public enum ErrorCode {
 
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "코스를 찾을 수 없습니다."),
     RECOMMENDATION_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "RECOMMENDATION_EVENT_NOT_FOUND", "추천 가능한 행사가 없습니다."),
+    COURSE_ALREADY_BOOKMARKED(HttpStatus.CONFLICT, "COURSE_ALREADY_BOOKMARKED", "이미 북마크한 코스입니다."),
 
     CROWD_AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "CROWD_AREA_NOT_FOUND", "혼잡도 정보를 조회할 지역을 찾을 수 없습니다."),
     CROWD_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "CROWD_DATA_NOT_FOUND", "혼잡도 데이터를 찾을 수 없습니다."),

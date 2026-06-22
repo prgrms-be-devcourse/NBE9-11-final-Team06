@@ -2,9 +2,6 @@ package come.back.gotoday.recommend.service;
 
 import come.back.gotoday.category.repository.PreferenceEventCategoryMappingRepository;
 
-import come.back.gotoday.course.entity.Course;
-import come.back.gotoday.course.entity.CoursePlace;
-import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.crowd.service.CrowdScoreCalculator;
 import come.back.gotoday.crowd.service.NearestCrowdAreaService;
 import come.back.gotoday.crowd.util.GeoDistanceCalculator;
@@ -13,22 +10,15 @@ import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.event.service.EventScheduleMatcher;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
-import come.back.gotoday.member.entity.Member;
-import come.back.gotoday.member.repository.MemberRepository;
-import come.back.gotoday.place.entity.Place;
-import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
 import come.back.gotoday.preference.repository.UserPreferenceRepository;
 import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
-import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
-import come.back.gotoday.recommend.dto.RecommendedCoursePlaceResponse;
 import come.back.gotoday.recommend.engine.SearchUtils;
 import come.back.gotoday.recommend.engine.VectorEmbeddingEngine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.*;
@@ -49,9 +39,6 @@ public class RecommendationService {
     private final UserPreferenceCategoryRepository userPreferenceCategoryRepository;
     private final PreferenceEventCategoryMappingRepository preferenceEventCategoryMappingRepository;
     private final EventRepository eventRepository;
-    private final MemberRepository memberRepository;
-    private final CourseRepository courseRepository;
-    private final PlaceRepository placeRepository;
     private final NearestCrowdAreaService nearestCrowdAreaService;
     private final CrowdScoreCalculator crowdScoreCalculator;
 
@@ -63,9 +50,6 @@ public class RecommendationService {
                                  UserPreferenceCategoryRepository userPreferenceCategoryRepository,
                                  PreferenceEventCategoryMappingRepository preferenceEventCategoryMappingRepository,
                                  EventRepository eventRepository,
-                                 MemberRepository memberRepository,
-                                 CourseRepository courseRepository,
-                                 PlaceRepository placeRepository,
                                  NearestCrowdAreaService nearestCrowdAreaService,
                                  CrowdScoreCalculator crowdScoreCalculator,
                                  EventScheduleMatcher eventScheduleMatcher,
@@ -75,9 +59,6 @@ public class RecommendationService {
         this.userPreferenceCategoryRepository = userPreferenceCategoryRepository;
         this.preferenceEventCategoryMappingRepository = preferenceEventCategoryMappingRepository;
         this.eventRepository = eventRepository;
-        this.memberRepository = memberRepository;
-        this.courseRepository = courseRepository;
-        this.placeRepository = placeRepository;
         this.nearestCrowdAreaService = nearestCrowdAreaService;
         this.crowdScoreCalculator = crowdScoreCalculator;
         this.eventScheduleMatcher = eventScheduleMatcher;
@@ -85,11 +66,8 @@ public class RecommendationService {
         this.vectorEngine = vectorEngine;
     }
 
-    @Transactional
-    public RecommendationCourseResponse createRecommendedCourse(Long memberId, RecommendationCourseCreateRequest request) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-
+    @Transactional(readOnly = true)
+    public RecommendedCourseDraft recommendCourse(Long memberId, RecommendationCourseCreateRequest request) {
         var preferenceOptional = userPreferenceRepository.findByMemberId(memberId);
 
         List<String> savedCategories = preferenceOptional
@@ -146,110 +124,36 @@ public class RecommendationService {
         Map<Long, Event> eventMap = eventRepository.findAllById(recommendedEventIds).stream()
                 .collect(Collectors.toMap(Event::getId, event -> event));
 
-        List<Event> recommendedEvents = recommendedEventIds.stream()
-                .map(eventMap::get)
-                .filter(Objects::nonNull)
-                .toList();
+        List<RecommendedEvent> recommendedEvents = new ArrayList<>();
+        int visitOrder = 1;
+        for (Long eventId : recommendedEventIds) {
+            Event event = eventMap.get(eventId);
+            if (event == null) {
+                continue;
+            }
 
-        Course course = Course.create(
-                member,
+            recommendedEvents.add(new RecommendedEvent(
+                    event.getId(),
+                    createRecommendationReason(event, selectedArea, preferredEventCategoryIds),
+                    visitOrder++
+            ));
+        }
+
+        if (recommendedEvents.isEmpty()) {
+            throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
+        }
+
+        return new RecommendedCourseDraft(
                 request.getTitleOrDefault(),
-                "추천 알고리즘으로 생성된 코스입니다.",
-                "RECOMMENDATION",
                 request.startDate(),
                 request.endDate(),
                 selectedArea,
                 selectedCompanionType,
-                null,
-                null,
-                "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
-        );
-
-        List<RecommendedCoursePlaceResponse> places = new ArrayList<>();
-        int visitOrder = 1;
-
-        for (Event event : recommendedEvents) {
-            Place place = getOrCreatePlaceFromEvent(event);
-            String reason = createRecommendationReason(
-                    event,
-                    selectedArea,
-                    preferredEventCategoryIds
-            );
-
-            CoursePlace coursePlace = CoursePlace.create(
-                    course,
-                    place,
-                    event,
-                    visitOrder,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    reason
-            );
-            course.addCoursePlace(coursePlace);
-
-            places.add(new RecommendedCoursePlaceResponse(
-                    event.getId(),
-                    place.getId(),
-                    event.getTitle(),
-                    event.getCategory().getName(),
-                    event.getArea(),
-                    event.getStartDate(),
-                    event.getEndDate(),
-                    place.getLatitude(),
-                    place.getLongitude(),
-                    visitOrder,
-                    reason
-            ));
-
-            visitOrder++;
-        }
-
-        Course savedCourse = courseRepository.save(course);
-
-        return new RecommendationCourseResponse(
-                savedCourse.getId(),
-                savedCourse.getTitle(),
-                savedCourse.getStartDate(),
-                savedCourse.getEndDate(),
-                places
+                List.copyOf(recommendedEvents)
         );
     }
 
-    private Place getOrCreatePlaceFromEvent(Event event) {
-        if (event.getPlace() != null) {
-            return event.getPlace();
-        }
 
-        Place place = Place.create(
-                event.getCategory(),
-                event.getTitle(),
-                event.getArea(),
-                null,
-                toBigDecimal(event.getLatitude()),
-                toBigDecimal(event.getLongitude()),
-                null,
-                event.getHomepageUrl(),
-                event.getDescription(),
-                String.valueOf(event.getSource()),
-                event.getExternalId(),
-                true
-        );
-
-        Place savedPlace = placeRepository.save(place);
-        event.updatePlace(savedPlace);
-        return savedPlace;
-    }
-
-    private BigDecimal toBigDecimal(Double coordinate) {
-        if (coordinate == null) {
-            return null;
-        }
-        return BigDecimal.valueOf(coordinate);
-    }
 
     private String createRecommendationReason(
             Event event,
@@ -580,6 +484,23 @@ public class RecommendationService {
             Event event,
             double preferenceScore,
             double crowdScore
+    ) {
+    }
+
+    public record RecommendedCourseDraft(
+            String title,
+            LocalDate startDate,
+            LocalDate endDate,
+            String baseArea,
+            String companionType,
+            List<RecommendedEvent> events
+    ) {
+    }
+
+    public record RecommendedEvent(
+            Long eventId,
+            String reason,
+            int visitOrder
     ) {
     }
 
