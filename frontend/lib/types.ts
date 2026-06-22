@@ -70,3 +70,18 @@ export interface UserPreferenceUpdateRequest {
   mobilityLevel?: MobilityLevel
   avoidCrowded?: boolean
 }
+
+export interface CourseBookmarkResponse {
+  courseId: number
+  bookmarked: boolean
+}
+
+export interface SavedCourseResponse {
+  savedCourseId: number
+  courseId: number
+  title: string
+  courseType: string
+  baseArea: string
+  startDate: string
+  savedAt: string
+}

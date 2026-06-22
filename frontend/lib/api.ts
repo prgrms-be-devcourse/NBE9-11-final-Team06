@@ -1,5 +1,8 @@
 import type { ApiResponse } from "./types"
 
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
+
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
 interface ApiRequestOptions {
@@ -13,13 +16,13 @@ export async function apiRequest<T>(
 ): Promise<ApiResponse<T>> {
   const requestInit = createRequestInit(options)
 
-  let response = await fetch(path, requestInit)
+  let response = await fetch(`${API_BASE_URL}${path}`, requestInit)
 
   if (response.status === 401 && shouldTryReissue(path)) {
     const reissueSuccess = await reissueAccessToken()
 
     if (reissueSuccess) {
-      response = await fetch(path, requestInit)
+      response = await fetch(`${API_BASE_URL}${path}`, createRequestInit(options))
     }
   }
 
@@ -27,14 +30,57 @@ export async function apiRequest<T>(
 }
 
 function createRequestInit(options: ApiRequestOptions): RequestInit {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  }
+
+  const accessToken = getAccessToken()
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
+
   return {
     method: options.method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
     credentials: "include",
   }
+}
+
+function getAccessToken() {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const storages = [localStorage, sessionStorage]
+  const tokenKeys = ["accessToken", "access_token", "token", "jwt"]
+
+  for (const storage of storages) {
+    for (const tokenKey of tokenKeys) {
+      const token = normalizeAccessToken(storage.getItem(tokenKey))
+
+      if (token) {
+        return token
+      }
+    }
+  }
+
+  return null
+}
+
+function normalizeAccessToken(value: string | null | undefined) {
+  if (!value) {
+    return null
+  }
+
+  const token = value.trim().replace(/^Bearer\s+/i, "")
+
+  if (!token || token === "undefined" || token === "null") {
+    return null
+  }
+
+  return token
 }
 
 function shouldTryReissue(path: string): boolean {
@@ -43,7 +89,7 @@ function shouldTryReissue(path: string): boolean {
 
 async function reissueAccessToken(): Promise<boolean> {
   try {
-    const response = await fetch(`/api/auth/reissue`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reissue`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

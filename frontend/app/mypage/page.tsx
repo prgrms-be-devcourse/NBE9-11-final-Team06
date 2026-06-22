@@ -2,9 +2,8 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { SiteHeader } from "@/components/site-header"
@@ -18,13 +17,14 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { SAVED_COURSES } from "@/lib/data"
 import { memberApi } from "@/lib/member-api"
 import { preferenceApi } from "@/lib/preference-api"
+import { courseBookmarkApi } from "@/lib/course-bookmark-api"
 import type {
   CompanionType,
   Member,
   MobilityLevel,
+  SavedCourseResponse,
   UserPreference,
 } from "@/lib/types"
 import { MapPin, Clock, Route, Heart, Settings, Bookmark } from "lucide-react"
@@ -43,12 +43,29 @@ const MOBILITY_OPTIONS: { value: MobilityLevel; label: string }[] = [
   { value: "HIGH", label: "높음" },
 ]
 
+function formatDate(date?: string | null) {
+  if (!date) {
+    return "날짜 미정"
+  }
+
+  return new Date(date).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
 export default function MyPage() {
   const router = useRouter()
 
   const [activeTab, setActiveTab] = useState("saved")
   const [member, setMember] = useState<Member | null>(null)
   const [preference, setPreference] = useState<UserPreference | null>(null)
+
+  const [savedCourses, setSavedCourses] = useState<SavedCourseResponse[]>([])
+  const [savedCoursePage, setSavedCoursePage] = useState(0)
+  const [totalSavedCoursePages, setTotalSavedCoursePages] = useState(0)
+  const [totalSavedCourseCount, setTotalSavedCourseCount] = useState(0)
 
   const [nickname, setNickname] = useState("")
   const [profileImageUrl, setProfileImageUrl] = useState("")
@@ -60,10 +77,33 @@ export default function MyPage() {
   const [avoidCrowded, setAvoidCrowded] = useState<boolean | null>(null)
 
   const [isLoading, setIsLoading] = useState(true)
+  const [isSavedCoursesLoading, setIsSavedCoursesLoading] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [isPreferenceSaving, setIsPreferenceSaving] = useState(false)
   const [isPreferenceDeleting, setIsPreferenceDeleting] = useState(false)
+
+  const fetchSavedCourses = useCallback(async (page = 0) => {
+    setIsSavedCoursesLoading(true)
+
+    try {
+      const response = await courseBookmarkApi.getSavedCourses(page)
+
+      if (!response.success || !response.data) {
+        toast.error(response.message ?? "북마크한 코스를 불러오지 못했습니다.")
+        return
+      }
+
+      setSavedCourses(response.data.content)
+      setSavedCoursePage(response.data.page)
+      setTotalSavedCoursePages(response.data.totalPages)
+      setTotalSavedCourseCount(response.data.totalElements)
+    } catch {
+      toast.error("북마크한 코스를 불러오는 중 오류가 발생했습니다.")
+    } finally {
+      setIsSavedCoursesLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -94,14 +134,17 @@ export default function MyPage() {
 
         if (preferenceResponse.success && preferenceResponse.data) {
           applyPreference(preferenceResponse.data)
-          return
-        }
-
-        if (!preferenceResponse.success && preferenceResponse.code !== "PREFERENCE_NOT_FOUND") {
+        } else if (
+          !preferenceResponse.success &&
+          preferenceResponse.code !== "PREFERENCE_NOT_FOUND"
+        ) {
           toast.error(
-            preferenceResponse.message ?? "선호 정보를 불러오는 중 오류가 발생했습니다.",
+            preferenceResponse.message ??
+              "선호 정보를 불러오는 중 오류가 발생했습니다.",
           )
         }
+
+        await fetchSavedCourses(0)
       } catch {
         if (!ignore) {
           toast.error("회원 정보를 불러오는 중 오류가 발생했습니다.")
@@ -119,12 +162,14 @@ export default function MyPage() {
     return () => {
       ignore = true
     }
-  }, [router])
+  }, [router, fetchSavedCourses])
 
   function applyPreference(nextPreference: UserPreference) {
     setPreference(nextPreference)
     setPreferredArea(nextPreference.preferredArea)
-    setSelectedCategoryIds(nextPreference.categories.map((category) => category.id))
+    setSelectedCategoryIds(
+      nextPreference.categories.map((category) => category.id),
+    )
     setCompanionType(nextPreference.companionType)
     setMobilityLevel(nextPreference.mobilityLevel)
     setAvoidCrowded(nextPreference.avoidCrowded)
@@ -302,11 +347,13 @@ export default function MyPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <SiteHeader />
+
         <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-10">
           <p className="text-sm text-muted-foreground">
             회원 정보를 불러오는 중...
           </p>
         </main>
+
         <SiteFooter />
       </div>
     )
@@ -342,11 +389,12 @@ export default function MyPage() {
               <h1 className="font-heading text-xl font-bold">
                 {member.nickname}님
               </h1>
+
               <p className="text-sm text-muted-foreground">{member.email}</p>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge variant="secondary" className="gap-1">
-                  <Heart className="size-3" /> {SAVED_COURSES.length}개 코스 저장
+                  <Heart className="size-3" /> {totalSavedCourseCount}개 코스 북마크
                 </Badge>
               </div>
             </div>
@@ -374,51 +422,100 @@ export default function MyPage() {
           </TabsList>
 
           <TabsContent value="saved" className="mt-6">
-            <div className="grid gap-5 sm:grid-cols-2">
-              {SAVED_COURSES.map((course) => (
-                <Link key={course.id} href={`/course/${course.id}`}>
-                  <Card className="group h-full overflow-hidden border-border/60 pt-0 transition-shadow hover:shadow-md">
-                    <div className="relative aspect-[16/9] overflow-hidden">
-                      <Image
-                        src={course.cover || "/placeholder.svg"}
-                        alt={course.title}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
+            {isSavedCoursesLoading ? (
+              <Card className="border-border/60 p-8 text-center text-sm text-muted-foreground">
+                북마크한 코스를 불러오는 중입니다.
+              </Card>
+            ) : savedCourses.length === 0 ? (
+              <Card className="border-border/60 p-8 text-center">
+                <p className="font-medium">아직 북마크한 코스가 없습니다.</p>
 
-                      <Badge className="absolute left-3 top-3 bg-background/90 text-foreground hover:bg-background/90">
-                        {course.area}
-                      </Badge>
-                    </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  마음에 드는 코스를 북마크하면 이곳에서 다시 확인할 수 있어요.
+                </p>
 
-                    <CardContent className="px-5 pb-5">
-                      <h3 className="font-heading font-semibold">
-                        {course.title}
-                      </h3>
+                <Button asChild className="mt-5">
+                  <Link href="/recommend">코스 추천 받기</Link>
+                </Button>
+              </Card>
+            ) : (
+              <>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {savedCourses.map((course) => (
+                    <Link
+                      key={course.savedCourseId}
+                      href={`/course/${course.courseId}`}
+                    >
+                      <Card className="group h-full border-border/60 p-5 transition-shadow hover:shadow-md">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <Badge variant="secondary">
+                              {course.baseArea || "지역 미정"}
+                            </Badge>
 
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                        {course.description}
-                      </p>
+                            <h3 className="mt-3 font-heading text-lg font-semibold">
+                              {course.title}
+                            </h3>
+                          </div>
 
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="size-3.5" /> {course.totalDuration}
-                        </span>
+                          <Bookmark className="size-5 text-primary" />
+                        </div>
 
-                        <span className="flex items-center gap-1">
-                          <Route className="size-3.5" /> {course.totalDistance}
-                        </span>
+                        <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Route className="size-3.5" />
+                            {course.courseType || "코스 유형 미정"}
+                          </span>
 
-                        <span className="flex items-center gap-1">
-                          <MapPin className="size-3.5" />{" "}
-                          {course.stops.length}개 장소
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="size-3.5" />
+                            {course.baseArea || "지역 미정"}
+                          </span>
+
+                          <span className="flex items-center gap-1">
+                            <Clock className="size-3.5" />
+                            {formatDate(course.startDate)}
+                          </span>
+                        </div>
+
+                        <p className="mt-4 text-xs text-muted-foreground">
+                          북마크한 날짜: {formatDate(course.savedAt)}
+                        </p>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+
+                {totalSavedCoursePages > 1 && (
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={savedCoursePage === 0 || isSavedCoursesLoading}
+                      onClick={() => fetchSavedCourses(savedCoursePage - 1)}
+                    >
+                      이전
+                    </Button>
+
+                    <span className="text-sm text-muted-foreground">
+                      {savedCoursePage + 1} / {totalSavedCoursePages}
+                    </span>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={
+                        savedCoursePage >= totalSavedCoursePages - 1 ||
+                        isSavedCoursesLoading
+                      }
+                      onClick={() => fetchSavedCourses(savedCoursePage + 1)}
+                    >
+                      다음
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="prefs" className="mt-6">
