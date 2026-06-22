@@ -5,10 +5,19 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "saved_course")
+@Table(
+        name = "saved_course",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_saved_course_member_course",
+                        columnNames = {"member_id", "course_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SavedCourse {
@@ -38,7 +47,10 @@ public class SavedCourse {
         this.createdAt = LocalDateTime.now();
     }
 
-    // [규칙 반영] 정적 팩토리 메서드
+    public static SavedCourse create(Member member, Course course) {
+        return new SavedCourse(member, course, null);
+    }
+
     public static SavedCourse create(Member member, Course course, String memo) {
         return new SavedCourse(member, course, memo);
     }
