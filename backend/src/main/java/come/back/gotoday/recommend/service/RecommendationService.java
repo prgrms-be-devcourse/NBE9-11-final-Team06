@@ -34,6 +34,7 @@ public class RecommendationService {
     private static final double INDIFFERENT_PREFERENCE_WEIGHT = 0.7;
     private static final double INDIFFERENT_DISTANCE_WEIGHT = 0.3;
     private static final double DEFAULT_CROWD_SCORE = 0.5;
+    private static final int DEFAULT_BEAM_WIDTH = 5;
 
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserPreferenceCategoryRepository userPreferenceCategoryRepository;
@@ -331,32 +332,35 @@ public class RecommendationService {
             }
         }
 
-        return selectGreedyEventIds(
+        return selectBeamSearchEventIds(
                 candidateEvents,
                 rrfScores,
                 startLatitude,
                 startLongitude,
                 avoidCrowds,
-                topK
+                topK,
+                DEFAULT_BEAM_WIDTH
         );
     }
 
     /**
-     * 기존 검색 관련도 점수를 선호 점수로 유지하면서 현재 위치와의 거리까지
-     * 매 선택 단계마다 다시 계산해 다음 행사를 고르는 그리디 선택 로직입니다.
+     * 여러 후보 경로를 동시에 유지하는 빔 서치 기반 행사 선택 로직입니다.
      *
-     * 시작 좌표가 없으면 첫 번째 행사는 선호 점수가 가장 높은 후보를 선택하고,
-     * 이후부터는 직전에 선택된 행사의 좌표를 현재 위치로 사용합니다.
+     * 각 단계에서 현재 빔의 모든 경로를 다음 행사 후보로 확장하고,
+     * 누적 점수가 높은 상위 beamWidth개의 경로만 다음 단계에 유지합니다.
+     * 이를 통해 각 단계의 단일 최고 점수를 즉시 확정하는 방식보다
+     * 전체 코스의 선호도·혼잡도·이동 거리 조합을 함께 고려합니다.
      */
-    private List<Long> selectGreedyEventIds(
+    private List<Long> selectBeamSearchEventIds(
             List<Event> candidateEvents,
             Map<Long, Double> preferenceScores,
             Double startLatitude,
             Double startLongitude,
             boolean avoidCrowds,
-            int topK
+            int topK,
+            int beamWidth
     ) {
-        if (topK <= 0 || candidateEvents.isEmpty()) {
+        if (topK <= 0 || beamWidth <= 0 || candidateEvents.isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -365,9 +369,9 @@ public class RecommendationService {
                 .max()
                 .orElse(0.0);
 
-        List<GreedyCandidate> candidates = candidateEvents.stream()
+        List<EventCandidate> candidates = candidateEvents.stream()
                 .filter(event -> preferenceScores.containsKey(event.getId()))
-                .map(event -> new GreedyCandidate(
+                .map(event -> new EventCandidate(
                         event,
                         normalizePreferenceScore(
                                 preferenceScores.getOrDefault(event.getId(), 0.0),
@@ -377,46 +381,67 @@ public class RecommendationService {
                 ))
                 .toList();
 
-        List<Long> selectedEventIds = new ArrayList<>();
-        Set<Long> selectedIds = new HashSet<>();
-        Double currentLatitude = startLatitude;
-        Double currentLongitude = startLongitude;
+        if (candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        while (selectedEventIds.size() < topK && selectedIds.size() < candidates.size()) {
-            Double scoringLatitude = currentLatitude;
-            Double scoringLongitude = currentLongitude;
+        List<BeamState> beam = List.of(BeamState.initial(startLatitude, startLongitude));
+        int maxDepth = Math.min(topK, candidates.size());
 
-            GreedyCandidate selected = candidates.stream()
-                    .filter(candidate -> !selectedIds.contains(candidate.event().getId()))
-                    .max(Comparator
-                            .comparingDouble((GreedyCandidate candidate) -> calculateGreedyScore(
-                                    candidate,
-                                    scoringLatitude,
-                                    scoringLongitude,
-                                    avoidCrowds
-                            ))
-                            .thenComparingLong(candidate -> -candidate.event().getId()))
-                    .orElse(null);
+        for (int depth = 0; depth < maxDepth; depth++) {
+            List<BeamState> expandedStates = new ArrayList<>();
 
-            if (selected == null) {
+            for (BeamState state : beam) {
+                for (EventCandidate candidate : candidates) {
+                    Long eventId = candidate.event().getId();
+                    if (state.selectedEventIds().contains(eventId)) {
+                        continue;
+                    }
+
+                    double candidateScore = calculateCandidateScore(
+                            candidate,
+                            state.currentLatitude(),
+                            state.currentLongitude(),
+                            avoidCrowds
+                    );
+                    expandedStates.add(state.extend(candidate.event(), candidateScore));
+                }
+            }
+
+            if (expandedStates.isEmpty()) {
                 break;
             }
 
-            Event selectedEvent = selected.event();
-            selectedEventIds.add(selectedEvent.getId());
-            selectedIds.add(selectedEvent.getId());
-
-            if (hasCoordinate(selectedEvent)) {
-                currentLatitude = selectedEvent.getLatitude();
-                currentLongitude = selectedEvent.getLongitude();
-            }
+            beam = expandedStates.stream()
+                    .sorted(Comparator
+                            .comparingDouble(BeamState::totalScore)
+                            .reversed()
+                            .thenComparing(BeamState::eventIds, this::compareEventIdSequences))
+                    .limit(beamWidth)
+                    .toList();
         }
 
-        return selectedEventIds;
+        return beam.stream()
+                .max(Comparator
+                        .comparingDouble(BeamState::totalScore)
+                        .thenComparing(BeamState::eventIds, this::compareEventIdSequences))
+                .map(BeamState::eventIds)
+                .orElseGet(Collections::emptyList);
     }
 
-    private double calculateGreedyScore(
-            GreedyCandidate candidate,
+    private int compareEventIdSequences(List<Long> first, List<Long> second) {
+        int size = Math.min(first.size(), second.size());
+        for (int index = 0; index < size; index++) {
+            int comparison = Long.compare(first.get(index), second.get(index));
+            if (comparison != 0) {
+                return comparison;
+            }
+        }
+        return Integer.compare(first.size(), second.size());
+    }
+
+    private double calculateCandidateScore(
+            EventCandidate candidate,
             Double currentLatitude,
             Double currentLongitude,
             boolean avoidCrowds
@@ -480,11 +505,52 @@ public class RecommendationService {
         return event.getLatitude() != null && event.getLongitude() != null;
     }
 
-    private record GreedyCandidate(
+    private record EventCandidate(
             Event event,
             double preferenceScore,
             double crowdScore
     ) {
+    }
+
+    private record BeamState(
+            List<Long> eventIds,
+            Set<Long> selectedEventIds,
+            Double currentLatitude,
+            Double currentLongitude,
+            double totalScore
+    ) {
+        private static BeamState initial(Double startLatitude, Double startLongitude) {
+            return new BeamState(
+                    List.of(),
+                    Set.of(),
+                    startLatitude,
+                    startLongitude,
+                    0.0
+            );
+        }
+
+        private BeamState extend(Event event, double candidateScore) {
+            List<Long> nextEventIds = new ArrayList<>(eventIds);
+            nextEventIds.add(event.getId());
+
+            Set<Long> nextSelectedEventIds = new HashSet<>(selectedEventIds);
+            nextSelectedEventIds.add(event.getId());
+
+            Double nextLatitude = currentLatitude;
+            Double nextLongitude = currentLongitude;
+            if (event.getLatitude() != null && event.getLongitude() != null) {
+                nextLatitude = event.getLatitude();
+                nextLongitude = event.getLongitude();
+            }
+
+            return new BeamState(
+                    List.copyOf(nextEventIds),
+                    Set.copyOf(nextSelectedEventIds),
+                    nextLatitude,
+                    nextLongitude,
+                    totalScore + candidateScore
+            );
+        }
     }
 
     public record RecommendedCourseDraft(

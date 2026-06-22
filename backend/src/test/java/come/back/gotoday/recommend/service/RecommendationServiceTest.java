@@ -260,8 +260,8 @@ class RecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("혼잡한 곳 피하기를 선택하면 쾌적한 행사가 우선된다")
-    void selectGreedyEventIdsAvoidCrowdsPrioritizesRelaxedEvent() {
+    @DisplayName("빔 서치에서 혼잡한 곳 피하기를 선택하면 쾌적한 행사가 우선된다")
+    void selectBeamSearchEventIdsAvoidCrowdsPrioritizesRelaxedEvent() {
         Event crowdedEvent = mockEvent(1L, 37.5000, 127.0000);
         Event relaxedEvent = mockEvent(2L, 37.5000, 127.0000);
 
@@ -273,7 +273,7 @@ class RecommendationServiceTest {
         given(crowdScoreCalculator.calculate(CongestionLevel.VERY_CROWDED)).willReturn(0);
         given(crowdScoreCalculator.calculate(CongestionLevel.RELAXED)).willReturn(100);
 
-        List<Long> result = selectGreedyEventIds(
+        List<Long> result = selectBeamSearchEventIds(
                 List.of(crowdedEvent, relaxedEvent),
                 Map.of(1L, 1.0, 2L, 1.0),
                 37.5000,
@@ -286,12 +286,12 @@ class RecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("혼잡도 상관없음을 선택하면 혼잡도 조회를 생략한다")
-    void selectGreedyEventIdsIndifferentSkipsCrowdLookup() {
+    @DisplayName("빔 서치에서 혼잡도 상관없음을 선택하면 혼잡도 조회를 생략한다")
+    void selectBeamSearchEventIdsIndifferentSkipsCrowdLookup() {
         Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
         Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
 
-        List<Long> result = selectGreedyEventIds(
+        List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, secondEvent),
                 Map.of(1L, 1.0, 2L, 0.5),
                 37.5000,
@@ -311,13 +311,13 @@ class RecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("첫 장소를 선택한 뒤 해당 좌표를 기준으로 다음 가까운 행사를 선택한다")
-    void selectGreedyEventIdsUpdatesCurrentLocation() {
+    @DisplayName("빔 서치는 직전 행사 좌표를 다음 후보 점수 계산에 사용한다")
+    void selectBeamSearchEventIdsUpdatesCurrentLocation() {
         Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
         Event nearFirstEvent = mockEvent(2L, 37.5005, 127.0005);
         Event farFromFirstEvent = mockEvent(3L, 37.5500, 127.0500);
 
-        List<Long> result = selectGreedyEventIds(
+        List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, nearFirstEvent, farFromFirstEvent),
                 Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0),
                 37.5000,
@@ -330,12 +330,12 @@ class RecommendationServiceTest {
     }
 
     @Test
-    @DisplayName("선택된 행사는 중복 선택하지 않고 후보 수만큼만 반환한다")
-    void selectGreedyEventIdsDoesNotSelectDuplicates() {
+    @DisplayName("빔 서치는 동일 행사를 중복 선택하지 않고 후보 수만큼만 반환한다")
+    void selectBeamSearchEventIdsDoesNotSelectDuplicates() {
         Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
         Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
 
-        List<Long> result = selectGreedyEventIds(
+        List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, secondEvent),
                 Map.of(1L, 1.0, 2L, 0.8),
                 37.5000,
@@ -349,8 +349,95 @@ class RecommendationServiceTest {
                 .doesNotHaveDuplicates();
     }
 
+    @Test
+    @DisplayName("빔 서치는 topK가 0이면 빈 결과를 반환한다")
+    void selectBeamSearchEventIdsReturnsEmptyWhenTopKIsZero() {
+        Event event = org.mockito.Mockito.mock(Event.class);
+
+        List<Long> result = selectBeamSearchEventIds(
+                List.of(event),
+                Map.of(1L, 1.0),
+                37.5000,
+                127.0000,
+                false,
+                0
+        );
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("빔 서치는 시작 좌표가 없어도 중복 없이 모든 후보를 추천한다")
+    void selectBeamSearchEventIdsWorksWithoutStartCoordinates() {
+        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
+        Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
+        Event thirdEvent = mockEvent(3L, 37.5200, 127.0200);
+
+        List<Long> result = selectBeamSearchEventIds(
+                List.of(firstEvent, secondEvent, thirdEvent),
+                Map.of(1L, 1.0, 2L, 0.8, 3L, 0.6),
+                null,
+                null,
+                false,
+                5
+        );
+
+        assertThat(result)
+                .containsExactlyInAnyOrder(1L, 2L, 3L)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("빔 서치는 선호 점수가 없는 행사를 추천 후보에서 제외한다")
+    void selectBeamSearchEventIdsExcludesEventsWithoutPreferenceScore() {
+        Event scoredEvent = mockEvent(1L, 37.5000, 127.0000);
+        Event unscoredEvent = org.mockito.Mockito.mock(Event.class);
+        given(unscoredEvent.getId()).willReturn(2L);
+
+        List<Long> result = selectBeamSearchEventIds(
+                List.of(scoredEvent, unscoredEvent),
+                Map.of(1L, 1.0),
+                37.5000,
+                127.0000,
+                false,
+                2
+        );
+
+        assertThat(result).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("빔 서치는 동일한 입력에 대해 항상 동일한 방문 순서를 반환한다")
+    void selectBeamSearchEventIdsReturnsDeterministicOrder() {
+        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
+        Event secondEvent = mockEvent(2L, 37.5005, 127.0005);
+        Event thirdEvent = mockEvent(3L, 37.5100, 127.0100);
+
+        List<Event> candidateEvents = List.of(firstEvent, secondEvent, thirdEvent);
+        Map<Long, Double> preferenceScores = Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0);
+
+        List<Long> firstResult = selectBeamSearchEventIds(
+                candidateEvents,
+                preferenceScores,
+                37.5000,
+                127.0000,
+                false,
+                3
+        );
+        List<Long> secondResult = selectBeamSearchEventIds(
+                candidateEvents,
+                preferenceScores,
+                37.5000,
+                127.0000,
+                false,
+                3
+        );
+
+        assertThat(secondResult).containsExactlyElementsOf(firstResult);
+    }
+
     @SuppressWarnings("unchecked")
-    private List<Long> selectGreedyEventIds(
+    private List<Long> selectBeamSearchEventIds(
             List<Event> candidateEvents,
             Map<Long, Double> preferenceScores,
             Double startLatitude,
@@ -360,13 +447,14 @@ class RecommendationServiceTest {
     ) {
         return (List<Long>) ReflectionTestUtils.invokeMethod(
                 recommendationService,
-                "selectGreedyEventIds",
+                "selectBeamSearchEventIds",
                 candidateEvents,
                 preferenceScores,
                 startLatitude,
                 startLongitude,
                 avoidCrowds,
-                topK
+                topK,
+                5
         );
     }
 
