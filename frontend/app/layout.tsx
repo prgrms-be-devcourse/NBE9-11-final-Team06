@@ -20,7 +20,7 @@ const notoKr = Noto_Sans_KR({
 })
 
 export const metadata: Metadata = {
-  title: '하루서울 · 서울 하루 여행 코스 추천',
+  title: '오늘 어디가? · 서울 하루 여행 코스 추천',
   description:
     '날짜, 위치, 동행, 취향만 고르면 실시간 혼잡도까지 반영한 서울 하루 여행 코스를 추천해 드려요.',
   generator: 'v0.app',

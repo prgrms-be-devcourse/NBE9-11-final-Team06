@@ -102,13 +102,6 @@ export default function HomePage() {
                 </Link>
 
                 <Link
-                  href="/explore"
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                >
-                  장소 둘러보기
-                </Link>
-
-                <Link
                   href="/events"
                   className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                 >
@@ -142,7 +135,9 @@ export default function HomePage() {
               </div>
 
               <Card className="absolute -bottom-5 -left-3 w-fit min-w-44 gap-1 p-4 shadow-lg sm:-left-6">
-                <span className="text-xs text-muted-foreground">지금 성수동은</span>
+                <span className="text-xs text-muted-foreground">
+                  지금 성수동은
+                </span>
                 <CrowdBadge
                   level={seongsuArea?.crowd ?? "보통"}
                   populationMin={seongsuArea?.populationMin}
@@ -259,10 +254,10 @@ export default function HomePage() {
             </div>
 
             <Link
-              href="/explore"
+              href="/plan"
               className="inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             >
-              전체보기
+              코스 추천받기
               <ArrowRight className="size-4" />
             </Link>
           </div>
@@ -278,7 +273,10 @@ export default function HomePage() {
         <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
           <div className="grid gap-5 md:grid-cols-3">
             {FEATURES.map((feature) => (
-              <Card key={feature.title} className="gap-3 border-0 bg-secondary/50 p-6">
+              <Card
+                key={feature.title}
+                className="gap-3 border-0 bg-secondary/50 p-6"
+              >
                 <span className="flex size-11 items-center justify-center rounded-xl bg-background text-primary shadow-sm">
                   <feature.icon className="size-5" />
                 </span>
