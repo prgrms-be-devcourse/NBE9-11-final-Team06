@@ -387,8 +387,6 @@ export function PlanWizard() {
                       key={a.name}
                       type="button"
                       onClick={() => {
-                        const selectedArea = SEOUL_AREAS.find(a => a.name === a.name)
-                      
                         setArea(a.name)
                         setLocationKeyword("")
                       

@@ -57,7 +57,7 @@ export function NaverCourseMap({ points }: Props) {
         point.longitude
       )
     
-      const isStart = index === 0
+      const isStart = point.order === 0
     
       bounds.extend(position)
       path.push(position)
