@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/use-auth"
 
 const NAV = [
   { href: "/", label: "홈" },
+  { href: "/pricing", label: "구독하기" }, //1
   { href: "/plan", label: "코스 추천받기" },
   { href: "/events", label: "행사 둘러보기" },
   { href: "/mypage", label: "마이페이지" },
@@ -60,6 +61,14 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Button
+            render={<Link href="/pricing" />}
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex border-primary text-primary hover:bg-primary/5"
+          >
+            멤버십 구독
+          </Button>
           {!isAuthLoading &&
             (isLoggedIn ? (
               <Button
