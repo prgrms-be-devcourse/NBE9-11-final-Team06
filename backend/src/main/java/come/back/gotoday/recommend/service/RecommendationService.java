@@ -170,6 +170,8 @@ public class RecommendationService {
                 request.endDate(),
                 selectedArea,
                 selectedCompanionType,
+                request.latitude(),
+                request.longitude(),
                 List.copyOf(recommendedEvents)
         );
     }
@@ -621,6 +623,8 @@ public class RecommendationService {
             LocalDate endDate,
             String baseArea,
             String companionType,
+            double latitude,
+            double longitude,
             List<RecommendedEvent> events
     ) {
     }

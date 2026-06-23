@@ -12,6 +12,8 @@ public record CourseCreateRequest(
         LocalDate endDate,
         String baseArea,
         String companionType,
+        Double startLatitude,
+        Double startLongitude,
         List<Long> eventIds,
         Long restaurantId,
         Long cafeId

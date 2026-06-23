@@ -204,6 +204,8 @@ export function PlanWizard() {
       baseArea: area ?? selectedLocation.name,
       companionType: companion,
       restaurantType: restaurantType,
+      startLatitude: selectedLocation.latitude,
+      startLongitude: selectedLocation.longitude,
     }
 
     localStorage.setItem(
@@ -389,6 +391,8 @@ export function PlanWizard() {
                         setLocationKeyword("")
                         setSelectedLocation({
                           name: a.name,
+                          latitude: a.lat,
+                          longitude: a.lng,
                           source: "preset",
                         })
                       }}

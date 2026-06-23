@@ -10,6 +10,8 @@ public record CoursePreviewRequest(
         LocalDate endDate,
         String baseArea,
         String companionType,
-        RestaurantType restaurantType
+        RestaurantType restaurantType,
+        Double startLatitude,
+        Double startLongitude
 ) {
 }

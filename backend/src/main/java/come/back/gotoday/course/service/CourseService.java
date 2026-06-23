@@ -87,6 +87,8 @@ public class CourseService {
                 request.endDate(),
                 request.baseArea(),
                 request.companionType(),
+                request.startLatitude(),
+                request.startLongitude(),
                 null,
                 null,
                 "사용자 선택 코스"
@@ -183,6 +185,8 @@ public class CourseService {
                 draft.endDate(),
                 draft.baseArea(),
                 draft.companionType(),
+                draft.latitude(), //시작점의 위도
+                draft.longitude(), //시작점의 경도
                 null,
                 null,
                 "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
@@ -297,17 +301,25 @@ public class CourseService {
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        double centerLat = events.stream()
-                .filter(e -> e.getLatitude() != null)
-                .mapToDouble(Event::getLatitude)
-                .average()
-                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
+//        double centerLat = events.stream()
+//                .filter(e -> e.getLatitude() != null)
+//                .mapToDouble(Event::getLatitude)
+//                .average()
+//                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
+//
+//        double centerLng = events.stream()
+//                .filter(e -> e.getLongitude() != null)
+//                .mapToDouble(Event::getLongitude)
+//                .average()
+//                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
 
-        double centerLng = events.stream()
-                .filter(e -> e.getLongitude() != null)
-                .mapToDouble(Event::getLongitude)
-                .average()
-                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
+        //중심좌표를 일단 2번째 이벤트의 좌표로 생각한다.
+        Event centerEvent = events.get(1);
+
+        double centerLat = centerEvent.getLatitude();
+        double centerLng = centerEvent.getLongitude();
+
+        double radius = 5000; // 5km
 
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(centerLat, centerLng);
@@ -328,11 +340,19 @@ public class CourseService {
 
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
+                .filter(doc -> doc.y() != null && doc.x() != null)
+                .filter(doc -> distance(centerLat, centerLng,
+                        Double.parseDouble(doc.y()),
+                        Double.parseDouble(doc.x())) <= 500)
                 .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
                 .toList();
 
         List<Place> savedCafes = cafeResponse.documents()
                 .stream()
+                .filter(doc -> doc.y() != null && doc.x() != null)
+                .filter(doc -> distance(centerLat, centerLng,
+                        Double.parseDouble(doc.y()),
+                        Double.parseDouble(doc.x())) <= 500)
                 .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
                 .toList();
 
@@ -357,7 +377,9 @@ public class CourseService {
                                 p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
                                 p.getPlaceUrl()
                         ))
-                        .toList()
+                        .toList(),
+                request.startLatitude(), //시작위치의 위도
+                request.startLongitude() //시작위치의 경도
         );
     }
 
@@ -424,6 +446,8 @@ public class CourseService {
                 course.getEndDate(),
                 course.getBaseArea(),
                 course.getCompanionType(),
+                course.getStartLatitude(),
+                course.getStartLongitude(),
                 places,
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
@@ -540,5 +564,22 @@ public class CourseService {
     private Course getCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
+    }
+
+    //거리계산 (distance 함수)
+    private double distance(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371; // km
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c * 1000; // meter
     }
 }
