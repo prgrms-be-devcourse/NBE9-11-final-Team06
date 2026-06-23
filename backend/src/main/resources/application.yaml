@@ -3,7 +3,7 @@ spring:
     name: go-today
 
   profiles:
-    active: dev
+    active: local
 
   sql:
     init:
@@ -43,6 +43,7 @@ spring:
 
 server:
   port: 8080
+  forward-headers-strategy: framework
 
 management:
   endpoints:
