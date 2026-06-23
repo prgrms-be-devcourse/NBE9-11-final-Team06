@@ -240,6 +240,8 @@ class CourseServiceBookmarkTest {
                 127.05611,
                 null,
                 null,
+                null,
+                null,
                 "사용자 선호 정보를 기반으로 추천되었습니다."
         );
 
