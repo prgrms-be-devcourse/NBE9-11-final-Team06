@@ -18,8 +18,8 @@ public class TourApiClient {
     private final RestClient restClient;
     private final TourApiProperties properties;
 
-    public TourApiClient(RestClient.Builder restClientBuilder, TourApiProperties properties) {
-        this.restClient = restClientBuilder.build();
+    public TourApiClient(TourApiProperties properties) {
+        this.restClient = RestClient.builder().build();
         this.properties = properties;
     }
 
