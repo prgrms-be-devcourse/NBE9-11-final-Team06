@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
-// 백엔드 ApiResponse 및 BillingIssueResponse 타입 정의
 type BillingIssueResponse = {
   billingInfoId: number
   cardCompany: string
@@ -20,10 +19,10 @@ type ApiResponse<T> = {
   message: string | null
 }
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const requestSent = useRef(false) // React 18 StrictMode 등에서 중복 호출을 막는 가드
+  const requestSent = useRef(false)
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [resultData, setResultData] = useState<BillingIssueResponse | null>(null)
@@ -32,9 +31,11 @@ export default function SuccessPage() {
   const authKey = searchParams.get("authKey")
   const customerKey = searchParams.get("customerKey")
   const plan = searchParams.get("plan")
+  
+  // 1. 어느 페이지에서 진입했는지 쿼리 스트링 값을 명확히 읽어옵니다.
+  const fromPage = searchParams.get("from")
 
   useEffect(() => {
-    // 필수 데이터 확인
     if (!authKey || !customerKey) {
       setStatus("error")
       setErrorMessage("결제 인증 정보가 누락되었습니다.")
@@ -44,7 +45,6 @@ export default function SuccessPage() {
     if (requestSent.current) return
     requestSent.current = true
 
-    // 스프링 부트 백엔드로 빌링키 생성 요청
     const issueBillingKey = async () => {
       try {
         const response = await fetch("/api/v1/billing/issue", {
@@ -77,6 +77,18 @@ export default function SuccessPage() {
     void issueBillingKey()
   }, [authKey, customerKey, plan])
 
+  // 2. 유입된 위치에 따라 동적으로 리다이렉트 주소를 계산하는 함수
+  const handleRedirect = () => {
+    if (fromPage === "mypage") {
+      // 마이페이지에서 왔다면 마이페이지 메인으로 복귀시킵니다.
+      // (MyPage 컴포넌트가 마운트될 때 결제 관리 탭을 열고 싶다면 가이드 메시지를 인지하게 하거나 유연하게 활용 가능합니다)
+      router.push("/mypage")
+    } else {
+      // 요금제 페이지 등 기타 영역에서 왔다면 이전 요금제 리스트로 이동시킵니다.
+      router.push("/pricing")
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/10 p-4">
       <Card className="w-full max-w-md p-6 shadow-xl bg-card">
@@ -94,9 +106,16 @@ export default function SuccessPage() {
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <CheckCircle2 className="size-14 text-green-500 mb-4" />
             <h2 className="text-2xl font-bold text-foreground">카드 등록 완료!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              선택하신 <span className="font-semibold text-primary">[{plan === "premium" ? "프리미엄 요금제" : "베이직 요금제"}]</span> 정기 결제 카드가 성공적으로 등록되었습니다.
-            </p>
+            
+            {fromPage === "mypage" ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                마이페이지 정기 결제 관리에 사용할 수단이 안전하게 추가되었습니다.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                선택하신 <span className="font-semibold text-primary">[{plan === "premium" ? "프리미엄 요금제" : "베이직 요금제"}]</span> 정기 결제 카드가 성공적으로 등록되었습니다.
+              </p>
+            )}
 
             {resultData && (
               <div className="mt-6 w-full rounded-xl bg-secondary/50 p-4 text-left text-sm space-y-2">
@@ -111,8 +130,9 @@ export default function SuccessPage() {
               </div>
             )}
 
-            <Button onClick={() => router.push("/")} className="mt-8 w-full font-semibold">
-              홈으로 가기
+            {/* 성공 시 유입 경로에 맞춤화된 동적 경로 이동 */}
+            <Button onClick={handleRedirect} className="mt-8 w-full font-semibold">
+              {fromPage === "mypage" ? "마이페이지로 돌아가기" : "구독 정보 확인하기"}
             </Button>
           </div>
         )}
@@ -126,19 +146,16 @@ export default function SuccessPage() {
             </p>
 
             <div className="mt-8 flex w-full gap-3">
+              {/* 실패 시 다시 시도하는 버튼의 대상 경로 동적 매핑 */}
               <Button 
                 variant="outline" 
-                onClick={() => {
-                  window.location.href = "/pricing"
-                }} 
+                onClick={handleRedirect} 
                 className="flex-1 font-semibold"
               >
                 다시 시도
               </Button>
               <Button 
-                onClick={() => {
-                  window.location.href = "/"
-                }} 
+                onClick={() => router.push("/")} 
                 className="flex-1 font-semibold"
               >
                 홈으로 가기
@@ -148,5 +165,20 @@ export default function SuccessPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-secondary/10 p-4">
+        <Card className="w-full max-w-md p-6 shadow-xl bg-card flex flex-col items-center justify-center py-10 text-center gap-4">
+          <Loader2 className="size-12 animate-spin text-primary" />
+          <h2 className="text-xl font-bold">결제 정보 읽는 중...</h2>
+        </Card>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   )
 }

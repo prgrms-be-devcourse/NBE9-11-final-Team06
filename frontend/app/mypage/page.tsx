@@ -243,8 +243,8 @@ export default function MyPage() {
       // 빌링키 인증 요청 (v2 규격 반영)
       await payment.requestBillingAuth({
         method: "CARD",
-        successUrl: `${window.location.origin}/success?customerKey=${customerKey}`, // 실제 백엔드 issue 호출 성공 페이지 규격에 맞춰 조정 가능합니다
-        failUrl: `${window.location.origin}/mypage?activeTab=billing&status=fail`,
+        successUrl: `${window.location.origin}/success?customerKey=${customerKey}&from=mypage`, 
+        failUrl: `${window.location.origin}/fail?from=mypage`,
         customerEmail: member.email || "customer@example.com",
         customerName: member.nickname || "고객",
       })
@@ -252,7 +252,7 @@ export default function MyPage() {
       console.error("토스페이먼츠 인증 창 호출 실패:", error)
       toast.error("결제창을 여는 중 오류가 발생했습니다.")
     } finally {
-      setIsRegistering(null)
+      setIsRegistering(false)
     }
   }
 
