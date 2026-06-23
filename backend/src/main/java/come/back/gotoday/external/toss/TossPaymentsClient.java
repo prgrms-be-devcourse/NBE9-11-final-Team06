@@ -109,4 +109,52 @@ public class TossPaymentsClient {
         log.warn("토스페이먼츠 빌링키 발급 API BusinessException 복구 처리: customerKey={}, message={}", customerKey, e.getMessage());
         throw e;
     }
+
+
+    /**
+     * 토스페이먼츠 빌링키 삭제(해지) API 호출 - DELETE 방식
+     */
+    @Retryable(
+            retryFor = { ResourceAccessException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public void deleteBillingKeyFromServer(String plainBillingKey) {
+        log.info("토스페이먼츠 빌링키 DELETE 삭제 API 호출 시작");
+        try {
+            String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
+
+            restClient.delete()
+                    .uri("/billing/{billingKey}", plainBillingKey)
+                    .header("Authorization", "Basic " + encodedKey)
+                    .retrieve()
+                    .toBodilessEntity(); // 성공 시 200 OK 빈 데이터 처리
+
+            log.info("토스페이먼츠 외부 서버 빌링키 삭제 성공");
+        } catch (ResourceAccessException e) {
+            log.error("토스페이먼츠 빌링키 삭제 서버 타임아웃 또는 네트워크 연결 실패: message={}", e.getMessage(), e);
+            throw e;
+        } catch (RestClientResponseException e) {
+            log.error("토스페이먼츠 빌링키 삭제 HTTP 에러 발생: statusCode={}, responseBody={}", e.getStatusCode(), e.getResponseBodyAsString());
+            tossErrorHandler.handleTossError(e);
+            throw e;
+        } catch (Exception e) {
+            log.error("토스페이먼츠 빌링키 삭제 중 알 수 없는 오류 발생: message={}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
+
+    /**
+     * 재시도 실패 시 복구 핸들러 메서드명 매칭 수정
+     */
+    @Recover
+    public void recoverDelete(ResourceAccessException e, String plainBillingKey) {
+        log.error("토스페이먼츠 빌링키 삭제 API 최대 재시도 횟수 초과 (최종 실패)");
+        throw new BusinessException(ErrorCode.NETWORK_ERROR_FINAL_FAILED);
+    }
+
+    @Recover
+    public void recoverDelete(BusinessException e, String plainBillingKey) {
+        throw e;
+    }
 }
