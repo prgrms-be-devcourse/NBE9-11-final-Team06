@@ -3,6 +3,10 @@ package come.back.gotoday.recommend.service;
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.PreferenceEventCategoryMappingRepository;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.weather.service.EventIndoorOutdoorPolicy;
+import come.back.gotoday.weather.service.WeatherConditionClassifier;
+import come.back.gotoday.weather.service.WeatherForecastService;
+import come.back.gotoday.weather.service.WeatherScoreCalculator;
 import come.back.gotoday.preference.entity.UserPreference;
 import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
 import come.back.gotoday.preference.repository.UserPreferenceRepository;
@@ -36,6 +40,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 @DisplayName("추천 서비스 단위 테스트")
 class RecommendationServiceTest {
 
+    private static final LocalDate BEAM_SEARCH_DATE = LocalDate.of(2026, 6, 20);
+
     @Mock
     private UserPreferenceRepository userPreferenceRepository;
 
@@ -53,6 +59,18 @@ class RecommendationServiceTest {
 
     @Mock
     private CrowdScoreCalculator crowdScoreCalculator;
+
+    @Mock
+    private WeatherForecastService weatherForecastService;
+
+    @Mock
+    private WeatherConditionClassifier weatherConditionClassifier;
+
+    @Mock
+    private WeatherScoreCalculator weatherScoreCalculator;
+
+    @Mock
+    private EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy;
 
     @InjectMocks
     private RecommendationService recommendationService;
@@ -276,6 +294,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(crowdedEvent, relaxedEvent),
                 Map.of(1L, 1.0, 2L, 1.0),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 true,
@@ -294,6 +313,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, secondEvent),
                 Map.of(1L, 1.0, 2L, 0.5),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -320,6 +340,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, nearFirstEvent, farFromFirstEvent),
                 Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -338,6 +359,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, secondEvent),
                 Map.of(1L, 1.0, 2L, 0.8),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -357,6 +379,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(event),
                 Map.of(1L, 1.0),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -376,6 +399,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(firstEvent, secondEvent, thirdEvent),
                 Map.of(1L, 1.0, 2L, 0.8, 3L, 0.6),
+                BEAM_SEARCH_DATE,
                 null,
                 null,
                 false,
@@ -397,6 +421,7 @@ class RecommendationServiceTest {
         List<Long> result = selectBeamSearchEventIds(
                 List.of(scoredEvent, unscoredEvent),
                 Map.of(1L, 1.0),
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -419,6 +444,7 @@ class RecommendationServiceTest {
         List<Long> firstResult = selectBeamSearchEventIds(
                 candidateEvents,
                 preferenceScores,
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -427,6 +453,7 @@ class RecommendationServiceTest {
         List<Long> secondResult = selectBeamSearchEventIds(
                 candidateEvents,
                 preferenceScores,
+                BEAM_SEARCH_DATE,
                 37.5000,
                 127.0000,
                 false,
@@ -440,6 +467,7 @@ class RecommendationServiceTest {
     private List<Long> selectBeamSearchEventIds(
             List<Event> candidateEvents,
             Map<Long, Double> preferenceScores,
+            LocalDate searchStart,
             Double startLatitude,
             Double startLongitude,
             boolean avoidCrowds,
@@ -450,6 +478,7 @@ class RecommendationServiceTest {
                 "selectBeamSearchEventIds",
                 candidateEvents,
                 preferenceScores,
+                searchStart,
                 startLatitude,
                 startLongitude,
                 avoidCrowds,
