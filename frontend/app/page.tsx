@@ -216,58 +216,29 @@ export default function HomePage() {
 
         {/* Categories */}
         <section className="bg-secondary/40 py-16">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <h2 className="text-balance text-3xl font-bold tracking-tight">
-              취향대로 골라보세요
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              선택한 카테고리에 가산점을 부여해 코스를 구성해요.
-            </p>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <h2 className="text-balance text-3xl font-bold tracking-tight">
+            취향대로 골라보세요
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            선택한 카테고리에 가산점을 부여해 코스를 구성해요.
+          </p>
 
-            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {CATEGORIES.map((category) => (
-                <Link
-                  key={category.value}
-                  href="/plan"
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
-                >
-                  <span className="text-2xl" aria-hidden>
-                    {category.emoji}
-                  </span>
-                  <span className="font-semibold">{category.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Popular places */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="mb-8 flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-balance text-3xl font-bold tracking-tight">
-                지금 뜨는 성수 장소
-              </h2>
-              <p className="mt-2 text-muted-foreground">
-                실시간 혼잡도와 함께 확인해보세요.
-              </p>
-            </div>
-
-            <Link
-              href="/plan"
-              className="inline-flex h-9 items-center justify-center gap-1 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-            >
-              코스 추천받기
-              <ArrowRight className="size-4" />
-            </Link>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {PLACES.slice(0, 3).map((place) => (
-              <PlaceCard key={place.id} place={place} />
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {CATEGORIES.map((category) => (
+              <div
+                key={category.value}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"
+              >
+                <span className="text-2xl" aria-hidden>
+                  {category.emoji}
+                </span>
+                <span className="font-semibold">{category.label}</span>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
         {/* Features */}
         <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
