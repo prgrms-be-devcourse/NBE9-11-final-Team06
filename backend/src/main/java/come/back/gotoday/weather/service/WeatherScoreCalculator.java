@@ -17,6 +17,7 @@ public class WeatherScoreCalculator {
     private static final double UNFAVORABLE_SCORE = 0.2;
     private static final double CAUTION_SCORE = 0.4;
     private static final double INDOOR_PREFERRED_SCORE = 0.8;
+    private static final double CLOUDY_OUTDOOR_SCORE = 0.7;
 
     /**
      * 날씨 상태와 실내 여부를 기준으로 행사 적합도 점수를 반환합니다.
@@ -34,7 +35,7 @@ public class WeatherScoreCalculator {
             case RAIN, SNOW -> indoorEvent ? FAVORABLE_SCORE : UNFAVORABLE_SCORE;
             case HOT, COLD, STRONG_WIND -> indoorEvent ? INDOOR_PREFERRED_SCORE : CAUTION_SCORE;
             case CLEAR -> indoorEvent ? NEUTRAL_SCORE : FAVORABLE_SCORE;
-            case CLOUDY -> indoorEvent ? NEUTRAL_SCORE : 0.7;
+            case CLOUDY -> indoorEvent ? NEUTRAL_SCORE : CLOUDY_OUTDOOR_SCORE;
             case UNKNOWN -> NEUTRAL_SCORE;
         };
     }

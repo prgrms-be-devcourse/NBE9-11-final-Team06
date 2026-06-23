@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -17,8 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * 기상청 단기예보 응답에서 코스 추천에 사용할 대표 날씨 정보를 추출하는 서비스입니다.
@@ -46,7 +48,10 @@ public class WeatherForecastService {
     private static final int FORECAST_PUBLISH_DELAY_MINUTES = 10;
 
     private final KmaWeatherClient kmaWeatherClient;
-    private final ConcurrentMap<ForecastCacheKey, Optional<WeatherForecast>> forecastCache = new ConcurrentHashMap<>();
+    private final Cache<ForecastCacheKey, Optional<WeatherForecast>> forecastCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofHours(4))
+            .maximumSize(10_000)
+            .build();
 
     /**
      * 선택한 일정 날짜와 위치에 대한 대표 단기예보를 조회합니다.
@@ -73,7 +78,7 @@ public class WeatherForecastService {
                 baseDateTime
         );
 
-        Optional<WeatherForecast> cachedForecast = forecastCache.get(cacheKey);
+        Optional<WeatherForecast> cachedForecast = forecastCache.getIfPresent(cacheKey);
         if (cachedForecast != null) {
             log.info(
                     "기상청 단기예보 캐시 사용: targetDate={}, nx={}, ny={}, baseDateTime={}",
@@ -85,10 +90,14 @@ public class WeatherForecastService {
             return cachedForecast;
         }
 
-        Optional<WeatherForecast> forecast = forecastCache.computeIfAbsent(
-                cacheKey,
-                ignored -> requestRepresentativeForecast(targetDate, gridCoordinate, baseDateTime)
-        );
+        Optional<WeatherForecast> requestedForecast =
+                requestRepresentativeForecast(targetDate, gridCoordinate, baseDateTime);
+
+        Optional<WeatherForecast> existingForecast =
+                forecastCache.asMap().putIfAbsent(cacheKey, requestedForecast);
+
+        Optional<WeatherForecast> forecast =
+                existingForecast != null ? existingForecast : requestedForecast;
 
         log.info(
                 "기상청 단기예보 조회 완료: targetDate={}, nx={}, ny={}, baseDateTime={}, found={}",
@@ -236,6 +245,10 @@ public class WeatherForecastService {
     }
 
     private int parseInt(String value) {
+        if (value == null) {
+            return 0;
+        }
+
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException exception) {
@@ -244,6 +257,10 @@ public class WeatherForecastService {
     }
 
     private double parseDouble(String value) {
+        if (value == null) {
+            return 0.0;
+        }
+
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException exception) {

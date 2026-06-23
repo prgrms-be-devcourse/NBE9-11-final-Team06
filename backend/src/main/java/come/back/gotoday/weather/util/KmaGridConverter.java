@@ -16,6 +16,19 @@ public final class KmaGridConverter {
 
     private static final double DEGREE_TO_RADIAN = Math.PI / 180.0;
 
+    private static final double RE = EARTH_RADIUS_KM / GRID_SPACING_KM;
+    private static final double SLAT1 = STANDARD_LATITUDE_1 * DEGREE_TO_RADIAN;
+    private static final double SLAT2 = STANDARD_LATITUDE_2 * DEGREE_TO_RADIAN;
+    private static final double OLON = ORIGIN_LONGITUDE * DEGREE_TO_RADIAN;
+    private static final double OLAT = ORIGIN_LATITUDE * DEGREE_TO_RADIAN;
+    private static final double SN = Math.log(Math.cos(SLAT1) / Math.cos(SLAT2))
+            / Math.log(Math.tan(Math.PI * 0.25 + SLAT2 * 0.5)
+            / Math.tan(Math.PI * 0.25 + SLAT1 * 0.5));
+    private static final double SF = Math.pow(Math.tan(Math.PI * 0.25 + SLAT1 * 0.5), SN)
+            * Math.cos(SLAT1) / SN;
+    private static final double RO = RE * SF
+            / Math.pow(Math.tan(Math.PI * 0.25 + OLAT * 0.5), SN);
+
     private KmaGridConverter() {
     }
 
@@ -27,36 +40,20 @@ public final class KmaGridConverter {
      * @return 기상청 격자 좌표
      */
     public static GridCoordinate toGrid(double latitude, double longitude) {
-        double re = EARTH_RADIUS_KM / GRID_SPACING_KM;
-        double slat1 = STANDARD_LATITUDE_1 * DEGREE_TO_RADIAN;
-        double slat2 = STANDARD_LATITUDE_2 * DEGREE_TO_RADIAN;
-        double olon = ORIGIN_LONGITUDE * DEGREE_TO_RADIAN;
-        double olat = ORIGIN_LATITUDE * DEGREE_TO_RADIAN;
-
-        double sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5)
-                / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
-        sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
-
-        double sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
-        sf = Math.pow(sf, sn) * Math.cos(slat1) / sn;
-
-        double ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
-        ro = re * sf / Math.pow(ro, sn);
-
         double ra = Math.tan(Math.PI * 0.25 + latitude * DEGREE_TO_RADIAN * 0.5);
-        ra = re * sf / Math.pow(ra, sn);
+        ra = RE * SF / Math.pow(ra, SN);
 
-        double theta = longitude * DEGREE_TO_RADIAN - olon;
+        double theta = longitude * DEGREE_TO_RADIAN - OLON;
         if (theta > Math.PI) {
             theta -= Math.PI * 2.0;
         }
         if (theta < -Math.PI) {
             theta += Math.PI * 2.0;
         }
-        theta *= sn;
+        theta *= SN;
 
         int nx = (int) Math.floor(ra * Math.sin(theta) + ORIGIN_X + 0.5);
-        int ny = (int) Math.floor(ro - ra * Math.cos(theta) + ORIGIN_Y + 0.5);
+        int ny = (int) Math.floor(RO - ra * Math.cos(theta) + ORIGIN_Y + 0.5);
 
         return new GridCoordinate(nx, ny);
     }
