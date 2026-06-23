@@ -4,10 +4,10 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Suspense } from "react" // 1. React에서 Suspense를 가져옵니다.
 
-export const dynamic = 'force-dynamic'
-
-export default function FailPage() {
+// 2. 기존 로직을 담은 실제 콘텐츠 컴포넌트입니다.
+function FailContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -38,5 +38,18 @@ export default function FailPage() {
         </div>
       </Card>
     </div>
+  )
+}
+
+// 3. Next.js가 인식할 기본 페이지 컴포넌트입니다. 여기서 전체를 Suspense로 감싸줍니다.
+export default function FailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground bg-secondary/10">
+        로딩 중...
+      </div>
+    }>
+      <FailContent />
+    </Suspense>
   )
 }
