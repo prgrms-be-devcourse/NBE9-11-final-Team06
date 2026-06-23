@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {
@@ -29,6 +31,19 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     Optional<Place> findBySourceAndExternalId(String source, String externalId);
 
     boolean existsBySourceAndExternalId(String source, String externalId);
+
+    @Query("""
+        SELECT p
+        FROM Place p
+        WHERE p.isActive = true
+          AND p.source = :source
+          AND (:area IS NULL OR p.address LIKE CONCAT('%', :area, '%'))
+        ORDER BY p.id ASC
+        """)
+    List<Place> findActivePlacesBySourceAndArea(
+            @Param("source") String source,
+            @Param("area") String area
+    );
 
     @Query("""
         SELECT p
