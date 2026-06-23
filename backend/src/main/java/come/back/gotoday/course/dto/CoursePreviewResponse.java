@@ -10,7 +10,11 @@ public record CoursePreviewResponse(
 
         List<PlacePreviewResponse> restaurants,
 
-        List<PlacePreviewResponse> cafes
+        List<PlacePreviewResponse> cafes,
+
+        Double startLatitude,
+
+        Double startLongitude
 
 ) {
 }

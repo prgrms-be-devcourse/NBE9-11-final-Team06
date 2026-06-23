@@ -360,6 +360,9 @@ export default function CourseDetailPage() {
               
                 restaurantId: selectedRestaurant.id,
                 cafeId: selectedCafe.id,
+
+                startLatitude: request.startLatitude,
+                startLongitude: request.startLongitude,
               }
             
               try {

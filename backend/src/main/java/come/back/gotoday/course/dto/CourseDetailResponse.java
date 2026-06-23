@@ -12,6 +12,8 @@ public record CourseDetailResponse(
         LocalDate endDate,
         String baseArea,
         String companionType,
+        Double startLatitude,
+        Double startLongitude,
         List<CoursePlaceResponse> places,
         double totalDistance,
         int estimatedTime
