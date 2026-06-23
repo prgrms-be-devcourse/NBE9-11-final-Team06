@@ -234,7 +234,7 @@ export function PlanWizard() {
         headers.Authorization = `Bearer ${accessToken}`
       }
 
-      const response = await fetch(`/api/recommendations/courses`, {
+      const response = await fetch(`http://localhost:8080/api/recommendations/courses`, {
         method: "POST",
         redirect: "manual",
         credentials: "include",

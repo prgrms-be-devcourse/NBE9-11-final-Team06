@@ -17,6 +17,41 @@ import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 
+/* ---------------- PlaceList ---------------- */
+
+function PlaceList({
+  title,
+  icon,
+  items,
+  selectedId,
+  onSelect,
+  color,
+}: any) {
+  return (
+    <section className="mt-10">
+      <h2 className="text-2xl font-bold">{icon} {title}</h2>
+
+      <div className="mt-5 space-y-4">
+        {items.map((place: any) => (
+          <Card
+            key={place.id}
+            onClick={() => onSelect(place.id)}
+            className={`p-5 cursor-pointer transition border
+              ${selectedId === place.id ? color : ""}`}
+          >
+            <h3 className="text-xl font-bold">{place.name}</h3>
+
+            <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="size-3.5" />
+              {place.address}
+            </p>
+          </Card>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /* ---------------- API ---------------- */
 
 const API_BASE_URL =
@@ -30,13 +65,19 @@ type PlaceItem = {
   address: string
   latitude: number
   longitude: number
-  url?: string // 👈 placeUrl -> url로 통일
+  url?: string
+}
+
+type EventNearbyPlaceResponse = {
+  eventId: number
+  eventTitle: string
+  restaurants: PlaceItem[]
+  cafes: PlaceItem[]
 }
 
 type CoursePreviewResponse = {
   eventIds: number[]
-  restaurants: PlaceItem[]
-  cafes: PlaceItem[]
+  events: EventNearbyPlaceResponse[]
 }
 
 /* ---------------- token ---------------- */
@@ -86,6 +127,9 @@ export default function CourseDetailPage() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
   const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
   const [request, setRequest] = useState<any>(null)
+  
+
+  
 
 
   function toggleRestaurant(id: number) {
@@ -127,6 +171,7 @@ export default function CourseDetailPage() {
           return
         }
 
+        
         setRequest(requestBody)
 
 
@@ -188,9 +233,11 @@ export default function CourseDetailPage() {
       isMounted = false
     }
   }, [])
+  const restaurants =
+  course?.events?.flatMap(e => e.restaurants) ?? []
 
-  const restaurants = course?.restaurants ?? []
-  const cafes = course?.cafes ?? []
+  const cafes =
+  course?.events?.flatMap(e => e.cafes) ?? []
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -383,6 +430,7 @@ export default function CourseDetailPage() {
                 
                 console.log("status:", result.status)
                 console.log("raw response:", result)
+                console.log("RAW RESULT:", result)
                 
                 if (response.status === 0 || response.status === 302 || response.type === "opaqueredirect") {
                   throw new Error("로그인 인증이 만료되었거나 토큰이 전달되지 않았습니다. 다시 로그인해주세요.")

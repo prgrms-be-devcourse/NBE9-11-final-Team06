@@ -139,15 +139,15 @@ public class PlaceService {
         log.info("장소 삭제 처리 완료: placeId={}", placeId);
     }
 
-    //DB에 Place 있으면 가져오고, 없으면 새로 만들어서 저장하는 메서드
     @Transactional
     public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
 
+        String externalId = doc.placeUrl() != null
+                ? doc.placeUrl().substring(doc.placeUrl().lastIndexOf("/") + 1)
+                : null;
+
         return placeRepository
-                .findFirstByNameAndAddressAndIsActiveTrueOrderByIdAsc(
-                        doc.placeName(),
-                        doc.addressName()
-                )
+                .findBySourceAndExternalId("KAKAO", externalId)
                 .orElseGet(() ->
                         placeRepository.save(
                                 Place.create(
@@ -161,14 +161,11 @@ public class PlaceService {
                                         doc.placeUrl(),
                                         null,
                                         "KAKAO",
-                                        doc.placeUrl().substring(doc.placeUrl().lastIndexOf("/") + 1),
+                                        externalId,
                                         true
                                 )
                         )
                 );
     }
-
-
-
 
 }
