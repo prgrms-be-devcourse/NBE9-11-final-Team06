@@ -1,11 +1,11 @@
 package come.back.gotoday.place.repository;
 
 import come.back.gotoday.place.entity.Place;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -25,6 +25,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             String name,
             String address
     );
+
+    Optional<Place> findBySourceAndExternalId(String source, String externalId);
+
+    boolean existsBySourceAndExternalId(String source, String externalId);
 
     @Query("""
         SELECT p
