@@ -52,7 +52,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: false
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=http://gotoday.site
+            NEXT_PUBLIC_API_BASE_URL=https://gotoday.site
             NEXT_PUBLIC_NAVER_MAP_CLIENT_ID=${{ secrets.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID }}
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -65,7 +65,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=http://gotoday.site
+            NEXT_PUBLIC_API_BASE_URL=https://gotoday.site
             NEXT_PUBLIC_NAVER_MAP_CLIENT_ID=${{ secrets.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
