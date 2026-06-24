@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.eq;
 @SpringBootTest(properties = {
         "KMA_WEATHER_API_KEY=mock_api_key",
         "weather.kma.service-key=mock_api_key",
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역"
 })
 @Slf4j
 public class SubscriptionBatchIntegrationTest {
