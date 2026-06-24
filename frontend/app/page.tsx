@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import {
   ArrowRight,
   CalendarDays,
@@ -59,13 +60,86 @@ type SeoulAreaWithCrowd = (typeof SEOUL_AREAS)[number] & {
   populationMax: number | null
 }
 
-const seoulAreas: SeoulAreaWithCrowd[] = SEOUL_AREAS.map((area) => ({
+type CrowdApiResponse = {
+  areaName: string
+  congestionText: string
+  populationMin: number | null
+  populationMax: number | null
+}
+
+const CROWD_API_AREA_NAMES: Record<string, string> = {
+  성수: "성수카페거리",
+  연남동: "연남동",
+  익선동: "익선동",
+  삼청동: "삼청동",
+  여의도: "여의도",
+  잠실: "잠실관광특구",
+  홍대: "홍대관광특구",
+  이태원: "이태원관광특구",
+}
+
+const CROWD_LEVELS = new Set(["여유", "보통", "혼잡", "매우혼잡"])
+
+const DEFAULT_SEOUL_AREAS: SeoulAreaWithCrowd[] = SEOUL_AREAS.map((area) => ({
   ...area,
   populationMin: null,
   populationMax: null,
 }))
 
 export default function HomePage() {
+  const [seoulAreas, setSeoulAreas] = useState<SeoulAreaWithCrowd[]>(DEFAULT_SEOUL_AREAS)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadRealtimeCrowds = async () => {
+      const updatedAreas = await Promise.all(
+        DEFAULT_SEOUL_AREAS.map(async (area) => {
+          const areaName = CROWD_API_AREA_NAMES[area.name]
+
+          if (!areaName) {
+            return area
+          }
+
+          try {
+            const response = await fetch(
+              `/api/crowds?areaName=${encodeURIComponent(areaName)}`,
+              { signal: controller.signal },
+            )
+
+            if (!response.ok) {
+              return area
+            }
+
+            const crowdData = (await response.json()) as CrowdApiResponse
+
+            return {
+              ...area,
+              crowd: CROWD_LEVELS.has(crowdData.congestionText)
+                ? crowdData.congestionText as SeoulAreaWithCrowd["crowd"]
+                : area.crowd,
+              populationMin: crowdData.populationMin,
+              populationMax: crowdData.populationMax,
+            }
+          } catch (error) {
+            if ((error as DOMException).name !== "AbortError") {
+              console.warn(`혼잡도 조회 실패: ${area.name}`, error)
+            }
+            return area
+          }
+        }),
+      )
+
+      if (!controller.signal.aborted) {
+        setSeoulAreas(updatedAreas)
+      }
+    }
+
+    void loadRealtimeCrowds()
+
+    return () => controller.abort()
+  }, [])
+
   const seongsuArea = seoulAreas.find((area) => area.name === "성수")
 
   return (
@@ -134,28 +208,6 @@ export default function HomePage() {
                 />
               </div>
 
-              <Card className="absolute -bottom-5 -left-3 w-fit min-w-44 gap-1 p-4 shadow-lg sm:-left-6">
-                <span className="text-xs text-muted-foreground">
-                  지금 성수동은
-                </span>
-                <CrowdBadge
-                  level={seongsuArea?.crowd ?? "보통"}
-                  populationMin={seongsuArea?.populationMin}
-                  populationMax={seongsuArea?.populationMax}
-                  showRange
-                  className="w-fit"
-                />
-              </Card>
-
-              <Card className="absolute -right-3 top-6 flex-row items-center gap-2 p-3 shadow-lg sm:-right-6">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
-                  <Route className="size-5" />
-                </span>
-                <div className="leading-tight">
-                  <p className="text-sm font-bold">4곳 · 6시간</p>
-                  <p className="text-xs text-muted-foreground">추천 코스 완성</p>
-                </div>
-              </Card>
             </div>
           </div>
         </section>
