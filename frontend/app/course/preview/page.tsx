@@ -349,11 +349,13 @@ export default function CourseDetailPage() {
             {mapLoaded ? (
               <SimpleNaverMap
               points={points}
+              selectedRestaurantId={selectedRestaurantId}
+              selectedCafeId={selectedCafeId}
               onSelect={(p) => {
                 if (p.type === "restaurant") {
                   setSelectedRestaurantId(p.id)
                 }
-              
+            
                 if (p.type === "cafe") {
                   setSelectedCafeId(p.id)
                 }
