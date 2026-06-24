@@ -60,4 +60,15 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("source") String source,
             Pageable pageable
     );
+
+    @Query("""
+        SELECT p
+        FROM Place p
+        WHERE p.isActive = true
+          AND p.latitude IS NOT NULL
+          AND p.longitude IS NOT NULL
+          AND (p.source IS NULL OR p.source <> 'KAKAO')
+        ORDER BY p.id DESC
+        """)
+    List<Place> findKakaoSyncBasePlaces(Pageable pageable);
 }
