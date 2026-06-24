@@ -197,6 +197,7 @@ export function PlanWizard() {
 
     const params = new URLSearchParams()
     const selectedDate = formatDate(date)
+    
     const coursePreviewRequest = {
       courseType: "RECOMMENDATION",
       startDate: selectedDate,

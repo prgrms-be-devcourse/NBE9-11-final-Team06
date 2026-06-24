@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { SimpleNaverMap } from "@/components/simple-naver-map"
 
 /* ---------------- PlaceList ---------------- */
 
@@ -127,6 +128,7 @@ export default function CourseDetailPage() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
   const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
   const [request, setRequest] = useState<any>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
   
 
   
@@ -139,9 +141,12 @@ export default function CourseDetailPage() {
   function toggleCafe(id: number) {
     setSelectedCafeId(prev => (prev === id ? null : id))
   }
+
+
+  
   useEffect(() => {
     let isMounted = true
-  
+
     async function fetchCourse() {
       setIsLoading(true)
       setErrorMessage(null)
@@ -234,11 +239,57 @@ export default function CourseDetailPage() {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`
+    script.async = true
+  
+    script.onload = () => {
+      console.log("NAVER MAP LOADED")
+      setMapLoaded(true) // ⭐ 이거 필수
+    }
+  
+    script.onerror = () => {
+      console.error("NAVER MAP LOAD FAILED")
+    }
+  
+    document.head.appendChild(script)
+  }, [])
+
+
+
   const restaurants =
   course?.events?.flatMap(e => e.restaurants) ?? []
 
   const cafes =
   course?.events?.flatMap(e => e.cafes) ?? []
+
+  const points = [
+    ...(course?.events?.map((e, idx) => ({
+      title: e.eventTitle,
+      latitude: e.restaurants?.[0]?.latitude ?? e.cafes?.[0]?.latitude,
+      longitude: e.restaurants?.[0]?.longitude ?? e.cafes?.[0]?.longitude,
+      order: idx,
+      type: "event",
+    })) ?? []),
+  
+    ...restaurants.map((r, i) => ({
+      title: r.name,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      order: i + 1,
+      type: "restaurant",
+    })),
+  
+    ...cafes.map((c, i) => ({
+      title: c.name,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      order: restaurants.length + i + 1,
+      type: "cafe",
+    })),
+  ]
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -291,6 +342,14 @@ export default function CourseDetailPage() {
             <h1 className="mt-6 text-3xl font-extrabold">
               추천 코스 상세
             </h1>
+
+            {mapLoaded ? (
+              <SimpleNaverMap points={points} />
+            ) : (
+              <Card className="p-4 text-sm text-muted-foreground">
+                지도 로딩 중...
+              </Card>
+            )}
 
             <p className="mt-3 text-muted-foreground">
               맛집과 카페가 함께 구성된 추천 일정입니다.
