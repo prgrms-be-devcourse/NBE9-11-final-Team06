@@ -55,6 +55,8 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private static final int SAVED_COURSE_PAGE_SIZE = 10;
+    private static final int DEFAULT_PREVIEW_EVENT_COUNT = 3;
+    private static final int DEFAULT_TOUR_PLACE_COUNT = 3;
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -379,20 +381,16 @@ public class CourseService {
                 request.categories()
         );
 
-        String queryText = recommendationService.createQueryText(
-                request.baseArea(),
-                request.courseType(),
-                request.companionType()
-        );
-
-        List<Long> recommendedEventIds =
-                recommendationService.getRecommendedEventIds(
+        RecommendationService.RecommendedCourseDraft draft =
+                recommendationService.recommendCourse(
                         memberId,
-                        queryText,
-                        request.startDate(),
-                        request.endDate(),
-                        3
+                        toRecommendationCourseCreateRequest(request)
                 );
+
+        List<Long> recommendedEventIds = draft.events()
+                .stream()
+                .map(RecommendationService.RecommendedEvent::eventId)
+                .toList();
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
@@ -413,13 +411,30 @@ public class CourseService {
         );
     }
 
+    private RecommendationCourseCreateRequest toRecommendationCourseCreateRequest(
+            CoursePreviewRequest request
+    ) {
+        return new RecommendationCourseCreateRequest(
+                null,
+                request.startDate(),
+                request.endDate(),
+                DEFAULT_PREVIEW_EVENT_COUNT,
+                request.baseArea(),
+                request.categories(),
+                request.companionType(),
+                null,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+    }
+
     private CoursePreviewResponse previewTourCourse(CoursePreviewRequest request) {
         List<Place> tourPlaces = placeRepository.findActivePlacesBySourceAndArea(
                         Place.TOUR_API_SOURCE,
                         normalizeArea(request.baseArea())
                 )
                 .stream()
-                .limit(3)
+                .limit(DEFAULT_TOUR_PLACE_COUNT)
                 .toList();
 
         if (tourPlaces.isEmpty()) {
@@ -542,11 +557,17 @@ public class CourseService {
             return null;
         }
 
-        return area
-                .replace("특별시", "")
-                .replace("광역시", "")
-                .replace("시", "")
-                .trim();
+        String trimmedArea = area.trim();
+
+        if ("서울특별시".equals(trimmedArea)) {
+            return "서울";
+        }
+
+        if (trimmedArea.startsWith("서울특별시 ")) {
+            return trimmedArea.replaceFirst("^서울특별시\\s*", "").trim();
+        }
+
+        return trimmedArea;
     }
 
     private Place getOrCreatePlaceFromEvent(Event event) {
@@ -767,4 +788,4 @@ public class CourseService {
 
         return R * c * 1000;
     }
-}
+}`
