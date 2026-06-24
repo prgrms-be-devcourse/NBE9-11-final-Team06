@@ -31,10 +31,9 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("추천 서비스 단위 테스트")
@@ -174,7 +173,11 @@ class RecommendationServiceTest {
                 any(LocalDate.class),
                 any()
         );
-        verify(eventRepository).findRecommendedEvents("마포구", startDate, endDate);
+        verify(eventRepository).findRecommendedEvents(
+                "마포구",
+                startDate,
+                endDate
+        );
     }
 
     @Test
@@ -192,7 +195,43 @@ class RecommendationServiceTest {
                 "createRecommendationReason",
                 event,
                 "종로구",
-                Set.of(201L)
+                Set.of(201L),
+                Set.of("전시")
+        );
+
+        assertThat(reason).isEqualTo("선택한 지역과 카테고리에 모두 부합하는 행사입니다.");
+    }
+
+    @Test
+    @DisplayName("성수 입력 지역은 행사 조회 기준 성동구로 정규화한다")
+    void normalizeRecommendationAreaConvertsSeongsuToSeongdongGu() {
+        String normalizedArea = ReflectionTestUtils.invokeMethod(
+                recommendationService,
+                "normalizeRecommendationArea",
+                "성수"
+        );
+
+        assertThat(normalizedArea).isEqualTo("성동구");
+    }
+
+    @Test
+    @DisplayName("직접 선택한 EVENT 카테고리명도 추천 이유에 반영한다")
+    void createRecommendationReasonUsesDirectlySelectedEventCategoryName() {
+        Category eventCategory = org.mockito.Mockito.mock(Category.class);
+        given(eventCategory.getId()).willReturn(201L);
+        given(eventCategory.getName()).willReturn("전시");
+
+        Event event = org.mockito.Mockito.mock(Event.class);
+        given(event.getArea()).willReturn("성동구");
+        given(event.getCategory()).willReturn(eventCategory);
+
+        String reason = ReflectionTestUtils.invokeMethod(
+                recommendationService,
+                "createRecommendationReason",
+                event,
+                "성동구",
+                Set.of(),
+                Set.of("전시")
         );
 
         assertThat(reason).isEqualTo("선택한 지역과 카테고리에 모두 부합하는 행사입니다.");
