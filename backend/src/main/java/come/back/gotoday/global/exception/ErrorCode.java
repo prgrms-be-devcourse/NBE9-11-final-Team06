@@ -40,6 +40,20 @@ public enum ErrorCode {
 
 
 
+    // --- 요금제 관련 에러 코드 ---
+    PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "요금제를 찾을 수 없습니다."),
+
+    // --- 구독 및 결제 관련 에러 코드 ---
+    INVALID_BILLING_INFO(HttpStatus.BAD_REQUEST, "INVALID_BILLING_INFO", "유효하지 않은 결제 정보입니다."),
+    DUPLICATE_ACTIVE_SUBSCRIPTION(HttpStatus.CONFLICT, "DUPLICATE_ACTIVE_SUBSCRIPTION", "이미 활성화된 구독이 존재합니다."),
+    SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIPTION_NOT_FOUND", "구독 정보를 찾을 수 없습니다."),
+    ACTIVE_SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "ACTIVE_SUBSCRIPTION_NOT_FOUND", "현재 활성화된 구독을 찾을 수 없습니다."),
+    UNAUTHORIZED_SUBSCRIPTION_ACCESS(HttpStatus.FORBIDDEN, "UNAUTHORIZED_SUBSCRIPTION_ACCESS", "해당 구독 정보에 대한 접근 권한이 없습니다."),
+
+    // --- 주문 아이디 관련 에러 코드 ---
+    INVALID_ORDER_ID_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_ORDER_ID_FORMAT", "주문 ID 형식이 올바르지 않습니다."),
+
+
     ALREADY_PROCESSED_PAYMENT(HttpStatus.BAD_REQUEST,"ALREADY_PROCESSED_PAYMENT","이미 진행중인 결제입니다"),
 
     // 400 Bad Request 관련
