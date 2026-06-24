@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 
 type Point = {
+  id: number
   title: string
   latitude: number
   longitude: number
@@ -15,7 +16,13 @@ declare global {
   }
 }
 
-export function SimpleNaverMap({ points }: { points: Point[] }) {
+export function SimpleNaverMap({
+  points,
+  onSelect,
+}: {
+  points: Point[]
+  onSelect?: (p: Point) => void
+}) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const infoWindowRef = useRef<any>(null)
@@ -92,6 +99,8 @@ export function SimpleNaverMap({ points }: { points: Point[] }) {
           </div>`
         )
         infoWindow.open(map, marker)
+
+        onSelect?.(p)
       })
     })
 

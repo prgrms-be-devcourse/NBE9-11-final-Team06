@@ -267,6 +267,7 @@ export default function CourseDetailPage() {
 
   const points = [
     ...(course?.events?.map((e, idx) => ({
+      id: e.eventId ?? idx,
       title: e.eventTitle,
       latitude: e.restaurants?.[0]?.latitude ?? e.cafes?.[0]?.latitude,
       longitude: e.restaurants?.[0]?.longitude ?? e.cafes?.[0]?.longitude,
@@ -275,6 +276,7 @@ export default function CourseDetailPage() {
     })) ?? []),
   
     ...restaurants.map((r, i) => ({
+      id : r.id,
       title: r.name,
       latitude: r.latitude,
       longitude: r.longitude,
@@ -283,6 +285,7 @@ export default function CourseDetailPage() {
     })),
   
     ...cafes.map((c, i) => ({
+      id : c.id,
       title: c.name,
       latitude: c.latitude,
       longitude: c.longitude,
@@ -344,7 +347,18 @@ export default function CourseDetailPage() {
             </h1>
 
             {mapLoaded ? (
-              <SimpleNaverMap points={points} />
+              <SimpleNaverMap
+              points={points}
+              onSelect={(p) => {
+                if (p.type === "restaurant") {
+                  setSelectedRestaurantId(p.id)
+                }
+              
+                if (p.type === "cafe") {
+                  setSelectedCafeId(p.id)
+                }
+              }}
+            />
             ) : (
               <Card className="p-4 text-sm text-muted-foreground">
                 지도 로딩 중...
