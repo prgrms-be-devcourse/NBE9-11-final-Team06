@@ -4,9 +4,11 @@ import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
 import come.back.gotoday.payment.subscription.dto.SubscriptionRequest;
 import come.back.gotoday.payment.subscription.dto.SubscriptionResponse;
+import come.back.gotoday.payment.subscription.enums.SubscriptionStatus;
 import come.back.gotoday.payment.subscription.service.SubscriptionFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/subscriptions")
 @RequiredArgsConstructor
+@Slf4j
 public class SubscriptionController {
 
     private final SubscriptionFacade subscriptionFacade;
@@ -22,9 +25,16 @@ public class SubscriptionController {
     @PostMapping
     public ResponseEntity<ApiResponse<SubscriptionResponse>> startSubscription(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestHeader(value = "Idempotency-Key", required = true) String idempotencyKey,
             @Valid @RequestBody SubscriptionRequest request) {
 
-        SubscriptionResponse response = subscriptionFacade.startSubscription(userDetails.getMemberId(), request);
+        log.info("[Subscription API] 헤더 기반 구독 요청 진입 - memberId: {}, idempotencyKey: {}",
+                userDetails.getMemberId(), idempotencyKey);
+
+        SubscriptionResponse response = subscriptionFacade.startSubscription(
+                userDetails.getMemberId(), request, idempotencyKey
+        );
+
         return ResponseEntity.ok(
                 ApiResponse.success(response, "정기 구독 신청 및 첫 달 결제가 완료되었습니다.")
         );

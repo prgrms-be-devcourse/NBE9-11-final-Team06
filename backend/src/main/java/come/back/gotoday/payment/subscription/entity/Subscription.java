@@ -66,15 +66,13 @@ public class Subscription {
     }
 
     public static Subscription startSubscription(BillingInfo billingInfo, Plan plan, Long amount, LocalDate startDate) {
-        LocalDate nextBillingDate = startDate.plusMonths(1);
-
         return new Subscription(
                 billingInfo,
                 plan,
                 amount,
-                nextBillingDate,
+                startDate,
                 startDate.getDayOfMonth(), // 시작일의 '일'을 기준 결제일로 저장
-                SubscriptionStatus.ACTIVE
+                SubscriptionStatus.PENDING
         );
     }
 
@@ -90,6 +88,13 @@ public class Subscription {
                 startDate.getDayOfMonth(),
                 SubscriptionStatus.ACTIVE
         );
+    }
+
+    public void activate() {
+        this.status = SubscriptionStatus.ACTIVE;
+        // 첫 결제가 완료되었으므로 다음 자동 결제일을 한 달 뒤로 미룹니다.
+        renewNextBillingDate();
+        this.updatedAt = LocalDateTime.now();
     }
 
     //  결제 성공 시 다음 결제일 갱신
@@ -114,7 +119,9 @@ public class Subscription {
         this.status = SubscriptionStatus.CANCELED;
         this.updatedAt = LocalDateTime.now(); // 데이터 변경 시 업데이트 시간 갱신
     }
-
+    public void changeToManualCheck() {
+        this.status = SubscriptionStatus.MANUAL_CHECK;
+    }
     // 결제 금액 검증 비즈니스 로직
     private void validateAmount(Long amount) {
         if (amount == null || amount < 0) {
