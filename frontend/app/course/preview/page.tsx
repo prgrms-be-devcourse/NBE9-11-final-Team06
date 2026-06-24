@@ -202,6 +202,8 @@ export default function CourseDetailPage() {
         console.log("requestBody:", requestBody)
         console.log("status:", res.status)
         console.log("raw body:", text.substring(0, 500))
+
+
   
         let result = null
   
@@ -219,7 +221,21 @@ export default function CourseDetailPage() {
         const fetched = extractCourse(result)
   
         console.log("fetched:", fetched)
-  
+        console.log("fetched:", fetched)
+
+        // 🔥 여기다 찍어
+        console.log("events:", fetched?.events)
+        console.log(
+          "event points:",
+          fetched?.events?.map(e => ({
+            id: e.eventId,
+            title: e.eventTitle,
+            lat: e.restaurants?.[0]?.latitude,
+            lng: e.restaurants?.[0]?.longitude
+          }))
+        )
+
+        console.log("event coords:", points.filter(p => p.type === "event"))
         if (isMounted) {
           setCourse(fetched)
         }
@@ -260,10 +276,22 @@ export default function CourseDetailPage() {
 
 
   const restaurants =
-  course?.events?.flatMap(e => e.restaurants) ?? []
+  Array.from(
+    new Map(
+      course?.events
+        ?.flatMap(e => e.restaurants)
+        .map(r => [r.id, r]) // 중복 제거
+    ).values()
+  ) ?? []
 
   const cafes =
-  course?.events?.flatMap(e => e.cafes) ?? []
+  Array.from(
+    new Map(
+      course?.events
+        ?.flatMap(e => e.cafes)
+        .map(c => [c.id, c])
+    ).values()
+  ) ?? []
 
   const points = [
     ...(course?.events?.map((e, idx) => ({
@@ -376,33 +404,33 @@ export default function CourseDetailPage() {
               <h2 className="text-2xl font-bold">🍽️ 추천 맛집</h2>
 
               <div className="mt-5 space-y-4">
-                {restaurants.map((place) => (
-                  <Card
-                  key={place.id}
-                  onClick={() => toggleRestaurant(place.id)}
-                  className={`p-5 cursor-pointer transition border
-                    ${selectedRestaurantId === place.id ? "border-blue-500 bg-blue-50" : ""}`}
-                >
-                    <h3 className="text-xl font-bold">{place.name}</h3>
+              {restaurants.map((place) => (
+              <Card
+                key={place.id}
+                onClick={() => toggleRestaurant(place.id)}
+                className={`p-5 cursor-pointer transition border
+                  ${selectedRestaurantId === place.id ? "border-blue-500 bg-blue-50" : ""}`}
+              >
+                <h3 className="text-xl font-bold">{place.name}</h3>
 
-                    <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="size-3.5" />
-                      {place.address}
-                    </p>
+                <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="size-3.5" />
+                  {place.address}
+                </p>
 
-                    {place.url && (
-                      <a
-                        href={place.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex items-center gap-1 text-sm text-blue-500"
-                      >
-                        카카오맵 보기
-                        <ExternalLink className="size-3" />
-                      </a>
-                    )}
-                  </Card>
-                ))}
+                {place.url && (
+                  <a
+                    href={place.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-sm text-blue-500"
+                  >
+                    카카오맵 보기
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </Card>
+            ))}
               </div>
             </section>
 
