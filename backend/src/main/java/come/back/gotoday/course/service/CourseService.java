@@ -55,6 +55,8 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private static final int SAVED_COURSE_PAGE_SIZE = 10;
+    private static final int DEFAULT_PREVIEW_EVENT_COUNT = 3;
+    private static final int DEFAULT_TOUR_PLACE_COUNT = 3;
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -68,7 +70,6 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
 
-    // 코스 저장 (생성)
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         Member member = getMemberOrThrow(memberId);
@@ -170,11 +171,6 @@ public class CourseService {
         return course.getId();
     }
 
-    /**
-     * 추천 서비스가 산출한 추천 결과를 실제 코스로 저장합니다.
-     * categories에 TOUR, TOUR_PLACE, TOURISM, TRAVEL 또는 관광/여행 계열 값이 있으면
-     * 행사 추천이 아니라 TOUR_API 관광지 데이터를 기반으로 코스를 생성합니다.
-     */
     @Transactional
     public RecommendationCourseResponse createRecommendedCourse(
             Long memberId,
@@ -365,88 +361,105 @@ public class CourseService {
         );
     }
 
-    private boolean hasTourCategory(RecommendationCourseCreateRequest request) {
-        if (request.categories() == null || request.categories().isEmpty()) {
-            return false;
-        }
-
-        return request.categories()
-                .stream()
-                .filter(category -> category != null && !category.isBlank())
-                .map(category -> category.trim().toUpperCase())
-                .anyMatch(category ->
-                        "TOUR".equals(category)
-                                || "TOUR_PLACE".equals(category)
-                                || "TOURISM".equals(category)
-                                || "TRAVEL".equals(category)
-                                || category.contains("관광")
-                                || category.contains("여행")
-                );
-    }
-
-    private String normalizeArea(String area) {
-        if (area == null || area.isBlank()) {
-            return null;
-        }
-
-        return area
-                .replace("특별시", "")
-                .replace("광역시", "")
-                .replace("시", "")
-                .trim();
-    }
-
-    private Place getOrCreatePlaceFromEvent(Event event) {
-        if (event.getPlace() != null) {
-            return event.getPlace();
-        }
-
-        Place place = Place.create(
-                event.getCategory(),
-                event.getTitle(),
-                event.getArea(),
-                null,
-                event.getLatitude() != null ? BigDecimal.valueOf(event.getLatitude()) : null,
-                event.getLongitude() != null ? BigDecimal.valueOf(event.getLongitude()) : null,
-                null,
-                event.getHomepageUrl(),
-                event.getDescription(),
-                event.getSource(),
-                event.getExternalId(),
-                true
-        );
-
-        Place savedPlace = placeRepository.save(place);
-        event.updatePlace(savedPlace);
-
-        return savedPlace;
-    }
-
-    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
-        String queryText = recommendationService.createQueryText(
-                request.baseArea(),
-                request.courseType(),
-                request.companionType()
+        getMemberOrThrow(memberId);
+
+        if (hasTourCategory(request.categories())) {
+            log.info(
+                    "관광지 기반 코스 미리보기 분기 진입: memberId={}, categories={}",
+                    memberId,
+                    request.categories()
+            );
+
+            return previewTourCourse(request);
+        }
+
+        log.info(
+                "행사 기반 코스 미리보기 분기 진입: memberId={}, categories={}",
+                memberId,
+                request.categories()
         );
 
-        List<Long> recommendedEventIds =
-                recommendationService.getRecommendedEventIds(
+        RecommendationService.RecommendedCourseDraft draft =
+                recommendationService.recommendCourse(
                         memberId,
-                        queryText,
-                        request.startDate(),
-                        request.endDate(),
-                        3
+                        toRecommendationCourseCreateRequest(request)
                 );
+
+        List<Long> recommendedEventIds = draft.events()
+                .stream()
+                .map(RecommendationService.RecommendedEvent::eventId)
+                .toList();
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        Event centerEvent = events.get(1);
+        if (events.isEmpty()) {
+            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
+        }
+
+        Event centerEvent = events.size() > 1 ? events.get(1) : events.get(0);
 
         double centerLat = centerEvent.getLatitude();
         double centerLng = centerEvent.getLongitude();
 
+        return createCoursePreviewResponse(
+                recommendedEventIds,
+                centerLat,
+                centerLng,
+                request
+        );
+    }
+
+    private RecommendationCourseCreateRequest toRecommendationCourseCreateRequest(
+            CoursePreviewRequest request
+    ) {
+        return new RecommendationCourseCreateRequest(
+                null,
+                request.startDate(),
+                request.endDate(),
+                DEFAULT_PREVIEW_EVENT_COUNT,
+                request.baseArea(),
+                request.categories(),
+                request.companionType(),
+                null,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+    }
+
+    private CoursePreviewResponse previewTourCourse(CoursePreviewRequest request) {
+        List<Place> tourPlaces = placeRepository.findActivePlacesBySourceAndArea(
+                        Place.TOUR_API_SOURCE,
+                        normalizeArea(request.baseArea())
+                )
+                .stream()
+                .limit(DEFAULT_TOUR_PLACE_COUNT)
+                .toList();
+
+        if (tourPlaces.isEmpty()) {
+            throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
+        }
+
+        Place centerPlace = tourPlaces.stream()
+                .filter(place -> place.getLatitude() != null && place.getLongitude() != null)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
+
+        return createCoursePreviewResponse(
+                List.of(),
+                centerPlace.getLatitude().doubleValue(),
+                centerPlace.getLongitude().doubleValue(),
+                request
+        );
+    }
+
+    private CoursePreviewResponse createCoursePreviewResponse(
+            List<Long> recommendedEventIds,
+            double centerLat,
+            double centerLng,
+            CoursePreviewRequest request
+    ) {
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(centerLat, centerLng);
 
@@ -458,11 +471,8 @@ public class CourseService {
         KakaoPlaceResponse restaurantResponse =
                 kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
 
-        Category restaurantCategory = categoryRepository.findByName("맛집")
-                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
-
-        Category cafeCategory = categoryRepository.findByName("카페")
-                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        Category restaurantCategory = getCategoryByName("맛집");
+        Category cafeCategory = getCategoryByName("카페");
 
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
@@ -515,7 +525,77 @@ public class CourseService {
         );
     }
 
-    // 코스 상세조회
+    private Category getCategoryByName(String name) {
+        return categoryRepository.findFirstByNameOrderByIdAsc(name)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+    }
+
+    private boolean hasTourCategory(RecommendationCourseCreateRequest request) {
+        return hasTourCategory(request.categories());
+    }
+
+    private boolean hasTourCategory(List<String> categories) {
+        if (categories == null || categories.isEmpty()) {
+            return false;
+        }
+
+        return categories.stream()
+                .filter(category -> category != null && !category.isBlank())
+                .map(category -> category.trim().toUpperCase())
+                .anyMatch(category ->
+                        "TOUR".equals(category)
+                                || "TOUR_PLACE".equals(category)
+                                || "TOURISM".equals(category)
+                                || "TRAVEL".equals(category)
+                                || category.contains("관광")
+                                || category.contains("여행")
+                );
+    }
+
+    private String normalizeArea(String area) {
+        if (area == null || area.isBlank()) {
+            return null;
+        }
+
+        String trimmedArea = area.trim();
+
+        if ("서울특별시".equals(trimmedArea)) {
+            return "서울";
+        }
+
+        if (trimmedArea.startsWith("서울특별시 ")) {
+            return trimmedArea.replaceFirst("^서울특별시\\s*", "").trim();
+        }
+
+        return trimmedArea;
+    }
+
+    private Place getOrCreatePlaceFromEvent(Event event) {
+        if (event.getPlace() != null) {
+            return event.getPlace();
+        }
+
+        Place place = Place.create(
+                event.getCategory(),
+                event.getTitle(),
+                event.getArea(),
+                null,
+                event.getLatitude() != null ? BigDecimal.valueOf(event.getLatitude()) : null,
+                event.getLongitude() != null ? BigDecimal.valueOf(event.getLongitude()) : null,
+                null,
+                event.getHomepageUrl(),
+                event.getDescription(),
+                event.getSource(),
+                event.getExternalId(),
+                true
+        );
+
+        Place savedPlace = placeRepository.save(place);
+        event.updatePlace(savedPlace);
+
+        return savedPlace;
+    }
+
     @Transactional(readOnly = true)
     public CourseDetailResponse getCourse(Long courseId) {
         log.info("코스 단건 조회 처리 시작: courseId={}", courseId);
@@ -586,7 +666,6 @@ public class CourseService {
         );
     }
 
-    // 코스 목록 조회
     @Transactional(readOnly = true)
     public List<CourseListResponse> getCourses() {
         return courseRepository.findAll()
@@ -601,7 +680,6 @@ public class CourseService {
                 .toList();
     }
 
-    // 코스 삭제
     @Transactional
     public void deleteCourse(Long memberId, Long courseId) {
         Course course = getCourseOrThrow(courseId);
@@ -614,7 +692,6 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
-    // 코스 북마크 등록/해제
     @Transactional
     public CourseBookmarkResponse toggleBookmark(Long memberId, Long courseId) {
         log.info("코스 북마크 토글 처리 시작: memberId={}, courseId={}", memberId, courseId);
@@ -637,7 +714,6 @@ public class CourseService {
                 .orElseGet(() -> saveBookmark(member, course));
     }
 
-    // 코스 북마크 여부 조회
     @Transactional(readOnly = true)
     public boolean isBookmarked(Long memberId, Long courseId) {
         getMemberOrThrow(memberId);
@@ -646,7 +722,6 @@ public class CourseService {
         return savedCourseRepository.existsByMemberIdAndCourseId(memberId, courseId);
     }
 
-    // 내가 북마크한 코스 목록 조회 - 10개 페이징
     @Transactional(readOnly = true)
     public SavedCoursePageResponse getSavedCourses(Long memberId, int page) {
         getMemberOrThrow(memberId);
