@@ -8,6 +8,7 @@ type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 interface ApiRequestOptions {
   method: HttpMethod
   body?: unknown
+  headers?: Record<string, string>
 }
 
 export async function apiRequest<T>(
@@ -30,8 +31,10 @@ export async function apiRequest<T>(
 }
 
 function createRequestInit(options: ApiRequestOptions): RequestInit {
+  const customHeaders = options.headers ?? {}
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...customHeaders,
   }
 
   const accessToken = getAccessToken()
