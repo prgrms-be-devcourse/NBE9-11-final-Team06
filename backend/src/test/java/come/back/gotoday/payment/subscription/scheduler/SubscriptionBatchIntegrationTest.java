@@ -98,32 +98,31 @@ public class SubscriptionBatchIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        // 💡 수동으로 확실하게 트랜잭션을 생성합니다.
         org.springframework.transaction.TransactionStatus status =
                 transactionManager.getTransaction(new org.springframework.transaction.support.DefaultTransactionDefinition());
 
         try {
-            // 1. 외래 키 제약 조건 검사를 잠시 해제합니다.
-            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            //  자식 테이블부터 외래키 제약조건 순서에 맞춰 완벽하게 딜리트 진행
+            paymentHistoryRepository.deleteAllInBatch();
+            subscriptionRepository.deleteAllInBatch();
 
-            // 2. 테스트에 사용된 주요 테이블들을 무조건 깨끗하게 비웁니다.
-            entityManager.createNativeQuery("TRUNCATE TABLE payment_history").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE subscription").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE billing_info").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE idempotency_keys").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE refresh_token").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE user_preference_category").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE user_preference").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE plan").executeUpdate();
-            entityManager.createNativeQuery("TRUNCATE TABLE member").executeUpdate();
+            billingInfoRepository.deleteAllInBatch();
 
-            // 3. 외래 키 제약 조건 검사를 다시 켭니다.
-            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            // 레포지토리가 없는 테이블들은 JPQL 벌크 연산으로 직접 제거
+            entityManager.createQuery("delete from IdempotencyKey").executeUpdate();
+            entityManager.createQuery("delete from RefreshToken").executeUpdate();
+            entityManager.createQuery("delete from UserPreferenceCategory").executeUpdate();
+            entityManager.createQuery("delete from UserPreference").executeUpdate();
 
-            // 성공 시 커밋
+            //  마지막에 마스터(부모) 테이블 삭제
+            planRepository.deleteAllInBatch();
+            memberRepository.deleteAllInBatch();
+
+            entityManager.flush();
+            entityManager.clear();
+
             transactionManager.commit(status);
         } catch (Exception e) {
-            // 에러 발생 시 롤백 후 예외 던지기
             transactionManager.rollback(status);
             throw e;
         }
