@@ -2,7 +2,16 @@ package come.back.gotoday.course.service;
 
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
-import come.back.gotoday.course.dto.*;
+import come.back.gotoday.course.dto.CourseBookmarkResponse;
+import come.back.gotoday.course.dto.CourseCreateRequest;
+import come.back.gotoday.course.dto.CourseDetailResponse;
+import come.back.gotoday.course.dto.CourseListResponse;
+import come.back.gotoday.course.dto.CoursePlaceResponse;
+import come.back.gotoday.course.dto.CoursePreviewRequest;
+import come.back.gotoday.course.dto.CoursePreviewResponse;
+import come.back.gotoday.course.dto.PlacePreviewResponse;
+import come.back.gotoday.course.dto.SavedCoursePageResponse;
+import come.back.gotoday.course.dto.SavedCourseResponse;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.entity.SavedCourse;
@@ -163,8 +172,8 @@ public class CourseService {
 
     /**
      * 추천 서비스가 산출한 추천 결과를 실제 코스로 저장합니다.
-     * 추천 후보 선정과 추천 이유 생성은 RecommendationService가 담당하고,
-     * Course 및 CoursePlace 생성·저장은 CourseService가 담당합니다.
+     * categories에 TOUR, TOUR_PLACE, TOURISM, TRAVEL 또는 관광/여행 계열 값이 있으면
+     * 행사 추천이 아니라 TOUR_API 관광지 데이터를 기반으로 코스를 생성합니다.
      */
     @Transactional
     public RecommendationCourseResponse createRecommendedCourse(
@@ -172,6 +181,22 @@ public class CourseService {
             RecommendationCourseCreateRequest request
     ) {
         Member member = getMemberOrThrow(memberId);
+
+        if (hasTourCategory(request)) {
+            log.info(
+                    "관광지 기반 추천 코스 생성 분기 진입: memberId={}, categories={}",
+                    memberId,
+                    request.categories()
+            );
+
+            return createTourRecommendedCourse(member, request);
+        }
+
+        log.info(
+                "행사 기반 추천 코스 생성 분기 진입: memberId={}, categories={}",
+                memberId,
+                request.categories()
+        );
 
         RecommendationService.RecommendedCourseDraft draft =
                 recommendationService.recommendCourse(memberId, request);
@@ -185,8 +210,8 @@ public class CourseService {
                 draft.endDate(),
                 draft.baseArea(),
                 draft.companionType(),
-                draft.latitude(), //시작점의 위도
-                draft.longitude(), //시작점의 경도
+                draft.latitude(),
+                draft.longitude(),
                 null,
                 null,
                 "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
@@ -255,6 +280,122 @@ public class CourseService {
         );
     }
 
+    private RecommendationCourseResponse createTourRecommendedCourse(
+            Member member,
+            RecommendationCourseCreateRequest request
+    ) {
+        List<Place> tourPlaces = placeRepository.findActivePlacesBySourceAndArea(
+                        Place.TOUR_API_SOURCE,
+                        normalizeArea(request.area())
+                )
+                .stream()
+                .limit(request.getTopKOrDefault())
+                .toList();
+
+        if (tourPlaces.isEmpty()) {
+            throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
+        }
+
+        Course course = Course.create(
+                member,
+                request.getTitleOrDefault(),
+                "관광공사 관광지 데이터를 기반으로 생성된 코스입니다.",
+                "RECOMMENDATION",
+                request.startDate(),
+                request.endDate(),
+                request.area(),
+                request.companionType(),
+                request.latitude(),
+                request.longitude(),
+                null,
+                null,
+                "선택한 관광 카테고리와 지역의 관광지 데이터를 기반으로 추천되었습니다."
+        );
+
+        List<RecommendedCoursePlaceResponse> places = new ArrayList<>();
+
+        int visitOrder = 1;
+
+        for (Place place : tourPlaces) {
+            String reason = "선택한 지역의 관광지 데이터를 기반으로 추천되었습니다.";
+
+            course.addCoursePlace(
+                    CoursePlace.create(
+                            course,
+                            place,
+                            null,
+                            visitOrder,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            reason
+                    )
+            );
+
+            places.add(
+                    new RecommendedCoursePlaceResponse(
+                            null,
+                            place.getId(),
+                            place.getName(),
+                            place.getCategory().getName(),
+                            place.getAddress(),
+                            null,
+                            null,
+                            place.getLatitude(),
+                            place.getLongitude(),
+                            visitOrder,
+                            reason
+                    )
+            );
+
+            visitOrder++;
+        }
+
+        Course savedCourse = courseRepository.save(course);
+
+        return new RecommendationCourseResponse(
+                savedCourse.getId(),
+                savedCourse.getTitle(),
+                savedCourse.getStartDate(),
+                savedCourse.getEndDate(),
+                places
+        );
+    }
+
+    private boolean hasTourCategory(RecommendationCourseCreateRequest request) {
+        if (request.categories() == null || request.categories().isEmpty()) {
+            return false;
+        }
+
+        return request.categories()
+                .stream()
+                .filter(category -> category != null && !category.isBlank())
+                .map(category -> category.trim().toUpperCase())
+                .anyMatch(category ->
+                        "TOUR".equals(category)
+                                || "TOUR_PLACE".equals(category)
+                                || "TOURISM".equals(category)
+                                || "TRAVEL".equals(category)
+                                || category.contains("관광")
+                                || category.contains("여행")
+                );
+    }
+
+    private String normalizeArea(String area) {
+        if (area == null || area.isBlank()) {
+            return null;
+        }
+
+        return area
+                .replace("특별시", "")
+                .replace("광역시", "")
+                .replace("시", "")
+                .trim();
+    }
+
     private Place getOrCreatePlaceFromEvent(Event event) {
         if (event.getPlace() != null) {
             return event.getPlace();
@@ -301,25 +442,10 @@ public class CourseService {
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-//        double centerLat = events.stream()
-//                .filter(e -> e.getLatitude() != null)
-//                .mapToDouble(Event::getLatitude)
-//                .average()
-//                .orElseThrow(() -> new IllegalArgumentException("유효한 위도 정보가 없습니다."));
-//
-//        double centerLng = events.stream()
-//                .filter(e -> e.getLongitude() != null)
-//                .mapToDouble(Event::getLongitude)
-//                .average()
-//                .orElseThrow(() -> new IllegalArgumentException("유효한 경도 정보가 없습니다."));
-
-        //중심좌표를 일단 2번째 이벤트의 좌표로 생각한다.
         Event centerEvent = events.get(1);
 
         double centerLat = centerEvent.getLatitude();
         double centerLng = centerEvent.getLongitude();
-
-        double radius = 5000; // 5km
 
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(centerLat, centerLng);
@@ -341,18 +467,24 @@ public class CourseService {
         List<Place> savedRestaurants = restaurantResponse.documents()
                 .stream()
                 .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(centerLat, centerLng,
+                .filter(doc -> distance(
+                        centerLat,
+                        centerLng,
                         Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())) <= 500)
+                        Double.parseDouble(doc.x())
+                ) <= 500)
                 .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
                 .toList();
 
         List<Place> savedCafes = cafeResponse.documents()
                 .stream()
                 .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(centerLat, centerLng,
+                .filter(doc -> distance(
+                        centerLat,
+                        centerLng,
                         Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())) <= 500)
+                        Double.parseDouble(doc.x())
+                ) <= 500)
                 .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
                 .toList();
 
@@ -378,8 +510,8 @@ public class CourseService {
                                 p.getPlaceUrl()
                         ))
                         .toList(),
-                request.startLatitude(), //시작위치의 위도
-                request.startLongitude() //시작위치의 경도
+                request.startLatitude(),
+                request.startLongitude()
         );
     }
 
@@ -566,9 +698,8 @@ public class CourseService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
     }
 
-    //거리계산 (distance 함수)
     private double distance(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371; // km
+        double R = 6371;
 
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
@@ -580,6 +711,6 @@ public class CourseService {
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        return R * c * 1000; // meter
+        return R * c * 1000;
     }
 }
