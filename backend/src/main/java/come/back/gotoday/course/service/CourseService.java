@@ -788,4 +788,4 @@ public class CourseService {
 
         return R * c * 1000;
     }
-}`
+}
