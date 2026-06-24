@@ -25,6 +25,9 @@ public class PaymentHistory { // BaseEntity 상속 제거
     @Column(name = "order_id", nullable = false, unique = true)
     private String orderId; // 가맹점에서 자체 생성한 고유 주문 ID
 
+    @Column(name = "payment_key", unique = true)
+    private String paymentKey;
+
     @Column(nullable = false)
     private Long amount; // 실제 승인 요청 금액
 
@@ -45,9 +48,9 @@ public class PaymentHistory { // BaseEntity 상속 제거
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // 내부 생성자
-    private PaymentHistory(Subscription subscription, String orderId, Long amount, PaymentStatus status, String failureReason, String receiptUrl) {
+    private PaymentHistory(Subscription subscription, String paymentKey, String orderId, Long amount, PaymentStatus status, String failureReason, String receiptUrl) {
         this.subscription = subscription;
+        this.paymentKey = paymentKey;
         this.orderId = orderId;
         this.amount = amount;
         this.status = status;
@@ -58,12 +61,11 @@ public class PaymentHistory { // BaseEntity 상속 제거
     }
 
     // 1: 결제 성공 이력 생성
-    public static PaymentHistory createSuccessHistory(Subscription subscription, String orderId, Long amount, String receiptUrl) {
-        return new PaymentHistory(subscription, orderId, amount, PaymentStatus.SUCCESS, null, receiptUrl);
+    public static PaymentHistory createSuccessHistory(Subscription subscription, String paymentKey, String orderId, Long amount, String receiptUrl) {
+        return new PaymentHistory(subscription, paymentKey, orderId, amount, PaymentStatus.SUCCESS, null, receiptUrl);
     }
 
-    // 2: 결제 실패 이력 생성
     public static PaymentHistory createFailureHistory(Subscription subscription, String orderId, Long amount, String failureReason) {
-        return new PaymentHistory(subscription, orderId, amount, PaymentStatus.FAILED, failureReason, null);
+        return new PaymentHistory(subscription, null, orderId, amount, PaymentStatus.FAILED, failureReason, null);
     }
 }
