@@ -171,6 +171,7 @@ export default function CourseDetailPage() {
           return
         }
 
+        console.log("requestFromUrl =", requestFromUrl)
         
         setRequest(requestBody)
 

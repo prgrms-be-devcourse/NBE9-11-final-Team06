@@ -142,30 +142,42 @@ public class PlaceService {
     @Transactional
     public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
 
-        String externalId = doc.placeUrl() != null
-                ? doc.placeUrl().substring(doc.placeUrl().lastIndexOf("/") + 1)
-                : null;
+        String externalId = extractExternalId(doc.placeUrl());
+
+        if (externalId == null) {
+            throw new IllegalArgumentException("externalId is null");
+        }
 
         return placeRepository
-                .findBySourceAndExternalId("KAKAO", externalId)
-                .orElseGet(() ->
-                        placeRepository.save(
-                                Place.create(
-                                        category,
-                                        doc.placeName(),
-                                        doc.addressName(),
-                                        doc.roadAddressName(),
-                                        BigDecimal.valueOf(Double.parseDouble(doc.y())),
-                                        BigDecimal.valueOf(Double.parseDouble(doc.x())),
-                                        doc.phone(),
-                                        doc.placeUrl(),
-                                        null,
-                                        "KAKAO",
-                                        externalId,
-                                        true
-                                )
-                        )
-                );
+                .findFirstBySourceAndExternalId("KAKAO", externalId)
+                .orElseGet(() -> createPlace(doc, category, externalId));
     }
+
+    private Place createPlace(KakaoPlaceDocument doc, Category category, String externalId) {
+
+        return placeRepository.save(
+                Place.create(
+                        category,
+                        doc.placeName(),
+                        doc.addressName(),
+                        doc.roadAddressName(),
+                        BigDecimal.valueOf(Double.parseDouble(doc.y())),
+                        BigDecimal.valueOf(Double.parseDouble(doc.x())),
+                        doc.phone(),
+                        doc.placeUrl(),
+                        null,
+                        "KAKAO",
+                        externalId,
+                        true
+                )
+        );
+    }
+
+    private String extractExternalId(String placeUrl) {
+        if (placeUrl == null || !placeUrl.contains("/")) return null;
+        return placeUrl.substring(placeUrl.lastIndexOf("/") + 1);
+    }
+
+
 
 }

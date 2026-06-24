@@ -11,6 +11,7 @@ import come.back.gotoday.course.repository.SavedCourseRepository;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.global.exception.BusinessException;
@@ -299,6 +300,7 @@ public class CourseService {
                         3
                 );
 
+        //실제 이벤트 형식으로 리스트
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
         List<EventNearbyPlaceResponse> nearbyPlaces = new ArrayList<>();
@@ -323,53 +325,54 @@ public class CourseService {
                 continue;
             }
 
+            //이벤트의 위경도
             double lat = event.getLatitude();
             double lng = event.getLongitude();
+
+
+            KakaoPlaceResponse restaurantResponse =
+                    kakaoLocalService.searchRestaurant(lat, lng, restaurantType);
 
             KakaoPlaceResponse cafeResponse =
                     kakaoLocalService.searchCafe(lat, lng);
 
-            KakaoPlaceResponse restaurantResponse =
-                    kakaoLocalService.searchRestaurant(
-                            lat,
-                            lng,
-                            restaurantType
-                    );
+
+            List<KakaoPlaceDocument> restaurantDocs =
+                    restaurantResponse != null
+                            ? restaurantResponse.documents()
+                            : List.of();
+
+
+            List<KakaoPlaceDocument> cafeDocs =
+                    cafeResponse != null
+                            ? cafeResponse.documents()
+                            : List.of();
 
             List<PlacePreviewResponse> restaurants =
-                    restaurantResponse.documents()
-                            .stream()
+                    restaurantDocs.stream()
                             .limit(3)
                             .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
                             .map(place -> new PlacePreviewResponse(
                                     place.getId(),
                                     place.getName(),
                                     place.getAddress(),
-                                    place.getLatitude() != null
-                                            ? place.getLatitude().doubleValue()
-                                            : null,
-                                    place.getLongitude() != null
-                                            ? place.getLongitude().doubleValue()
-                                            : null,
+                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
+                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
                                     place.getPlaceUrl()
                             ))
                             .toList();
 
+
             List<PlacePreviewResponse> cafes =
-                    cafeResponse.documents()
-                            .stream()
+                    cafeDocs.stream()
                             .limit(3)
                             .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
                             .map(place -> new PlacePreviewResponse(
                                     place.getId(),
                                     place.getName(),
                                     place.getAddress(),
-                                    place.getLatitude() != null
-                                            ? place.getLatitude().doubleValue()
-                                            : null,
-                                    place.getLongitude() != null
-                                            ? place.getLongitude().doubleValue()
-                                            : null,
+                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
+                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
                                     place.getPlaceUrl()
                             ))
                             .toList();
@@ -574,6 +577,8 @@ public class CourseService {
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
     }
+
+
 
 
 }

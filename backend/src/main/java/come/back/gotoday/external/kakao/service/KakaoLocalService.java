@@ -29,12 +29,13 @@ public class KakaoLocalService {
                         .queryParam("category_group_code", "CE7")
                         .queryParam("x", longitude)
                         .queryParam("y", latitude)
-                        .queryParam("radius", 500)
+                        .queryParam("radius", 2000)
                         .queryParam("sort", "distance")
                         .build())
                 .header("Authorization", "KakaoAK " + apiKey)
                 .retrieve()
                 .body(KakaoPlaceResponse.class);
+
     }
 
     public KakaoPlaceResponse searchRestaurant(
@@ -51,7 +52,7 @@ public class KakaoLocalService {
                         .queryParam("query", restaurantType.getKeyword())
                         .queryParam("x", longitude)
                         .queryParam("y", latitude)
-                        .queryParam("radius", 500) //1km이내에 있는
+                        .queryParam("radius", 2000) //1km이내에 있는
                         .queryParam("sort", "distance")
                         .build())
                 .header("Authorization", "KakaoAK " + apiKey)
