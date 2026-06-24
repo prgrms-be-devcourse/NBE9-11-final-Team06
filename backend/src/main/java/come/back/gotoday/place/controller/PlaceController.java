@@ -4,6 +4,7 @@ import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.dto.PlaceSearchResponse;
+import come.back.gotoday.place.dto.ReverseGeocodingResponse;
 import come.back.gotoday.place.service.PlaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,27 @@ public class PlaceController {
         log.info("장소 검색 응답: query={}, resultCount={}", query, response.size());
         return ResponseEntity.ok(
                 ApiResponse.success(response, "장소 검색 성공")
+        );
+    }
+
+    @GetMapping("/reverse-geocode")
+    public ResponseEntity<ApiResponse<ReverseGeocodingResponse>> reverseGeocode(
+            @RequestParam Double latitude,
+            @RequestParam Double longitude
+    ) {
+        log.info("좌표 기반 지역명 조회 요청: latitude={}, longitude={}", latitude, longitude);
+
+        ReverseGeocodingResponse response = placeService.reverseGeocode(latitude, longitude);
+
+        log.info(
+                "좌표 기반 지역명 조회 응답: latitude={}, longitude={}, areaName={}",
+                latitude,
+                longitude,
+                response.areaName()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "좌표 기반 지역명 조회 성공")
         );
     }
 

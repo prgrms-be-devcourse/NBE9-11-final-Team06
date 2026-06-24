@@ -92,6 +92,10 @@ naver:
     client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
+  geocoding:
+    client-id: ${NAVER_GEOCODING_CLIENT_ID:dummy-client-id}
+    client-secret: ${NAVER_GEOCODING_CLIENT_SECRET:dummy-client-secret}
+    base-url: https://maps.apigw.ntruss.com
 
 app:
   oauth2:
