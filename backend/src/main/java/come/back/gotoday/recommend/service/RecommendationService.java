@@ -107,22 +107,22 @@ public class RecommendationService {
         Set<Long> preferredEventCategoryIds = selectedCategories.isEmpty()
                 ? Collections.emptySet()
                 : new HashSet<>(preferenceEventCategoryMappingRepository
-                        .findEventCategoryIdsByPreferenceCategoryNames(selectedCategories));
+                                .findEventCategoryIdsByPreferenceCategoryNames(selectedCategories));
 
         String selectedCompanionType = hasText(request.companionType())
                 ? request.companionType()
                 : preferenceOptional
-                        .map(preference -> preference.getCompanionType() != null
-                                ? preference.getCompanionType().toString()
-                                : null)
-                        .orElse(null);
+                  .map(preference -> preference.getCompanionType() != null
+                                     ? preference.getCompanionType().toString()
+                                     : null)
+                  .orElse(null);
 
         Set<String> requestedEventCategoryNames = request.categories() == null
                 ? Collections.emptySet()
                 : request.categories().stream()
-                .filter(this::hasText)
-                .map(String::trim)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                  .filter(this::hasText)
+                  .map(String::trim)
+                  .collect(Collectors.toCollection(LinkedHashSet::new));
 
         log.info(
                 "[행사 추천 요청 조건] requestArea={}, selectedArea={}, requestCategories={}, selectedCategories={}, requestedEventCategoryNames={}, mappedEventCategoryIds={}, companionType={}",
@@ -202,7 +202,6 @@ public class RecommendationService {
     }
 
 
-
     private String createRecommendationReason(
             Event event,
             String preferredArea,
@@ -241,7 +240,7 @@ public class RecommendationService {
         Set<Long> preferredEventCategoryIds = preferenceCategoryIds.isEmpty()
                 ? Collections.emptySet()
                 : new HashSet<>(preferenceEventCategoryMappingRepository
-                        .findEventCategoryIdsByPreferenceCategoryIds(preferenceCategoryIds));
+                                .findEventCategoryIdsByPreferenceCategoryIds(preferenceCategoryIds));
         boolean avoidCrowds = Boolean.TRUE.equals(preference.getAvoidCrowded());
         return getRecommendedEventIds(
                 preference.getPreferredArea(),
@@ -306,68 +305,110 @@ public class RecommendationService {
                 topK
         );
 
+        boolean hasAreaConstraint = hasText(targetArea);
+        boolean hasCategoryConstraint = !preferredEventCategoryIds.isEmpty()
+                || !requestedEventCategoryNames.isEmpty();
+
         List<Event> candidateEvents;
-        if (!preferredEventCategoryIds.isEmpty()) {
-            candidateEvents = eventRepository.findRecommendedEventsWithCategoryIds(
-                    targetArea,
-                    searchStart,
-                    searchEnd,
-                    preferredEventCategoryIds
-            );
-        } else if (!requestedEventCategoryNames.isEmpty()) {
-            candidateEvents = eventRepository.findRecommendedEvents(targetArea, searchStart, searchEnd).stream()
-                    .filter(event -> matchesRequestedCategory(
-                            event,
-                            Collections.emptySet(),
-                            requestedEventCategoryNames
-                    ))
-                    .toList();
-        } else {
-            candidateEvents = eventRepository.findRecommendedEvents(targetArea, searchStart, searchEnd);
-        }
 
-        log.info(
-                "[행사 추천 후보 1단계] 조건=지역+기간+카테고리, area={}, date={}~{}, categoryIds={}, categoryNames={}, candidateCount={}",
-                targetArea,
-                searchStart,
-                searchEnd,
-                preferredEventCategoryIds,
-                requestedEventCategoryNames,
-                candidateEvents.size()
-        );
-
-        if (candidateEvents.isEmpty()) {
-            candidateEvents = eventRepository.findRecommendedEvents(targetArea, searchStart, searchEnd);
-            log.info(
-                    "[행사 추천 후보 2단계] 조건=지역+기간(카테고리 해제), area={}, date={}~{}, candidateCount={}",
-                    targetArea,
-                    searchStart,
-                    searchEnd,
-                    candidateEvents.size()
-            );
-        }
-
-        if (candidateEvents.isEmpty()) {
-            LocalDate expandedStart = searchStart.minusDays(7);
-            LocalDate expandedEnd = searchEnd.plusDays(7);
-            candidateEvents = eventRepository.findRecommendedEvents(targetArea, expandedStart, expandedEnd);
-            log.info(
-                    "[행사 추천 후보 3단계] 조건=지역+확장기간, area={}, date={}~{}, candidateCount={}",
-                    targetArea,
-                    expandedStart,
-                    expandedEnd,
-                    candidateEvents.size()
-            );
-        }
-
-        if (candidateEvents.isEmpty()) {
+        if (!hasAreaConstraint) {
             candidateEvents = eventRepository.findAllEventsByDate(searchStart, searchEnd);
+
             log.info(
-                    "[행사 추천 후보 4단계] 조건=전체지역+기간, date={}~{}, candidateCount={}",
+                    "[행사 추천 후보 1단계] 지역 조건 없음: 전체지역+기간으로 조회, date={}~{}, candidateCount={}",
                     searchStart,
                     searchEnd,
                     candidateEvents.size()
             );
+        } else {
+            Map<Long, Event> candidateEventMap = new LinkedHashMap<>();
+
+            // 취향 매핑으로 얻은 EVENT 카테고리 ID 기준 후보
+            if (!preferredEventCategoryIds.isEmpty()) {
+                eventRepository.findRecommendedEventsWithCategoryIds(
+                                targetArea,
+                                searchStart,
+                                searchEnd,
+                                preferredEventCategoryIds
+                        )
+                        .forEach(event -> candidateEventMap.put(event.getId(), event));
+            }
+
+            // 화면에서 직접 선택한 EVENT 카테고리명 기준 후보
+            if (!requestedEventCategoryNames.isEmpty()) {
+                eventRepository.findRecommendedEvents(targetArea, searchStart, searchEnd).stream()
+                        .filter(event -> matchesRequestedCategory(
+                                event,
+                                Collections.emptySet(),
+                                requestedEventCategoryNames
+                        ))
+                        .forEach(event -> candidateEventMap.put(event.getId(), event));
+            }
+
+            // 카테고리 조건이 없을 때만 지역 + 기간 전체 후보 조회
+            if (!hasCategoryConstraint) {
+                eventRepository.findRecommendedEvents(targetArea, searchStart, searchEnd)
+                        .forEach(event -> candidateEventMap.put(event.getId(), event));
+            }
+
+            candidateEvents = new ArrayList<>(candidateEventMap.values());
+
+            log.info(
+                    "[행사 추천 후보 1단계] 조건=지역+기간+카테고리, area={}, date={}~{}, categoryIds={}, categoryNames={}, candidateCount={}",
+                    targetArea,
+                    searchStart,
+                    searchEnd,
+                    preferredEventCategoryIds,
+                    requestedEventCategoryNames,
+                    candidateEvents.size()
+            );
+
+            // 실제 카테고리 조건을 적용했을 때만 카테고리 해제 재조회
+            if (hasCategoryConstraint && candidateEvents.isEmpty()) {
+                candidateEvents = eventRepository.findRecommendedEvents(
+                        targetArea,
+                        searchStart,
+                        searchEnd
+                );
+
+                log.info(
+                        "[행사 추천 후보 2단계] 조건=지역+기간(카테고리 해제), area={}, date={}~{}, candidateCount={}",
+                        targetArea,
+                        searchStart,
+                        searchEnd,
+                        candidateEvents.size()
+                );
+            }
+
+            if (candidateEvents.isEmpty()) {
+                LocalDate expandedStart = searchStart.minusDays(7);
+                LocalDate expandedEnd = searchEnd.plusDays(7);
+
+                candidateEvents = eventRepository.findRecommendedEvents(
+                        targetArea,
+                        expandedStart,
+                        expandedEnd
+                );
+
+                log.info(
+                        "[행사 추천 후보 3단계] 조건=지역+확장기간, area={}, date={}~{}, candidateCount={}",
+                        targetArea,
+                        expandedStart,
+                        expandedEnd,
+                        candidateEvents.size()
+                );
+            }
+
+            if (candidateEvents.isEmpty()) {
+                candidateEvents = eventRepository.findAllEventsByDate(searchStart, searchEnd);
+
+                log.info(
+                        "[행사 추천 후보 4단계] 조건=전체지역+기간, date={}~{}, candidateCount={}",
+                        searchStart,
+                        searchEnd,
+                        candidateEvents.size()
+                );
+            }
         }
 
         log.info("[행사 추천 후보 최종] selectedCandidateCount={}", candidateEvents.size());
@@ -472,7 +513,7 @@ public class RecommendationService {
 
     /**
      * 여러 후보 경로를 동시에 유지하는 빔 서치 기반 행사 선택 로직입니다.
-     *
+     * <p>
      * 각 단계에서 현재 빔의 모든 경로를 다음 행사 후보로 확장하고,
      * 누적 점수가 높은 상위 beamWidth개의 경로만 다음 단계에 유지합니다.
      * 이를 통해 각 단계의 단일 최고 점수를 즉시 확정하는 방식보다

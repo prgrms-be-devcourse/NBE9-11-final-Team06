@@ -173,7 +173,7 @@ class RecommendationServiceTest {
                 any(LocalDate.class),
                 any()
         );
-        verify(eventRepository, times(2)).findRecommendedEvents(
+        verify(eventRepository).findRecommendedEvents(
                 "마포구",
                 startDate,
                 endDate
