@@ -77,18 +77,38 @@ export function SimpleNaverMap({
       if (p.type === "restaurant") icon = "🍽️"
       if (p.type === "cafe") icon = "☕"
 
-      const size = isSelected ? 40 : 34
+      const size = isSelected ? 40 : 34 
       const fontSize = isSelected ? 24 : 20
-      let color = "#2563eb"
       
+      
+      
+      let color = "#2563eb"
+
+      let bgColor = "white"
+      let borderColor = "#000"
+      let textColor = "#111"
+      let shadow = "0 2px 6px rgba(0,0,0,0.2)"
+
+
       // 기본 타입 색
-      if (p.type === "restaurant") color = "#dc2626"
-      if (p.type === "cafe") color = "#16a34a"
+      if (p.type === "restaurant") borderColor = "#dc2626" // 빨강
+      if (p.type === "cafe") borderColor = "#16a34a"       // 초록
       
       // 🔥 선택된 경우 override
       if (isSelected) {
-        if (p.type === "restaurant") color = "#f59e0b" // 선택: 주황
-        if (p.type === "cafe") color = "#f59e0b"
+        if (p.type === "restaurant") {
+          bgColor = "#dc2626" // 빨강 배경
+          borderColor = "white"
+          textColor = "white"
+          shadow = "0 0 0 4px rgba(220, 38, 38, 0.35)"
+        }
+      
+        if (p.type === "cafe") {
+          bgColor = "#16a34a" // 초록 배경
+          borderColor = "white"
+          textColor = "white"
+          shadow = "0 0 0 4px rgba(22, 163, 74, 0.35)"
+        }
       }
 
       const marker = new naver.maps.Marker({
@@ -97,21 +117,23 @@ export function SimpleNaverMap({
       title: p.title,
       icon: {
         content: `
-          <div style="
-            width:${size}px;
-            height:${size}px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:${fontSize}px;
-            background:white;
-            border-radius:50%;
-            border:2px solid ${color};
-            box-shadow:0 2px 6px rgba(0,0,0,0.2);
-          ">
-            ${icon}
-          </div>
-        `,
+        <div style="
+          width:${size}px;
+          height:${size}px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-size:${fontSize}px;
+          background:${bgColor};
+          color:${textColor};
+          border-radius:50%;
+          border:2px solid ${borderColor};
+          box-shadow:${shadow};
+          transition: all 0.2s ease;
+        ">
+          ${icon}
+        </div>
+      `,
         anchor: new naver.maps.Point(size / 2, size / 2),
       },
     })
