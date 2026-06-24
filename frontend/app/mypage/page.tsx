@@ -21,6 +21,12 @@ import { memberApi } from "@/lib/member-api"
 import { preferenceApi } from "@/lib/preference-api"
 import { courseBookmarkApi } from "@/lib/course-bookmark-api"
 import { billingApi, type BillingCardResponse } from "@/lib/billing-api"
+
+import { subscriptionApi } from "@/lib/subscription-api"
+import { useSubscription } from "@/hooks/use-subscription"
+import { Calendar, ShieldCheck, XCircle } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth" 
+
 import type {
   CompanionType,
   Member,
@@ -28,7 +34,7 @@ import type {
   SavedCourseResponse,
   UserPreference,
 } from "@/lib/types"
-import { MapPin, Clock, Route, Heart, Settings, Bookmark, CreditCard, Plus, Trash2 } from "lucide-react"
+import { MapPin, Clock, Route, Heart, Settings, Bookmark, CreditCard, Plus, Trash2,Loader2 } from "lucide-react"
 
 declare global {
   interface Window {
@@ -66,6 +72,10 @@ function formatDate(date?: string | null) {
 
 export default function MyPage() {
   const router = useRouter()
+
+  const { isLoggedIn } = useAuth() // 이미 구현된 훅 주입
+  const { subscription, isSubLoading, isSubscribed, refetchSubscription } = useSubscription(isLoggedIn)
+  const [isCanceling, setIsCanceling] = useState(false)
 
   const [activeTab, setActiveTab] = useState("saved")
   const [member, setMember] = useState<Member | null>(null)
@@ -162,6 +172,34 @@ export default function MyPage() {
     }
   }, [])
 
+  const handleCancelSubscription = async () => {
+    if (!subscription) return
+
+    const confirmed = window.confirm(
+      `정말 ${subscription.planName} 해지를 진행하시겠습니까?\n해지 완료 후 다음 결제일(${subscription.nextBillingDate})부터 서비스 정기 결제가 안전하게 중단됩니다.`
+    )
+    if (!confirmed) return
+
+    setIsCanceling(true)
+    try {
+      const response = await subscriptionApi.cancelSubscription(subscription.subscriptionId)
+      if (response.success) {
+        toast.success("정기 구독 해지 처리가 정상적으로 접수되었습니다.")
+        
+        await refetchSubscription()
+        router.refresh()
+      } else {
+        toast.error(response.message ?? "구독 해지 중 오류가 발생했습니다.")
+      }
+    } catch (error) {
+      toast.error("서버 내부 통신 실패로 구독 취소를 처리하지 못했습니다.")
+    } finally {
+      setIsCanceling(false)
+    }
+  }
+
+
+  // 회원 정보 조회 및 선호 정보, 북마크 코스, 결제 수단 초기 데이터 로드
   useEffect(() => {
     let ignore = false
 
@@ -456,12 +494,13 @@ export default function MyPage() {
     return member.nickname.slice(0, 2)
   }
 
-  if (isLoading) {
+  if (isLoading || isSubLoading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <SiteHeader />
         <main className="mx-auto flex w-full max-w-5xl flex-1 items-center justify-center px-4 py-10">
-          <p className="text-sm text-muted-foreground">회원 정보를 불러오는 중...</p>
+          <Loader2 className="size-6 animate-spin text-primary" />
+          <p className="ml-2 text-sm text-muted-foreground">마이페이지 데이터를 동기화 중...</p>
         </main>
         <SiteFooter />
       </div>
@@ -530,6 +569,9 @@ export default function MyPage() {
             </TabsTrigger>
             <TabsTrigger value="billing" className="gap-1.5">
               <CreditCard className="size-4" /> 결제 관리
+            </TabsTrigger>
+            <TabsTrigger value="subscription" className="gap-1.5">
+              <ShieldCheck className="size-4" /> 멤버십 관리
             </TabsTrigger>
           </TabsList>
 
@@ -729,6 +771,60 @@ export default function MyPage() {
                         <p className="text-xs text-muted-foreground mt-1">정기 구독에 사용할 카드를 등록하세요</p>
                       </div>
                     </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="subscription" className="mt-6">
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="text-base">현재 이용 중인 구독 멤버십</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isSubscribed && subscription ? (
+                  <div className="rounded-2xl border border-border/80 p-6 bg-secondary/10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-heading text-lg font-bold text-foreground">
+                          {subscription.planName}
+                        </span>
+                        <Badge className="bg-green-500/10 text-green-600 border-0 hover:bg-green-500/10">
+                          이용 중
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        매달 정기 정산 금액: <span className="font-semibold text-foreground">₩{subscription.amount.toLocaleString()}</span>
+                      </p>
+                      
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+                        <Calendar className="size-3.5" />
+                        <span>다음 자동 정기 결제 예정일: <strong className="text-foreground">{subscription.nextBillingDate}</strong></span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 hover:text-destructive shrink-0"
+                      disabled={isCanceling}
+                      onClick={handleCancelSubscription}
+                    >
+                      {isCanceling ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <XCircle className="size-3.5" />
+                      )}
+                      멤버십 구독 해지
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="py-10 text-center">
+                    <p className="font-medium text-muted-foreground text-sm">현재 활성화된 구독 멤버십 요금제가 없습니다.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">구독 멤버십에 가입하시면 최적화된 고퀄리티 여행 루트 추천 패키지를 이용하실 수 있어요.</p>
+                    <Button render={<Link href="/pricing" />} className="mt-5 size-sm text-xs">
+                      멤버십 요금제 둘러보기
+                    </Button>
                   </div>
                 )}
               </CardContent>
