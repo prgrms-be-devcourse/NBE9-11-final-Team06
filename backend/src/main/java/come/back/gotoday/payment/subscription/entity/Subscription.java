@@ -51,6 +51,8 @@ public class Subscription {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "payment_failed_at")
+    private LocalDate paymentFailedAt; // 자동 결제 실패일 (정상 결제 시 null로 초기화)
 
     private Subscription(BillingInfo billingInfo,Plan plan,Long amount, LocalDate nextBillingDate, int paymentDay, SubscriptionStatus status) {
         validateAmount(amount); // [추가] 금액 검증
@@ -111,6 +113,7 @@ public class Subscription {
 
         // 4. 최종 보정된 날짜로 세팅합니다. (withDayOfMonth 사용)
         this.nextBillingDate = nextMonthDate.withDayOfMonth(targetDay);
+        this.paymentFailedAt = null; // 실패 기록 초기화
         this.updatedAt = LocalDateTime.now();
     }
 
@@ -119,9 +122,31 @@ public class Subscription {
         this.status = SubscriptionStatus.CANCELED;
         this.updatedAt = LocalDateTime.now(); // 데이터 변경 시 업데이트 시간 갱신
     }
+
     public void changeToManualCheck() {
         this.status = SubscriptionStatus.MANUAL_CHECK;
     }
+    public void changeStatus() {
+        this.status = SubscriptionStatus.PENDING;
+        this.updatedAt = LocalDateTime.now();
+    }
+    /**
+     *  결제 실패 시 즉시 해지하지 않고 유예 상태로 전환합니다.
+     * 이때 최초 실패라면 실패 날짜를 기록합니다.
+     */
+    public void changeToPaymentBatchFail(LocalDate today) {
+        this.status = SubscriptionStatus.EXPIRED_PAYMENT_PENDING;
+        if (this.paymentFailedAt == null) {
+            this.paymentFailedAt = today; // 최초 실패일 기록
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isGracePeriodExpired(LocalDate today, int graceDays) {
+        if (this.paymentFailedAt == null) return false;
+        return this.paymentFailedAt.plusDays(graceDays).isBefore(today);
+    }
+
     // 결제 금액 검증 비즈니스 로직
     private void validateAmount(Long amount) {
         if (amount == null || amount < 0) {
