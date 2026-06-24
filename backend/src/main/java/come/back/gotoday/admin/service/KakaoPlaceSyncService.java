@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,7 +30,6 @@ public class KakaoPlaceSyncService {
     private final PlaceRepository placeRepository;
     private final CategoryRepository categoryRepository;
 
-    @Transactional
     public int syncKakaoPlacesFromBasePlaces(int limit) {
         Category cafeCategory = getCategory(CAFE_CATEGORY_NAME);
         Category restaurantCategory = getCategory(RESTAURANT_CATEGORY_NAME);
@@ -45,15 +43,25 @@ public class KakaoPlaceSyncService {
         int processedCount = 0;
 
         for (Place basePlace : basePlaces) {
-            double latitude = toDouble(basePlace.getLatitude());
-            double longitude = toDouble(basePlace.getLongitude());
+            try {
+                double latitude = toDouble(basePlace.getLatitude());
+                double longitude = toDouble(basePlace.getLongitude());
 
-            processedCount += syncByCoordinate(
-                    latitude,
-                    longitude,
-                    cafeCategory,
-                    restaurantCategory
-            );
+                processedCount += syncByCoordinate(
+                        latitude,
+                        longitude,
+                        cafeCategory,
+                        restaurantCategory
+                );
+            } catch (Exception e) {
+                log.warn(
+                        "기준 장소 주변 카카오 장소 동기화 실패: placeId={}, name={}, reason={}",
+                        basePlace.getId(),
+                        basePlace.getName(),
+                        e.getMessage(),
+                        e
+                );
+            }
         }
 
         log.info(
@@ -65,7 +73,6 @@ public class KakaoPlaceSyncService {
         return processedCount;
     }
 
-    @Transactional
     public int syncKakaoPlacesNearby(AdminKakaoPlaceSyncRequest request) {
         Category cafeCategory = getCategory(CAFE_CATEGORY_NAME);
         Category restaurantCategory = getCategory(RESTAURANT_CATEGORY_NAME);
@@ -84,14 +91,14 @@ public class KakaoPlaceSyncService {
             Category cafeCategory,
             Category restaurantCategory
     ) {
+        int processedCount = 0;
+
         KakaoPlaceResponse cafeResponse = kakaoLocalService.searchCafe(
                 latitude,
                 longitude
         );
 
-        int cafeCount = savePlaces(cafeResponse, cafeCategory);
-
-        int restaurantCount = 0;
+        processedCount += savePlaces(cafeResponse, cafeCategory);
 
         for (RestaurantType restaurantType : RestaurantType.values()) {
             KakaoPlaceResponse restaurantResponse = kakaoLocalService.searchRestaurant(
@@ -100,10 +107,10 @@ public class KakaoPlaceSyncService {
                     restaurantType
             );
 
-            restaurantCount += savePlaces(restaurantResponse, restaurantCategory);
+            processedCount += savePlaces(restaurantResponse, restaurantCategory);
         }
 
-        return cafeCount + restaurantCount;
+        return processedCount;
     }
 
     private int savePlaces(KakaoPlaceResponse response, Category category) {
@@ -111,12 +118,28 @@ public class KakaoPlaceSyncService {
             return 0;
         }
 
-        return response.documents()
-                .stream()
-                .filter(doc -> doc.y() != null && doc.x() != null)
-                .map(doc -> placeService.getOrCreatePlace(doc, category))
-                .toList()
-                .size();
+        int processedCount = 0;
+
+        for (var doc : response.documents()) {
+            if (doc.y() == null || doc.x() == null) {
+                continue;
+            }
+
+            try {
+                placeService.getOrCreatePlace(doc, category);
+                processedCount++;
+            } catch (Exception e) {
+                log.warn(
+                        "카카오 장소 저장 실패: name={}, address={}, reason={}",
+                        doc.placeName(),
+                        doc.addressName(),
+                        e.getMessage(),
+                        e
+                );
+            }
+        }
+
+        return processedCount;
     }
 
     private Category getCategory(String categoryName) {
