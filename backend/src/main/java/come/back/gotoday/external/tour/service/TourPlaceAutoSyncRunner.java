@@ -18,29 +18,15 @@ import org.springframework.stereotype.Component;
 )
 public class TourPlaceAutoSyncRunner {
 
-    private final TourPlaceSyncService tourPlaceSyncService;
+    private final TourPlaceSyncAsyncService tourPlaceSyncAsyncService;
 
     @Value("${external.tour.auto-sync.area-code:1}")
     private String areaCode;
 
     @EventListener(ApplicationReadyEvent.class)
     public void syncTourPlacesOnApplicationReady() {
-        try {
-            log.info("관광공사 관광지 자동 동기화 시작: areaCode={}", areaCode);
+        log.info("관광공사 관광지 자동 동기화 요청 접수: areaCode={}", areaCode);
 
-            int syncedCount = tourPlaceSyncService.syncTourPlaces(areaCode);
-
-            log.info(
-                    "관광공사 관광지 자동 동기화 완료: areaCode={}, syncedCount={}",
-                    areaCode,
-                    syncedCount
-            );
-        } catch (Exception e) {
-            log.warn(
-                    "관광공사 관광지 자동 동기화 실패: areaCode={}, reason={}",
-                    areaCode,
-                    e.getMessage()
-            );
-        }
+        tourPlaceSyncAsyncService.syncTourPlacesAsync(areaCode);
     }
 }
