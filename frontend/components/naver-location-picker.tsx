@@ -42,7 +42,11 @@ declare global {
         Marker: new (options: NaverMarkerOptions) => NaverMarker
         InfoWindow: new (options: NaverInfoWindowOptions) => NaverInfoWindow
         Event: {
-          addListener: (target: NaverMarker, eventName: string, listener: () => void) => void
+          addListener: (
+            target: NaverMarker | NaverMap,
+            eventName: string,
+            listener: (event: NaverMapClickEvent) => void,
+          ) => void
         }
       }
     }
@@ -63,6 +67,11 @@ type NaverMapOptions = {
 type NaverMap = {
   setCenter: (latLng: NaverLatLng) => void
 }
+
+type NaverMapClickEvent = {
+  coord: NaverLatLng
+}
+
 
 type NaverMarkerOptions = {
   map: NaverMap | null
@@ -91,14 +100,63 @@ const DEFAULT_CENTER = {
 const NAVER_LOCAL_COORDINATE_SCALE = 10_000_000
 
 
+let naverMapsSdkPromise: Promise<void> | null = null
+
+function loadNaverMapsSdk(clientId: string): Promise<void> {
+  if (window.naver?.maps) {
+    return Promise.resolve()
+  }
+
+  if (naverMapsSdkPromise) {
+    return naverMapsSdkPromise
+  }
+
+  const existingScript = document.querySelector<HTMLScriptElement>(
+    'script[data-naver-map-script="true"]',
+  )
+
+  if (existingScript) {
+    existingScript.remove()
+  }
+
+  naverMapsSdkPromise = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script")
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`
+    script.async = true
+    script.dataset.naverMapScript = "true"
+
+    script.addEventListener("load", () => {
+      if (window.naver?.maps) {
+        resolve()
+        return
+      }
+
+      reject(new Error("네이버 지도 SDK를 불러오지 못했습니다."))
+    })
+
+    script.addEventListener("error", () => {
+      reject(new Error("네이버 지도 SDK를 불러오지 못했습니다."))
+    })
+
+    document.head.appendChild(script)
+  }).catch((error) => {
+    naverMapsSdkPromise = null
+    throw error
+  })
+
+  return naverMapsSdkPromise
+}
+
 export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLocationPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<NaverMap | null>(null)
   const markerRef = useRef<NaverMarker | null>(null)
   const infoWindowRef = useRef<NaverInfoWindow | null>(null)
+  const selectionVersionRef = useRef(0)
 
   const [keyword, setKeyword] = useState(initialKeyword)
   const [selectedLocationName, setSelectedLocationName] = useState<string | null>(initialKeyword || null)
+  const [selectedLocationAddress, setSelectedLocationAddress] = useState<string | null>(null)
   const [isMapReady, setIsMapReady] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [results, setResults] = useState<PlaceSearchResult[]>([])
@@ -124,50 +182,22 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
       }
     }
 
-    const handleLoad = () => {
-      if (isMounted) {
-        initializeMap()
-      }
-    }
+    void loadNaverMapsSdk(naverMapClientId)
+      .then(() => {
+        if (isMounted) {
+          initializeMap()
+        }
+      })
+      .catch((error: unknown) => {
+        console.error(error)
 
-    const handleError = () => {
-      if (isMounted) {
-        setErrorMessage("네이버 지도 SDK를 불러오지 못했습니다.")
-      }
-    }
-
-    if (window.naver?.maps) {
-      handleLoad()
-      return () => {
-        isMounted = false
-      }
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>("script[data-naver-map-script]")
-
-    if (existingScript) {
-      existingScript.addEventListener("load", handleLoad)
-      existingScript.addEventListener("error", handleError)
-
-      return () => {
-        isMounted = false
-        existingScript.removeEventListener("load", handleLoad)
-        existingScript.removeEventListener("error", handleError)
-      }
-    }
-
-    const script = document.createElement("script")
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${naverMapClientId}`
-    script.async = true
-    script.dataset.naverMapScript = "true"
-    script.addEventListener("load", handleLoad)
-    script.addEventListener("error", handleError)
-    document.head.appendChild(script)
+        if (isMounted) {
+          setErrorMessage("네이버 지도 SDK를 불러오지 못했습니다.")
+        }
+      })
 
     return () => {
       isMounted = false
-      script.removeEventListener("load", handleLoad)
-      script.removeEventListener("error", handleError)
     }
   }, [naverMapClientId])
 
@@ -184,11 +214,109 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     setIsMapReady(true)
     setErrorMessage(null)
 
+    window.naver.maps.Event.addListener(map, "click", function (event) {
+      if (!event?.coord) {
+        console.warn("네이버 지도 클릭 좌표를 가져오지 못했습니다.", event)
+        return
+      }
+
+      selectMapPosition(event.coord, map)
+    })
+
     const trimmedKeyword = initialKeyword.trim()
 
     if (trimmedKeyword) {
       void searchLocations(trimmedKeyword, map)
     }
+  }
+
+  async function resolveNeighborhoodName(
+    latitude: number,
+    longitude: number,
+    fallbackName: string,
+    onResolved: (name: string) => void,
+  ) {
+    try {
+      const response = await fetch(
+        `/api/places/reverse-geocode?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`,
+      )
+
+      if (!response.ok) {
+        throw new Error(`역지오코딩 요청 실패: ${response.status}`)
+      }
+
+      const payload = await response.json()
+      const resolvedName =
+        payload?.data?.areaName ??
+        payload?.result?.areaName ??
+        payload?.areaName
+
+      if (typeof resolvedName !== "string" || !resolvedName.trim()) {
+        throw new Error("역지오코딩 응답에 지역명이 없습니다.")
+      }
+
+      onResolved(resolvedName.trim())
+    } catch (error) {
+      console.warn("좌표 기반 지역명 조회에 실패했습니다.", error)
+      onResolved(fallbackName)
+    }
+  }
+
+  function selectMapPosition(position: NaverLatLng, targetMap?: NaverMap) {
+    const map = targetMap ?? mapRef.current
+    const selectionVersion = ++selectionVersionRef.current
+
+    if (!window.naver?.maps || !map) return
+
+    markerRef.current?.setMap(null)
+    infoWindowRef.current?.close()
+
+    const latitude = position.lat()
+    const longitude = position.lng()
+    const locationName = "선택한 위치"
+    const marker = new window.naver.maps.Marker({
+      map,
+      position,
+    })
+    const infoWindow = new window.naver.maps.InfoWindow({
+      content: `<div style="padding:6px 10px;font-size:13px;white-space:nowrap;">${locationName}</div>`,
+    })
+
+    markerRef.current = marker
+    infoWindowRef.current = infoWindow
+
+    map.setCenter(position)
+    infoWindow.open(map, marker)
+    setSelectedLocationName(locationName)
+    setSelectedLocationAddress(null)
+    setKeyword("")
+    setResults([])
+    setErrorMessage(null)
+
+    window.naver.maps.Event.addListener(marker, "click", () => {
+      infoWindow.open(map, marker)
+    })
+
+    void resolveNeighborhoodName(latitude, longitude, locationName, (resolvedName) => {
+      if (selectionVersion !== selectionVersionRef.current) {
+        return
+      }
+
+      if (resolvedName === locationName) {
+        setErrorMessage("선택한 위치의 동 이름을 확인하지 못했습니다. 다른 위치를 선택해 주세요.")
+        return
+      }
+
+      setSelectedLocationName(resolvedName)
+      setSelectedLocationAddress(resolvedName)
+      onSelect({
+        name: resolvedName,
+        address: resolvedName,
+        latitude,
+        longitude,
+        source: "naver",
+      })
+    })
   }
 
   async function searchLocations(searchKeyword = keyword, targetMap?: NaverMap) {
@@ -244,21 +372,38 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
   }
 
   function selectLocation(location: PlaceSearchResult, targetMap?: NaverMap) {
-    const map = targetMap ?? mapRef.current
-
-    if (!window.naver?.maps || !map) return
     if (typeof location.mapx !== "number" || typeof location.mapy !== "number") {
       setErrorMessage("선택한 장소의 좌표 정보가 없습니다.")
+      return
+    }
+
+    const latitude = location.mapy / NAVER_LOCAL_COORDINATE_SCALE
+    const longitude = location.mapx / NAVER_LOCAL_COORDINATE_SCALE
+    const map = targetMap ?? mapRef.current
+
+    selectionVersionRef.current += 1
+    const address = location.roadAddress || location.address || null
+    setSelectedLocationName(location.name)
+    setSelectedLocationAddress(address)
+    setKeyword(location.name)
+    setErrorMessage(null)
+
+    onSelect({
+      name: location.name,
+      address: address ?? undefined,
+      latitude,
+      longitude,
+      source: "naver",
+    })
+
+    if (!window.naver?.maps || !map) {
       return
     }
 
     markerRef.current?.setMap(null)
     infoWindowRef.current?.close()
 
-    const latitude = location.mapy / NAVER_LOCAL_COORDINATE_SCALE
-    const longitude = location.mapx / NAVER_LOCAL_COORDINATE_SCALE
     const position = new window.naver.maps.LatLng(latitude, longitude)
-
     const marker = new window.naver.maps.Marker({
       map,
       position,
@@ -272,19 +417,9 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
     map.setCenter(position)
     infoWindow.open(map, marker)
-    setSelectedLocationName(location.name)
-    setKeyword(location.name)
 
     window.naver.maps.Event.addListener(marker, "click", () => {
       infoWindow.open(map, marker)
-    })
-
-    onSelect({
-      name: location.name,
-      address: location.roadAddress || location.address,
-      latitude: position.lat(),
-      longitude: position.lng(),
-      source: "naver",
     })
   }
 
@@ -292,7 +427,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     <div className="rounded-2xl border bg-background p-4">
       <p className="font-semibold">네이버 지도로 위치 선택</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        장소명을 검색한 뒤 결과를 선택하면 지도 중심이 이동하고 마커가 표시됩니다.
+        장소명을 검색해 결과를 선택하거나, 지도에서 원하는 위치를 직접 클릭해 선택할 수 있습니다.
       </p>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -311,7 +446,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
         <button
           type="button"
           onClick={() => void searchLocations()}
-          disabled={!isMapReady || isSearching}
+          disabled={isSearching}
           className="h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSearching ? "검색 중..." : "검색"}
@@ -320,7 +455,21 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
 
       {errorMessage && <p className="mt-2 text-sm text-destructive">{errorMessage}</p>}
 
+      <p className="mt-3 text-xs text-muted-foreground">
+        지도 위를 한 번 클릭하면 해당 위치에 마커가 표시되고 위치가 선택됩니다.
+      </p>
       <div ref={mapContainerRef} className="mt-4 h-72 overflow-hidden rounded-2xl border bg-secondary/30" />
+      {selectedLocationName && (
+        <div className="mt-4 rounded-xl border bg-background p-3">
+          <p className="text-sm font-semibold">선택된 위치</p>
+          <p className="mt-1 font-medium">{selectedLocationName}</p>
+          {selectedLocationAddress ? (
+            <p className="mt-1 text-sm text-muted-foreground">{selectedLocationAddress}</p>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">주소 정보를 확인하는 중입니다.</p>
+          )}
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="mt-4 space-y-2">

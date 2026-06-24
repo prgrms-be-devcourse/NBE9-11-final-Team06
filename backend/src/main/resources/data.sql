@@ -142,86 +142,70 @@ WHERE NOT EXISTS (
 
 -- =================================================================================
 -- Preference Categories
--- 회원가입 / 온보딩 / 마이페이지 선호정보 선택용 카테고리
+-- 코스 생성 화면에서 사용자가 선택하는 취향 카테고리
 -- =================================================================================
 
--- 18. 전시
+-- 조용한 힐링
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '전시', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '조용한 힐링', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '전시' AND `type` = 'PREFERENCE'
+    WHERE `name` = '조용한 힐링' AND `type` = 'PREFERENCE'
 );
 
--- 19. 공연
+-- 문화생활
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '공연', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '문화생활', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '공연' AND `type` = 'PREFERENCE'
+    WHERE `name` = '문화생활' AND `type` = 'PREFERENCE'
 );
 
--- 20. 축제
+-- 자연·산책
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '축제', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '자연·산책', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '축제' AND `type` = 'PREFERENCE'
+    WHERE `name` = '자연·산책' AND `type` = 'PREFERENCE'
 );
 
--- 21. 체험
+-- 감성·사진
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '체험', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '감성·사진', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '체험' AND `type` = 'PREFERENCE'
+    WHERE `name` = '감성·사진' AND `type` = 'PREFERENCE'
 );
 
--- 22. 식당
+-- 활동적인 하루
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '식당', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '활동적인 하루', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '식당' AND `type` = 'PREFERENCE'
+    WHERE `name` = '활동적인 하루' AND `type` = 'PREFERENCE'
 );
 
--- 23. 카페
+-- 새로운 경험
 INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '카페', 'PREFERENCE', NOW(), NOW() FROM DUAL
+SELECT '새로운 경험', 'PREFERENCE', NOW(), NOW() FROM DUAL
 WHERE NOT EXISTS (
     SELECT 1 FROM `category`
-    WHERE `name` = '카페' AND `type` = 'PREFERENCE'
-);
-
--- 24. 산책
-INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '산책', 'PREFERENCE', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (
-    SELECT 1 FROM `category`
-    WHERE `name` = '산책' AND `type` = 'PREFERENCE'
-);
-
--- 25. 문화시설
-INSERT INTO `category` (`name`, `type`, `created_at`, `updated_at`)
-SELECT '문화시설', 'PREFERENCE', NOW(), NOW() FROM DUAL
-WHERE NOT EXISTS (
-    SELECT 1 FROM `category`
-    WHERE `name` = '문화시설' AND `type` = 'PREFERENCE'
+    WHERE `name` = '새로운 경험' AND `type` = 'PREFERENCE'
 );
 
 -- =================================================================================
 -- Preference → Event Category Mapping
--- PREFERENCE 타입 카테고리를 실제 EVENT 타입 카테고리로 변환하기 위한 매핑 데이터
+-- 선택한 취향 카테고리를 실제 EVENT 타입 카테고리로 변환하기 위한 매핑 데이터
 -- =================================================================================
 
--- 전시 → 전시/미술
+-- 조용한 힐링 → 클래식, 국악, 독주/독창회
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
          JOIN `category` e
-              ON e.name = '전시/미술'
+              ON e.name IN ('클래식', '국악', '독주/독창회')
                   AND e.type = 'EVENT'
-WHERE p.name = '전시'
+WHERE p.name = '조용한 힐링'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1
@@ -230,14 +214,14 @@ WHERE p.name = '전시'
       AND m.event_category_id = e.id
 );
 
--- 공연 → 무용, 국악, 연극, 독주/독창회, 뮤지컬/오페라, 콘서트, 클래식
+-- 문화생활 → 전시, 공연, 영화 계열
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
          JOIN `category` e
-              ON e.name IN ('무용', '국악', '연극', '독주/독창회', '뮤지컬/오페라', '콘서트', '클래식')
+              ON e.name IN ('전시/미술', '무용', '국악', '연극', '독주/독창회', '뮤지컬/오페라', '콘서트', '클래식', '영화')
                   AND e.type = 'EVENT'
-WHERE p.name = '공연'
+WHERE p.name = '문화생활'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1
@@ -246,21 +230,14 @@ WHERE p.name = '공연'
       AND m.event_category_id = e.id
 );
 
--- 축제 → 축제 계열 EVENT 카테고리
+-- 자연·산책 → 자연/경관 축제
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
          JOIN `category` e
-              ON e.name IN (
-                            '축제-기타',
-                            '축제-자연/경관',
-                            '축제-관광/체육',
-                            '축제-문화/예술',
-                            '축제-전통/역사',
-                            '축제-시민화합'
-                  )
+              ON e.name = '축제-자연/경관'
                   AND e.type = 'EVENT'
-WHERE p.name = '축제'
+WHERE p.name = '자연·산책'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1
@@ -269,14 +246,46 @@ WHERE p.name = '축제'
       AND m.event_category_id = e.id
 );
 
--- 체험 → 교육/체험
+-- 감성·사진 → 전시/미술, 자연/경관 축제, 문화/예술 축제
 INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
 SELECT p.id, e.id
 FROM `category` p
          JOIN `category` e
-              ON e.name = '교육/체험'
+              ON e.name IN ('전시/미술', '축제-자연/경관', '축제-문화/예술')
                   AND e.type = 'EVENT'
-WHERE p.name = '체험'
+WHERE p.name = '감성·사진'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
+
+-- 활동적인 하루 → 교육/체험, 관광/체육 축제, 시민화합 축제
+INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
+SELECT p.id, e.id
+FROM `category` p
+         JOIN `category` e
+              ON e.name IN ('교육/체험', '축제-관광/체육', '축제-시민화합')
+                  AND e.type = 'EVENT'
+WHERE p.name = '활동적인 하루'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM `preference_event_category_mapping` m
+    WHERE m.preference_category_id = p.id
+      AND m.event_category_id = e.id
+);
+
+-- 새로운 경험 → 교육/체험, 전통/역사 축제, 기타 축제, 기타
+INSERT INTO `preference_event_category_mapping` (`preference_category_id`, `event_category_id`)
+SELECT p.id, e.id
+FROM `category` p
+         JOIN `category` e
+              ON e.name IN ('교육/체험', '축제-전통/역사', '축제-기타', '기타')
+                  AND e.type = 'EVENT'
+WHERE p.name = '새로운 경험'
   AND p.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1
@@ -303,11 +312,11 @@ SELECT 1, 1, '영등포', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
     WHERE `id` = 1
 );
 
--- 유저 1번: 공연, 문화시설, 체험
+-- 유저 1번: 문화생활, 감성·사진, 새로운 경험
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 1, 1, c.id
 FROM `category` c
-WHERE c.name = '공연'
+WHERE c.name = '문화생활'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -317,7 +326,7 @@ WHERE c.name = '공연'
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 2, 1, c.id
 FROM `category` c
-WHERE c.name = '문화시설'
+WHERE c.name = '감성·사진'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -327,7 +336,7 @@ WHERE c.name = '문화시설'
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 3, 1, c.id
 FROM `category` c
-WHERE c.name = '체험'
+WHERE c.name = '새로운 경험'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -349,11 +358,11 @@ SELECT 2, 2, '종로', 'SOLO', 'NORMAL', TRUE, NOW(), NOW()
     WHERE `id` = 2
 );
 
--- 유저 2번: 전시, 문화시설
+-- 유저 2번: 조용한 힐링, 감성·사진
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 4, 2, c.id
 FROM `category` c
-WHERE c.name = '전시'
+WHERE c.name = '조용한 힐링'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -363,7 +372,7 @@ WHERE c.name = '전시'
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 5, 2, c.id
 FROM `category` c
-WHERE c.name = '문화시설'
+WHERE c.name = '감성·사진'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -385,11 +394,11 @@ SELECT 3, 3, '홍대', 'FRIEND', 'NORMAL', FALSE, NOW(), NOW()
     WHERE `id` = 3
 );
 
--- 유저 3번: 축제, 공연
+-- 유저 3번: 활동적인 하루, 문화생활
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 6, 3, c.id
 FROM `category` c
-WHERE c.name = '축제'
+WHERE c.name = '활동적인 하루'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -399,7 +408,7 @@ WHERE c.name = '축제'
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 7, 3, c.id
 FROM `category` c
-WHERE c.name = '공연'
+WHERE c.name = '문화생활'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -421,11 +430,11 @@ SELECT 4, 4, '마포구', 'FAMILY', 'NORMAL', FALSE, NOW(), NOW()
     WHERE `id` = 4
 );
 
--- 유저 4번: 공연, 체험
+-- 유저 4번: 문화생활, 새로운 경험
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 8, 4, c.id
 FROM `category` c
-WHERE c.name = '공연'
+WHERE c.name = '문화생활'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`
@@ -435,7 +444,7 @@ WHERE c.name = '공연'
 INSERT INTO `user_preference_category` (`id`, `user_preference_id`, `category_id`)
 SELECT 9, 4, c.id
 FROM `category` c
-WHERE c.name = '체험'
+WHERE c.name = '새로운 경험'
   AND c.type = 'PREFERENCE'
   AND NOT EXISTS (
     SELECT 1 FROM `user_preference_category`

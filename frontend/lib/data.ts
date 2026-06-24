@@ -8,6 +8,14 @@ export type Category =
   | "산책"
   | "문화시설"
 
+export type PreferenceCategory =
+  | "조용한 힐링"
+  | "문화생활"
+  | "자연·산책"
+  | "감성·사진"
+  | "활동적인 하루"
+  | "새로운 경험"
+
 export type Companion = "SOLO" | "COUPLE" | "FRIEND" | "FAMILY" | "PARENT"
 
 export type RestaurantType =
@@ -71,13 +79,48 @@ export type Course = {
   cover: string
 }
 
-export const CATEGORIES: { value: Category; emoji: string; label: string }[] = [
-  { value: "전시", emoji: "🖼", label: "전시" },
-  { value: "공연", emoji: "🎭", label: "공연" },
-  { value: "축제", emoji: "🎪", label: "축제" },
-  { value: "체험", emoji: "🧗", label: "체험" },
-  { value: "산책", emoji: "🌳", label: "산책" },
-  { value: "문화시설", emoji: "🏛", label: "문화시설" },
+export const CATEGORIES: {
+  value: PreferenceCategory
+  emoji: string
+  label: string
+  description: string
+}[] = [
+  {
+    value: "조용한 힐링",
+    emoji: "🌿",
+    label: "조용한 힐링",
+    description: "여유롭게 쉬고 싶은 하루",
+  },
+  {
+    value: "문화생활",
+    emoji: "🎨",
+    label: "문화생활",
+    description: "전시와 공연을 즐기는 하루",
+  },
+  {
+    value: "자연·산책",
+    emoji: "🌳",
+    label: "자연·산책",
+    description: "공원과 산책을 즐기는 하루",
+  },
+  {
+    value: "감성·사진",
+    emoji: "📷",
+    label: "감성·사진",
+    description: "분위기 좋은 장소를 찾는 하루",
+  },
+  {
+    value: "활동적인 하루",
+    emoji: "🏃",
+    label: "활동적인 하루",
+    description: "체험과 축제를 즐기는 하루",
+  },
+  {
+    value: "새로운 경험",
+    emoji: "✨",
+    label: "새로운 경험",
+    description: "색다른 장소를 발견하는 하루",
+  },
 ]
 
 export const COMPANIONS = [
