@@ -1,7 +1,7 @@
 "use client"
 
-import {useState} from "react"
-import {useRouter} from "next/navigation"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
     CalendarDays,
     MapPin,
@@ -11,19 +11,18 @@ import {
     ArrowLeft,
     Sparkles,
 } from "lucide-react"
-import {Button} from "@/components/ui/button"
-import {Card} from "@/components/ui/card"
-import {Calendar} from "@/components/ui/calendar"
-import {cn} from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 import {
     CATEGORIES,
     COMPANIONS,
     RestaurantType,
     type Companion,
-    type PreferenceCategory,
 } from "@/lib/data"
-import {SiteHeader} from "@/components/site-header"
-import {NaverLocationPicker} from "@/components/naver-location-picker"
+import { SiteHeader } from "@/components/site-header"
+import { NaverLocationPicker } from "@/components/naver-location-picker"
 
 const STEPS = ["날짜", "위치", "동행", "음식", "취향"]
 const MAX_CATEGORIES = 5
@@ -36,6 +35,8 @@ type SelectedLocation = {
     source: "preset" | "naver"
 }
 
+type CategoryOption = (typeof CATEGORIES)[number]
+
 export function PlanWizard() {
     const router = useRouter()
     const [step, setStep] = useState(0)
@@ -44,7 +45,7 @@ export function PlanWizard() {
     const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
     const [locationKeyword, setLocationKeyword] = useState("")
     const [companion, setCompanion] = useState<Companion | null>(null)
-    const [categories, setCategories] = useState<PreferenceCategory[]>([])
+    const [categories, setCategories] = useState<CategoryOption[]>([])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [restaurantType, setRestaurantType] = useState<RestaurantType | null>(null)
@@ -56,11 +57,22 @@ export function PlanWizard() {
         (step === 3 && !!restaurantType) ||
         (step === 4 && categories.length > 0)
 
-    function toggleCategory(c: PreferenceCategory) {
+    function getCategoryIdentity(category: CategoryOption) {
+        return String(category.value ?? category.label ?? "")
+    }
+
+    function toggleCategory(category: CategoryOption) {
         setCategories((prev) => {
-            if (prev.includes(c)) {
+            const categoryIdentity = getCategoryIdentity(category)
+            const alreadySelected = prev.some(
+                (selectedCategory) => getCategoryIdentity(selectedCategory) === categoryIdentity
+            )
+
+            if (alreadySelected) {
                 setSubmitError(null)
-                return prev.filter((x) => x !== c)
+                return prev.filter(
+                    (selectedCategory) => getCategoryIdentity(selectedCategory) !== categoryIdentity
+                )
             }
 
             if (prev.length >= MAX_CATEGORIES) {
@@ -69,7 +81,7 @@ export function PlanWizard() {
             }
 
             setSubmitError(null)
-            return [...prev, c]
+            return [...prev, category]
         })
     }
 
@@ -78,6 +90,82 @@ export function PlanWizard() {
         const month = String(value.getMonth() + 1).padStart(2, "0")
         const day = String(value.getDate()).padStart(2, "0")
         return `${year}-${month}-${day}`
+    }
+
+    function toCategoryCode(category: unknown): string | null {
+        const candidates: string[] = []
+
+        if (typeof category === "string") {
+            candidates.push(category)
+        } else if (typeof category === "object" && category !== null) {
+            const record = category as Record<string, unknown>
+
+            candidates.push(
+                String(record.value ?? ""),
+                String(record.name ?? ""),
+                String(record.label ?? ""),
+                String(record.description ?? "")
+            )
+        } else {
+            candidates.push(String(category ?? ""))
+        }
+
+        const normalizedCandidates = candidates
+            .map((candidate) => candidate.trim())
+            .filter(Boolean)
+
+        if (normalizedCandidates.length === 0) {
+            return null
+        }
+
+        const hasTourKeyword = normalizedCandidates.some((candidate) => {
+            const upperValue = candidate.toUpperCase()
+
+            return (
+                upperValue === "TOUR" ||
+                upperValue === "TOUR_PLACE" ||
+                upperValue === "TOURISM" ||
+                upperValue === "TRAVEL" ||
+                candidate.includes("관광") ||
+                candidate.includes("여행")
+            )
+        })
+
+        if (hasTourKeyword) {
+            return "TOUR"
+        }
+
+        return normalizedCandidates[0]
+    }
+
+    function toRecommendationCategories(
+        selectedCategories: CategoryOption[]
+    ): string[] {
+        return Array.from(
+            new Set(
+                selectedCategories
+                    .map(toCategoryCode)
+                    .filter((category): category is string => Boolean(category))
+            )
+        )
+    }
+
+    function getBaseAreaValue(
+        selectedLocation: SelectedLocation,
+        area: string | null
+    ): string {
+        if (area?.trim()) {
+            return area.trim()
+        }
+
+        const address = selectedLocation.address ?? ""
+        const districtMatch = address.match(/서울(?:특별시)?\s*([가-힣]+구)/)
+
+        if (districtMatch?.[1]) {
+            return districtMatch[1]
+        }
+
+        return selectedLocation.name
     }
 
     function normalizeAccessToken(value: string | null | undefined) {
@@ -193,11 +281,15 @@ export function PlanWizard() {
 
         const params = new URLSearchParams()
         const selectedDate = formatDate(date)
+        const baseArea = getBaseAreaValue(selectedLocation, area)
+        const recommendationCategories = toRecommendationCategories(categories)
+
         const coursePreviewRequest = {
             courseType: "RECOMMENDATION",
             startDate: selectedDate,
             endDate: selectedDate,
-            baseArea: area ?? selectedLocation.name,
+            baseArea: baseArea,
+            categories: recommendationCategories,
             companionType: companion,
             restaurantType: restaurantType,
             startLatitude: selectedLocation.latitude,
@@ -209,16 +301,38 @@ export function PlanWizard() {
             JSON.stringify(coursePreviewRequest)
         )
 
+        localStorage.setItem(
+            "recommendationCategories",
+            JSON.stringify(recommendationCategories)
+        )
+
+        console.log("recommendationCategories:", recommendationCategories)
+        console.log("coursePreviewRequest 저장값:", coursePreviewRequest)
+
         params.set("date", selectedDate)
-        params.set("area", area ?? selectedLocation.name)
+        params.set("area", baseArea)
         params.set("locationName", selectedLocation.name)
         params.set("locationSource", selectedLocation.source)
 
-        if (selectedLocation.address) params.set("locationAddress", selectedLocation.address)
-        if (selectedLocation.latitude !== undefined) params.set("lat", String(selectedLocation.latitude))
-        if (selectedLocation.longitude !== undefined) params.set("lng", String(selectedLocation.longitude))
-        if (companion) params.set("companion", companion)
-        if (categories.length) params.set("cats", categories.join(","))
+        if (selectedLocation.address) {
+            params.set("locationAddress", selectedLocation.address)
+        }
+
+        if (selectedLocation.latitude !== undefined) {
+            params.set("lat", String(selectedLocation.latitude))
+        }
+
+        if (selectedLocation.longitude !== undefined) {
+            params.set("lng", String(selectedLocation.longitude))
+        }
+
+        if (companion) {
+            params.set("companion", companion)
+        }
+
+        if (recommendationCategories.length) {
+            params.set("cats", recommendationCategories.join(","))
+        }
 
         try {
             const accessToken = getAccessToken()
@@ -236,12 +350,12 @@ export function PlanWizard() {
                 credentials: "include",
                 headers,
                 body: JSON.stringify({
-                    title: `${area ?? selectedLocation.name} 추천 코스`,
+                    title: `${baseArea} 추천 코스`,
                     startDate: selectedDate,
                     endDate: selectedDate,
                     topK: 3,
-                    area: area ?? selectedLocation.name,
-                    categories,
+                    area: baseArea,
+                    categories: recommendationCategories,
                     companionType: companion,
                     address: selectedLocation.address ?? selectedLocation.name,
                     latitude: selectedLocation.latitude,
@@ -251,7 +365,11 @@ export function PlanWizard() {
 
             const result = await response.json().catch(() => null)
 
-            if (response.status === 0 || response.status === 302 || response.type === "opaqueredirect") {
+            if (
+                response.status === 0 ||
+                response.status === 302 ||
+                response.type === "opaqueredirect"
+            ) {
                 throw new Error("로그인 인증이 만료되었거나 토큰이 전달되지 않았습니다. 다시 로그인해주세요.")
             }
 
@@ -262,20 +380,22 @@ export function PlanWizard() {
             const recommendedCourse = extractRecommendedCourse(result)
             const courseId = extractCourseId(result) ?? extractCourseId(recommendedCourse)
 
-
-            //식당, 카페에 현재 알고리즘을 통해 나온 행사의 아이디를 넘겨주기 위해서 저장한다.
             const eventIds =
-                recommendedCourse?.places?.map((place: any) => place.eventId) ?? []
+                (recommendedCourse?.places ?? [])
+                    .map((place: any) => place.eventId)
+                    .filter((eventId: any) => eventId !== null && eventId !== undefined)
+                    .map(Number)
+                    .filter(Number.isFinite)
 
             localStorage.setItem(
                 "recommendedEventIds",
                 JSON.stringify(eventIds)
             )
 
-
             console.log("추천 코스 생성 응답:", result)
             console.log("추출된 추천 코스:", recommendedCourse)
             console.log("추출된 courseId:", courseId)
+            console.log("추천 eventIds:", eventIds)
 
             if (typeof window !== "undefined") {
                 sessionStorage.setItem("recommendedCourse", JSON.stringify(recommendedCourse))
@@ -297,35 +417,36 @@ export function PlanWizard() {
 
     return (
         <div className="flex min-h-screen flex-col">
-            <SiteHeader/>
+            <SiteHeader />
             <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
-                {/* progress */}
                 <div className="mb-8">
                     <div className="flex items-center justify-between">
                         {STEPS.map((s, i) => (
                             <div key={s} className="flex flex-1 items-center">
                                 <div className="flex flex-col items-center gap-1.5">
-                  <span
-                      className={cn(
-                          "flex size-9 items-center justify-center rounded-full text-sm font-bold transition-colors",
-                          i < step
-                              ? "bg-primary text-primary-foreground"
-                              : i === step
-                                  ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
-                                  : "bg-secondary text-muted-foreground",
-                      )}
-                  >
-                    {i < step ? <Check className="size-4"/> : i + 1}
-                  </span>
+                                    <span
+                                        className={cn(
+                                            "flex size-9 items-center justify-center rounded-full text-sm font-bold transition-colors",
+                                            i < step
+                                                ? "bg-primary text-primary-foreground"
+                                                : i === step
+                                                    ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                                                    : "bg-secondary text-muted-foreground",
+                                        )}
+                                    >
+                                        {i < step ? <Check className="size-4" /> : i + 1}
+                                    </span>
+
                                     <span
                                         className={cn(
                                             "text-xs font-medium",
                                             i <= step ? "text-foreground" : "text-muted-foreground",
                                         )}
                                     >
-                    {s}
-                  </span>
+                                        {s}
+                                    </span>
                                 </div>
+
                                 {i < STEPS.length - 1 && (
                                     <div
                                         className={cn(
@@ -347,12 +468,13 @@ export function PlanWizard() {
                                 title="언제 떠나시나요?"
                                 desc="방문할 날짜를 선택하면 그날 운영 중인 행사를 찾아드려요."
                             />
+
                             <div className="flex justify-center">
                                 <Calendar
                                     mode="single"
                                     selected={date}
                                     onSelect={setDate}
-                                    disabled={{before: new Date(new Date().setHours(0, 0, 0, 0))}}
+                                    disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                                     className="rounded-2xl border"
                                 />
                             </div>
@@ -366,6 +488,7 @@ export function PlanWizard() {
                                 title="어디로 가볼까요?"
                                 desc="장소명이나 주소를 검색하거나, 기본 지역을 선택해 주세요."
                             />
+
                             <NaverLocationPicker
                                 initialKeyword={locationKeyword}
                                 onSelect={(location) => {
@@ -374,24 +497,37 @@ export function PlanWizard() {
                                     setSelectedLocation(location)
                                 }}
                             />
+
                             {selectedLocation && (
                                 <div className="rounded-2xl border bg-secondary/30 p-4">
-                                    <p className="text-sm font-semibold text-muted-foreground">선택된 위치</p>
+                                    <p className="text-sm font-semibold text-muted-foreground">
+                                        선택된 위치
+                                    </p>
+
                                     <div className="mt-2 flex items-start gap-2">
-                                        <MapPin className="mt-0.5 size-4 text-primary"/>
+                                        <MapPin className="mt-0.5 size-4 text-primary" />
+
                                         <div>
                                             <p className="font-semibold">{selectedLocation.name}</p>
+
                                             <p className="text-sm text-muted-foreground">
-                                                {selectedLocation.source === "preset" ? "기본 지역 선택" : "네이버 지도 선택"}
+                                                {selectedLocation.source === "preset"
+                                                    ? "기본 지역 선택"
+                                                    : "네이버 지도 선택"}
                                             </p>
+
                                             {selectedLocation.address && (
-                                                <p className="mt-1 text-sm text-muted-foreground">{selectedLocation.address}</p>
-                                            )}
-                                            {selectedLocation.latitude !== undefined && selectedLocation.longitude !== undefined && (
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    위도 {selectedLocation.latitude}, 경도 {selectedLocation.longitude}
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    {selectedLocation.address}
                                                 </p>
                                             )}
+
+                                            {selectedLocation.latitude !== undefined &&
+                                                selectedLocation.longitude !== undefined && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        위도 {selectedLocation.latitude}, 경도 {selectedLocation.longitude}
+                                                    </p>
+                                                )}
                                         </div>
                                     </div>
                                 </div>
@@ -406,6 +542,7 @@ export function PlanWizard() {
                                 title="누구와 함께 가나요?"
                                 desc="동행 유형에 맞는 분위기의 코스를 추천해 드려요."
                             />
+
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {COMPANIONS.map((c) => (
                                     <button
@@ -437,15 +574,15 @@ export function PlanWizard() {
 
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 {[
-                                    {value: "KOREAN", label: "한식", emoji: "🍚"},
-                                    {value: "WESTERN", label: "양식", emoji: "🍝"},
-                                    {value: "JAPANESE", label: "일식", emoji: "🍣"},
-                                    {value: "CHINESE", label: "중식", emoji: "🥟"},
+                                    { value: "KOREAN", label: "한식", emoji: "🍚" },
+                                    { value: "WESTERN", label: "양식", emoji: "🍝" },
+                                    { value: "JAPANESE", label: "일식", emoji: "🍣" },
+                                    { value: "CHINESE", label: "중식", emoji: "🥟" },
                                 ].map((type) => (
                                     <button
                                         key={type.value}
                                         type="button"
-                                        onClick={() => setRestaurantType(type.value as any)}
+                                        onClick={() => setRestaurantType(type.value as RestaurantType)}
                                         className={cn(
                                             "flex flex-col items-center gap-1.5 rounded-2xl border p-4",
                                             restaurantType === type.value
@@ -460,6 +597,7 @@ export function PlanWizard() {
                             </div>
                         </div>
                     )}
+
                     {step === 4 && (
                         <div className="flex flex-col gap-4">
                             <StepHeader
@@ -469,13 +607,17 @@ export function PlanWizard() {
                             />
 
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                {CATEGORIES.map((c) => {
-                                    const active = categories.includes(c.value)
+                                {CATEGORIES.map((category) => {
+                                    const active = categories.some(
+                                        (selectedCategory) =>
+                                            getCategoryIdentity(selectedCategory) === getCategoryIdentity(category)
+                                    )
+
                                     return (
                                         <button
-                                            key={c.value}
+                                            key={getCategoryIdentity(category)}
                                             type="button"
-                                            onClick={() => toggleCategory(c.value)}
+                                            onClick={() => toggleCategory(category)}
                                             className={cn(
                                                 "flex flex-col items-center gap-1.5 rounded-2xl border p-4",
                                                 active
@@ -483,13 +625,15 @@ export function PlanWizard() {
                                                     : "border-border hover:border-primary/50"
                                             )}
                                         >
-                                            <span className="text-2xl">{c.emoji}</span>
-                                            {c.description && (
+                                            <span className="text-2xl">{category.emoji}</span>
+
+                                            {category.description && (
                                                 <span className="text-center text-xs text-muted-foreground">
-    {c.description}
-  </span>
+                                                    {category.description}
+                                                </span>
                                             )}
-                                            <span className="text-sm font-semibold">{c.label}</span>
+
+                                            <span className="text-sm font-semibold">{category.label}</span>
                                         </button>
                                     )
                                 })}
@@ -498,11 +642,11 @@ export function PlanWizard() {
                     )}
 
                     {submitError && (
-                        <div
-                            className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-medium text-destructive">
+                        <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-medium text-destructive">
                             {submitError}
                         </div>
                     )}
+
                     <div className="mt-8 flex items-center justify-between">
                         <Button
                             variant="ghost"
@@ -510,9 +654,10 @@ export function PlanWizard() {
                             disabled={step === 0}
                             className="gap-1"
                         >
-                            <ArrowLeft className="size-4"/>
+                            <ArrowLeft className="size-4" />
                             이전
                         </Button>
+
                         {step < STEPS.length - 1 ? (
                             <Button
                                 onClick={() => setStep((s) => s + 1)}
@@ -520,11 +665,15 @@ export function PlanWizard() {
                                 className="gap-1"
                             >
                                 다음
-                                <ArrowRight className="size-4"/>
+                                <ArrowRight className="size-4" />
                             </Button>
                         ) : (
-                            <Button onClick={submit} disabled={isSubmitting || !restaurantType} className="gap-1">
-                                <Sparkles className="size-4"/>
+                            <Button
+                                onClick={submit}
+                                disabled={isSubmitting || !restaurantType}
+                                className="gap-1"
+                            >
+                                <Sparkles className="size-4" />
                                 {isSubmitting ? "추천 코스 생성 중..." : "코스 추천받기"}
                             </Button>
                         )}
@@ -536,19 +685,20 @@ export function PlanWizard() {
 }
 
 function StepHeader({
-                        icon: Icon,
-                        title,
-                        desc,
-                    }: {
+    icon: Icon,
+    title,
+    desc,
+}: {
     icon: React.ElementType
     title: string
     desc: string
 }) {
     return (
         <div className="flex flex-col gap-2">
-      <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="size-5"/>
-      </span>
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="size-5" />
+            </span>
+
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             <p className="text-muted-foreground">{desc}</p>
         </div>

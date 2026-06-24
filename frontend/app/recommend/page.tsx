@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CalendarDays,
   Clock,
+  ExternalLink,
+  Landmark,
   MapPin,
   Route,
   Sparkles,
@@ -17,6 +19,9 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteHeader } from "@/components/site-header"
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 
 type CoursePlace = {
   id?: number
@@ -38,6 +43,17 @@ type CoursePlace = {
   memo?: string
   recommendationReason?: string
   reason?: string
+}
+
+type TourPlaceItem = {
+  placeId: number
+  title: string
+  categoryName: string
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  url: string | null
+  recommendationReason: string | null
 }
 
 type CourseDetail = {
@@ -131,6 +147,20 @@ function getAccessToken() {
   return null
 }
 
+async function readJsonSafely(response: Response) {
+  const text = await response.text()
+
+  if (!text) {
+    return null
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
 function extractCourse(result: any) {
   return (
     result?.data ??
@@ -140,6 +170,18 @@ function extractCourse(result: any) {
     result?.response ??
     result
   ) as CourseDetail | null
+}
+
+function extractTourPlaces(result: any): TourPlaceItem[] {
+  const data =
+    result?.data ??
+    result?.result ??
+    result?.body ??
+    result?.content ??
+    result?.response ??
+    result
+
+  return Array.isArray(data) ? data : []
 }
 
 function getSavedRecommendedCourse(courseId?: string) {
@@ -198,6 +240,14 @@ function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
 }
 
+function parseNullableNumber(value?: string) {
+  if (!value) return null
+
+  const numberValue = Number(value)
+
+  return Number.isFinite(numberValue) ? numberValue : null
+}
+
 export default function RecommendPage() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -253,6 +303,10 @@ function RecommendContent() {
   const [isLoadingCourse, setIsLoadingCourse] = useState(false)
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null)
 
+  const [tourPlaces, setTourPlaces] = useState<TourPlaceItem[]>([])
+  const [isTourLoading, setIsTourLoading] = useState(false)
+  const [tourErrorMessage, setTourErrorMessage] = useState<string | null>(null)
+
   const courseId = searchParams.get("courseId") ?? undefined
   const areaParam = searchParams.get("area") ?? undefined
   const locationNameParam = searchParams.get("locationName") ?? undefined
@@ -306,7 +360,7 @@ function RecommendContent() {
           headers,
         })
 
-        const result = await response.json().catch(() => null)
+        const result = await readJsonSafely(response)
 
         if (!response.ok) {
           if (!savedCourse) {
@@ -328,6 +382,94 @@ function RecommendContent() {
 
     fetchCourse()
   }, [courseId])
+
+  useEffect(() => {
+    const baseArea = course?.baseArea ?? areaParam ?? locationNameParam
+
+    if (!hasRecommendContext || !baseArea) {
+      return
+    }
+
+    let isMounted = true
+
+    async function fetchTourPlaces() {
+      setIsTourLoading(true)
+      setTourErrorMessage(null)
+
+      try {
+        const accessToken = getAccessToken()
+
+        const startLatitude = parseNullableNumber(latitude)
+        const startLongitude = parseNullableNumber(longitude)
+
+        const tourPlaceRequest = {
+          area: baseArea,
+          baseArea,
+          topK: 3,
+          categories: ["TOUR"],
+          startLatitude,
+          startLongitude,
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/api/recommendations/tour-places/preview`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json; charset=UTF-8",
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify(tourPlaceRequest),
+          },
+        )
+
+        const result = await readJsonSafely(response)
+
+        console.log("recommend tour places requestBody:", tourPlaceRequest)
+        console.log("recommend tour places status:", response.status)
+        console.log("recommend tour places response:", result)
+
+        if (!response.ok) {
+          if (isMounted) {
+            setTourErrorMessage(
+              result?.message ?? "관광지 추천 정보를 불러오지 못했습니다.",
+            )
+          }
+          return
+        }
+
+        const fetchedTourPlaces = extractTourPlaces(result)
+
+        if (isMounted) {
+          setTourPlaces(fetchedTourPlaces)
+        }
+      } catch (error) {
+        console.error(error)
+
+        if (isMounted) {
+          setTourErrorMessage("관광지 추천 정보를 불러오지 못했습니다.")
+        }
+      } finally {
+        if (isMounted) {
+          setIsTourLoading(false)
+        }
+      }
+    }
+
+    fetchTourPlaces()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    course?.baseArea,
+    areaParam,
+    locationNameParam,
+    latitude,
+    longitude,
+    hasRecommendContext,
+  ])
 
   if (!course && !courseId && !hasRecommendContext) {
     return <RecommendEmptyState />
@@ -567,6 +709,95 @@ function RecommendContent() {
           <Card className="mt-5 p-6 text-center text-muted-foreground">
             아직 표시할 코스 장소가 없습니다. 조건을 다시 선택해 코스를
             생성해주세요.
+          </Card>
+        )}
+      </section>
+
+      <section className="mt-12">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">추천 관광지</h2>
+            <p className="mt-1 text-muted-foreground">
+              선택한 지역의 TOUR API 관광지 데이터를 기반으로 추천합니다.
+            </p>
+          </div>
+        </div>
+
+        {isTourLoading && (
+          <Card className="mt-5 p-6 text-sm text-muted-foreground">
+            관광지 추천 정보를 불러오는 중입니다.
+          </Card>
+        )}
+
+        {tourErrorMessage && !isTourLoading && (
+          <Card className="mt-5 border-destructive/30 bg-destructive/5 p-6">
+            <p className="font-semibold text-destructive">
+              {tourErrorMessage}
+            </p>
+          </Card>
+        )}
+
+        {!isTourLoading && !tourErrorMessage && tourPlaces.length > 0 && (
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {tourPlaces.map((place) => (
+              <Card key={place.placeId} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <Badge variant="secondary">
+                    {place.categoryName || "관광지"}
+                  </Badge>
+
+                  <Landmark className="size-5 shrink-0 text-primary" />
+                </div>
+
+                <h3 className="mt-4 text-lg font-bold leading-tight">
+                  {place.title}
+                </h3>
+
+                <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+                  {place.address && (
+                    <p className="flex items-start gap-1.5">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0" />
+                      {place.address}
+                    </p>
+                  )}
+
+                  {place.latitude !== null && place.longitude !== null && (
+                    <p className="text-xs">
+                      관광지 좌표: 위도 {place.latitude}, 경도 {place.longitude}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-secondary/50 p-4">
+                  <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+                    <Sparkles className="size-4 text-accent" />
+                    추천 이유
+                  </p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {place.recommendationReason ??
+                      "선택한 지역에 맞는 관광지입니다."}
+                  </p>
+                </div>
+
+                {place.url && (
+                  <a
+                    href={place.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 inline-flex items-center gap-1 text-sm text-blue-500"
+                  >
+                    상세 보기
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {!isTourLoading && !tourErrorMessage && tourPlaces.length === 0 && (
+          <Card className="mt-5 p-6 text-center text-muted-foreground">
+            추천 관광지가 없습니다.
           </Card>
         )}
       </section>
