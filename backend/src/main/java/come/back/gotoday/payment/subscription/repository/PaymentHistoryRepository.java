@@ -1,7 +1,9 @@
 package come.back.gotoday.payment.subscription.repository;
 
 import come.back.gotoday.payment.subscription.entity.PaymentHistory;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,6 +12,12 @@ import java.util.Optional;
 
 public interface PaymentHistoryRepository extends JpaRepository<PaymentHistory, Long> {
     List<PaymentHistory> findBySubscriptionId(Long id);
+
+    Optional<PaymentHistory> findByOrderId(String orderId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ph FROM PaymentHistory ph WHERE ph.orderId = :orderId")
+    Optional<PaymentHistory> findByOrderIdForUpdate(@Param("orderId") String orderId);
 
     /**
      * 특정 회원의 전체 결제 내역 조회 (구독 -> 빌링정보 -> 회원 연관관계를 타고 들어가 조회)
