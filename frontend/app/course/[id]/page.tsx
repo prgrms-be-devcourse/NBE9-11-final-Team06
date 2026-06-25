@@ -22,20 +22,25 @@ import { CourseActions } from "@/components/course-actions"
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 
+type CourseItemType = "PLACE" | "EVENT" | "TOUR"
+
 type CoursePlace = {
   id?: number
-  placeId?: number
-  eventId?: number
+  itemType?: CourseItemType
+  placeId?: number | null
+  eventId?: number | null
+  tourId?: number | null
   title?: string
+  itemName?: string
   name?: string
   placeName?: string
   eventTitle?: string
   category?: string
   categoryName?: string
   area?: string
-  address?: string
-  latitude?: number | string
-  longitude?: number | string
+  address?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
   visitOrder?: number
   sequence?: number
   order?: number
@@ -189,6 +194,7 @@ function getCoursePlaces(course: CourseDetail | null) {
 
 function getPlaceTitle(place: CoursePlace) {
   return (
+    place.itemName ??
     place.title ??
     place.placeName ??
     place.eventTitle ??
@@ -198,6 +204,14 @@ function getPlaceTitle(place: CoursePlace) {
 }
 
 function getPlaceCategory(place: CoursePlace) {
+  if (place.itemType === "TOUR") return "관광지"
+  if (place.itemType === "EVENT") {
+    return place.categoryName ?? place.category ?? "행사"
+  }
+  if (place.itemType === "PLACE") {
+    return place.categoryName ?? place.category ?? "장소"
+  }
+
   return place.categoryName ?? place.category ?? "추천"
 }
 
@@ -212,6 +226,12 @@ function getPlaceReason(place: CoursePlace) {
 
 function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
+}
+
+function getPlaceKey(place: CoursePlace, index: number) {
+  return `${place.itemType ?? "UNKNOWN"}-${
+    place.tourId ?? place.eventId ?? place.placeId ?? place.id ?? index
+  }`
 }
 
 export default function CourseDetailPage() {
@@ -291,28 +311,28 @@ export default function CourseDetailPage() {
       ? numericCourseId
       : course?.id ?? course?.courseId
 
-      const mapPoints = [
-        ...(course?.startLatitude && course?.startLongitude
-          ? [
-              {
-                title: "출발 위치",
-                latitude: Number(course.startLatitude),
-                longitude: Number(course.startLongitude),
-                order: 0,
-              },
-            ]
-          : []),
-      
-        ...coursePlaces
-          .filter((p) => p.latitude && p.longitude)
-          .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
-          .map((p) => ({
-            title: getPlaceTitle(p),
-            latitude: Number(p.latitude),
-            longitude: Number(p.longitude),
-            order: p.visitOrder ?? 0,
-          })),
-      ]
+  const mapPoints = [
+    ...(course?.startLatitude && course?.startLongitude
+      ? [
+          {
+            title: "출발 위치",
+            latitude: Number(course.startLatitude),
+            longitude: Number(course.startLongitude),
+            order: 0,
+          },
+        ]
+      : []),
+
+    ...coursePlaces
+      .filter((p) => p.latitude && p.longitude)
+      .sort((a, b) => (a.visitOrder ?? 0) - (b.visitOrder ?? 0))
+      .map((p) => ({
+        title: getPlaceTitle(p),
+        latitude: Number(p.latitude),
+        longitude: Number(p.longitude),
+        order: p.visitOrder ?? 0,
+      })),
+  ]
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -417,10 +437,7 @@ export default function CourseDetailPage() {
                         (a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0),
                       )
                       .map((place, index) => (
-                        <Card
-                          key={`${place.placeId ?? place.eventId ?? index}`}
-                          className="p-5"
-                        >
+                        <Card key={getPlaceKey(place, index)} className="p-5">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <Badge>{getVisitOrder(place, index)}번째</Badge>

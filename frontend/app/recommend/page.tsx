@@ -23,20 +23,25 @@ import { SiteHeader } from "@/components/site-header"
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
 
+type CourseItemType = "PLACE" | "EVENT" | "TOUR"
+
 type CoursePlace = {
   id?: number
-  placeId?: number
-  eventId?: number
+  itemType?: CourseItemType
+  placeId?: number | null
+  eventId?: number | null
+  tourId?: number | null
   title?: string
+  itemName?: string
   name?: string
   placeName?: string
   eventTitle?: string
   category?: string
   categoryName?: string
   area?: string
-  address?: string
-  latitude?: number | string
-  longitude?: number | string
+  address?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
   visitOrder?: number
   sequence?: number
   order?: number
@@ -46,7 +51,8 @@ type CoursePlace = {
 }
 
 type TourPlaceItem = {
-  placeId: number
+  tourId?: number
+  placeId?: number
   title: string
   categoryName: string
   address: string | null
@@ -204,6 +210,19 @@ function getSavedRecommendedCourse(courseId?: string) {
   }
 }
 
+function normalizeTourArea(area?: string) {
+  if (!area) return area
+
+  const trimmedArea = area.trim()
+  const districtMatch = trimmedArea.match(/[가-힣]+구/)
+
+  if (districtMatch) {
+    return districtMatch[0]
+  }
+
+  return trimmedArea
+}
+
 function formatDate(dateStr?: string) {
   return dateStr
     ? new Date(dateStr).toLocaleDateString("ko-KR", {
@@ -220,10 +239,25 @@ function getCoursePlaces(course: CourseDetail | null) {
 }
 
 function getPlaceTitle(place: CoursePlace) {
-  return place.title ?? place.placeName ?? place.eventTitle ?? place.name ?? "추천 장소"
+  return (
+    place.itemName ??
+    place.title ??
+    place.placeName ??
+    place.eventTitle ??
+    place.name ??
+    "추천 장소"
+  )
 }
 
 function getPlaceCategory(place: CoursePlace) {
+  if (place.itemType === "TOUR") return "관광지"
+  if (place.itemType === "EVENT") {
+    return place.categoryName ?? place.category ?? "행사"
+  }
+  if (place.itemType === "PLACE") {
+    return place.categoryName ?? place.category ?? "장소"
+  }
+
   return place.categoryName ?? place.category ?? "추천"
 }
 
@@ -238,6 +272,18 @@ function getPlaceReason(place: CoursePlace) {
 
 function getVisitOrder(place: CoursePlace, index: number) {
   return place.visitOrder ?? place.sequence ?? place.order ?? index + 1
+}
+
+function getPlaceKey(place: CoursePlace, index: number) {
+  return `${place.itemType ?? "UNKNOWN"}-${
+    place.tourId ?? place.eventId ?? place.placeId ?? place.id ?? index
+  }`
+}
+
+function getCoordinateLabel(place: CoursePlace) {
+  if (place.itemType === "TOUR") return "관광지 좌표"
+  if (place.itemType === "EVENT") return "행사 좌표"
+  return "장소 좌표"
 }
 
 function parseNullableNumber(value?: string) {
@@ -354,7 +400,7 @@ function RecommendContent() {
           headers.Authorization = `Bearer ${accessToken}`
         }
 
-        const response = await fetch(`/api/courses/${courseId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
           method: "GET",
           credentials: "include",
           headers,
@@ -401,10 +447,11 @@ function RecommendContent() {
 
         const startLatitude = parseNullableNumber(latitude)
         const startLongitude = parseNullableNumber(longitude)
+        const normalizedTourArea = normalizeTourArea(baseArea)
 
         const tourPlaceRequest = {
-          area: baseArea,
-          baseArea,
+          area: normalizedTourArea,
+          baseArea: normalizedTourArea,
           topK: 3,
           categories: ["TOUR"],
           startLatitude,
@@ -656,10 +703,7 @@ function RecommendContent() {
               .slice()
               .sort((a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0))
               .map((place, index) => (
-                <Card
-                  key={`${place.placeId ?? place.eventId ?? index}`}
-                  className="p-5"
-                >
+                <Card key={getPlaceKey(place, index)} className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <Badge className="shrink-0">
                       {getVisitOrder(place, index)}번째
@@ -688,7 +732,8 @@ function RecommendContent() {
 
                     {place.latitude && place.longitude && (
                       <p className="text-xs">
-                        행사 좌표: 위도 {place.latitude}, 경도 {place.longitude}
+                        {getCoordinateLabel(place)}: 위도 {place.latitude}, 경도{" "}
+                        {place.longitude}
                       </p>
                     )}
                   </div>
@@ -718,7 +763,7 @@ function RecommendContent() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">추천 관광지</h2>
             <p className="mt-1 text-muted-foreground">
-              선택한 지역의 TOUR API 관광지 데이터를 기반으로 추천합니다.
+              선택한 지역의 관광지 데이터를 기반으로 추천합니다.
             </p>
           </div>
         </div>
@@ -740,7 +785,10 @@ function RecommendContent() {
         {!isTourLoading && !tourErrorMessage && tourPlaces.length > 0 && (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {tourPlaces.map((place) => (
-              <Card key={place.placeId} className="p-5">
+              <Card
+                key={place.tourId ?? place.placeId ?? place.title}
+                className="p-5"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <Badge variant="secondary">
                     {place.categoryName || "관광지"}
