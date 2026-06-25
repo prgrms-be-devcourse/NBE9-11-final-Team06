@@ -49,6 +49,10 @@ export function PlanWizard() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [restaurantType, setRestaurantType] = useState<RestaurantType | null>(null)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const maxDate = new Date(today)
+    maxDate.setMonth(maxDate.getMonth() + 1)
 
     const canNext =
         (step === 0 && !!date) ||
@@ -270,6 +274,7 @@ export function PlanWizard() {
         const baseArea = getBaseAreaValue(selectedLocation, area)
         const recommendationCategories = toRecommendationCategories(categories)
 
+
         const coursePreviewRequest = {
             courseType: "RECOMMENDATION",
             startDate: selectedDate,
@@ -460,7 +465,10 @@ export function PlanWizard() {
                                     mode="single"
                                     selected={date}
                                     onSelect={setDate}
-                                    disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+                                    disabled={[
+                                      { before: today },
+                                      { after: maxDate }
+                                  ]}
                                     className="rounded-2xl border"
                                 />
                             </div>
