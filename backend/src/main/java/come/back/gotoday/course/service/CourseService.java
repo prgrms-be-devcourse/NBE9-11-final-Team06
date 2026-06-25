@@ -541,7 +541,7 @@ public class CourseService {
 
             List<PlacePreviewResponse> restaurants =
                     restaurantDocs.stream()
-                            .limit(3)
+                            .limit(5)
                             .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
                             .map(place -> new PlacePreviewResponse(
                                     place.getId(),
@@ -556,7 +556,7 @@ public class CourseService {
 
             List<PlacePreviewResponse> cafes =
                     cafeDocs.stream()
-                            .limit(3)
+                            .limit(5)
                             .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
                             .map(place -> new PlacePreviewResponse(
                                     place.getId(),
