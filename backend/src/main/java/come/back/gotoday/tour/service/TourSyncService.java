@@ -11,10 +11,12 @@ import come.back.gotoday.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -38,6 +40,18 @@ public class TourSyncService {
     private final TourRepository tourRepository;
     private final CategoryRepository categoryRepository;
     private final TourCategoryMapper tourCategoryMapper;
+
+    @Async("tourPlaceSyncExecutor")
+    @Transactional
+    public CompletableFuture<Integer> syncToursAsync(String areaCode, String sigunguCode) {
+        try {
+            int syncedCount = syncTours(areaCode, sigunguCode);
+            return CompletableFuture.completedFuture(syncedCount);
+        } catch (Exception e) {
+            log.error("TourAPI 관광지 비동기 동기화 실패: areaCode={}, sigunguCode={}", areaCode, sigunguCode, e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
 
     @Transactional
     public int syncTours(String areaCode, String sigunguCode) {
@@ -63,6 +77,18 @@ public class TourSyncService {
                 areaCode, sigunguCode, syncedCount);
 
         return syncedCount;
+    }
+
+    @Async("tourPlaceSyncExecutor")
+    @Transactional
+    public CompletableFuture<Integer> syncAllSeoulToursAsync() {
+        try {
+            int syncedCount = syncAllSeoulTours();
+            return CompletableFuture.completedFuture(syncedCount);
+        } catch (Exception e) {
+            log.error("TourAPI 서울 전체 관광지 비동기 동기화 실패", e);
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Transactional

@@ -24,7 +24,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Optional<Event> findByExternalId(String externalId);
 
     @Modifying
-    @Query("DELETE FROM Event e WHERE e.endDate < :today")
+    @Query("""
+            DELETE FROM Event e
+            WHERE e.endDate < :today
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM CoursePlace cp
+                  WHERE cp.event.id = e.id
+              )
+            """)
     int deleteExpiredEvents(@Param("today") LocalDate today);
 
     List<Event> findByExternalIdIn(Collection<String> externalIds);

@@ -1,14 +1,17 @@
 package come.back.gotoday.external.seoul.api_client;
 
+import tools.jackson.databind.ObjectMapper;
 import come.back.gotoday.external.seoul.dto.SeoulEventResponse;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.aop.framework.AopProxyUtils;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -19,24 +22,25 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.times;
 
-@SpringBootTest(properties = {
-        "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
-        "crowd.scheduler.enabled=false"
-})
+@SpringJUnitConfig(classes = SeoulEventApiClientRetryTest.RetryTestConfig.class)
 public class SeoulEventApiClientRetryTest {
 
-    @Autowired
+    @org.springframework.beans.factory.annotation.Autowired
     private SeoulEventApiClient seoulEventApiClient;
 
-    @MockitoBean
     private RestClient restClient;
-    private RestClient.ResponseSpec responseSpec; // 인스턴스 변수로 상량화하면 편리합니다.
+
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(seoulEventApiClient, "restClient", restClient);
+        restClient = mock(RestClient.class);
+
+        Object target = AopProxyUtils.ultimateTargetClass(seoulEventApiClient) != null
+                ? org.springframework.test.util.AopTestUtils.getUltimateTargetObject(seoulEventApiClient)
+                : seoulEventApiClient;
+
+        ReflectionTestUtils.setField(target, "restClient", restClient);
     }
 
     @Test
@@ -48,7 +52,7 @@ public class SeoulEventApiClientRetryTest {
         String mockSuccessJson = "{\"culturalEventInfo\": {\"list_total_count\": 5, \"RESULT\": {\"CODE\": \"INFO-000\", \"MESSAGE\": \"정상\"}, \"row\": []}}";
 
         RestClient.RequestHeadersUriSpec requestHeadersUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
-        responseSpec = mock(RestClient.ResponseSpec.class);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
 
         given(restClient.get()).willReturn(requestHeadersUriSpec);
         given(requestHeadersUriSpec.uri(anyString(), anyString(), anyInt(), anyInt())).willReturn(requestHeadersUriSpec);
@@ -103,5 +107,15 @@ public class SeoulEventApiClientRetryTest {
 
         // 중요: 실제로 최대 재시도 횟수(maxAttempts = 3)만큼 정확히 3번 찔러봤는지 검증
         verify(responseSpec, times(3)).body(String.class);
+    }
+
+    @Configuration
+    @EnableRetry
+    static class RetryTestConfig {
+
+        @Bean
+        SeoulEventApiClient seoulEventApiClient() {
+            return new SeoulEventApiClient("test-seoul-api-key", new ObjectMapper());
+        }
     }
 }

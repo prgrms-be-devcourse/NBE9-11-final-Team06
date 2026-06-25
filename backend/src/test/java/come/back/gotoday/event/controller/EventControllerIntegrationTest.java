@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -28,7 +29,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
-        "crowd.scheduler.enabled=false"
+        "crowd.scheduler.enabled=false",
+        "TOUR_API_KEY=mock_tour_api_key",
+        "external.tour.api-key=mock_tour_api_key",
+        "KAKAO_REST_API_KEY=mock_kakao_rest_api_key",
+        "external.kakao.api-key=mock_kakao_rest_api_key",
+        "KMA_WEATHER_API_KEY=mock_weather_api_key",
+        "weather.kma.service-key=mock_weather_api_key"
 })
 @AutoConfigureMockMvc
 @Transactional // 테스트 완료 후 DB 자동 Rollback 보장
@@ -40,6 +47,9 @@ class EventControllerIntegrationTest {
 
     @Autowired
     private EntityManager em; // 영속화 처리를 위한 엔티티 매니저
+
+    @MockitoBean(name = "apiKeyCheckConfig")
+    private Object apiKeyCheckConfig;
 
     @Nested
     @DisplayName("이벤트 단건 조회 통합 테스트")

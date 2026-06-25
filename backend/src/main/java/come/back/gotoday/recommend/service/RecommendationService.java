@@ -108,7 +108,10 @@ public class RecommendationService {
                 .orElseGet(Collections::emptyList);
 
         List<String> selectedCategories = request.categories() != null && !request.categories().isEmpty()
-                ? request.categories()
+                ? request.categories().stream()
+                        .filter(this::hasText)
+                        .map(String::trim)
+                        .toList()
                 : savedCategories;
 
         String rawSelectedArea = hasText(request.area())
@@ -185,7 +188,10 @@ public class RecommendationService {
                 .sorted(Comparator
                         .comparingDouble(RecommendationCandidate::score)
                         .reversed()
-                        .thenComparing(RecommendationCandidate::title))
+                        .thenComparing(
+                                RecommendationCandidate::title,
+                                Comparator.nullsLast(Comparator.naturalOrder())
+                        ))
                 .limit(10)
                 .toList();
 

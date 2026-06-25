@@ -19,11 +19,10 @@ public class TourSyncController {
 
     @PostMapping("/sync")
     public ResponseEntity<Map<String, Object>> syncAllSeoulTours() {
-        int syncedCount = tourSyncService.syncAllSeoulTours();
+        tourSyncService.syncAllSeoulToursAsync();
 
-        return ResponseEntity.ok(Map.of(
-                "message", "서울 관광지 동기화가 완료되었습니다.",
-                "syncedCount", syncedCount
+        return ResponseEntity.accepted().body(Map.of(
+                "message", "서울 관광지 동기화 작업이 시작되었습니다."
         ));
     }
 
@@ -32,13 +31,12 @@ public class TourSyncController {
             @RequestParam String areaCode,
             @RequestParam String sigunguCode
     ) {
-        int syncedCount = tourSyncService.syncTours(areaCode, sigunguCode);
+        tourSyncService.syncToursAsync(areaCode, sigunguCode);
 
-        return ResponseEntity.ok(Map.of(
-                "message", "관광지 동기화가 완료되었습니다.",
+        return ResponseEntity.accepted().body(Map.of(
+                "message", "관광지 동기화 작업이 시작되었습니다.",
                 "areaCode", areaCode,
-                "sigunguCode", sigunguCode,
-                "syncedCount", syncedCount
+                "sigunguCode", sigunguCode
         ));
     }
 }

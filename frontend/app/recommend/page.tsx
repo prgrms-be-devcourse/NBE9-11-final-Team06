@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   CalendarDays,
@@ -372,6 +372,7 @@ function RecommendEmptyState() {
 
 function RecommendContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoadingCourse, setIsLoadingCourse] = useState(false)
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null)
@@ -518,7 +519,7 @@ function RecommendContent() {
       `행사 ${selectedEventIds.length}개, 관광지 ${selectedTourIds.length}개를 선택했어요.`,
     )
 
-    window.location.href = "/course/preview"
+    router.push("/course/preview")
   }
 
   if (!course && !courseId && !candidateMode && !hasRecommendContext) {
