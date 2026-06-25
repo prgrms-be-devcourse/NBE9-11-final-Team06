@@ -41,6 +41,17 @@ type CoursePreviewResponse = {
   events: EventNearbyPlaceResponse[]
 }
 
+type SelectedRecommendationItems = {
+  eventIds?: number[]
+  tourIds?: number[]
+  startDate?: string | null
+  endDate?: string | null
+  baseArea?: string | null
+  companionType?: string | null
+  startLatitude?: number | null
+  startLongitude?: number | null
+}
+
 function normalizeAccessToken(value: string | null | undefined) {
   if (!value) return null
 
@@ -81,42 +92,40 @@ function extractCourse(result: any): CoursePreviewResponse | null {
   )
 }
 
-function readSelectedTourIds() {
-  if (typeof window === "undefined") return []
-
-  const selectedTourIds = localStorage.getItem("selectedTourIds")
-
-  if (selectedTourIds) {
-    try {
-      const parsed = JSON.parse(selectedTourIds)
-
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id) && id > 0)
-      }
-    } catch {
-      // 잘못 저장된 값은 단일 tourId 조회로 fallback 합니다.
-    }
-  }
-
-  const selectedTourId = Number(localStorage.getItem("selectedTourId"))
-
-  if (Number.isFinite(selectedTourId) && selectedTourId > 0) {
-    return [selectedTourId]
-  }
-
-  return []
-}
-
-function readSelectedTourTitle() {
-  if (typeof window === "undefined") return null
-
-  return localStorage.getItem("selectedTourTitle")
-}
-
 function getPlaceUrl(place: PlaceItem) {
   return place.url ?? place.placeUrl ?? null
+}
+
+function readSelectedRecommendationItems(): SelectedRecommendationItems | null {
+  if (typeof window === "undefined") return null
+
+  const saved = sessionStorage.getItem("selectedRecommendationItems")
+  if (!saved) return null
+
+  try {
+    const parsed = JSON.parse(saved) as SelectedRecommendationItems
+
+    return {
+      eventIds: Array.isArray(parsed.eventIds)
+        ? parsed.eventIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : [],
+      tourIds: Array.isArray(parsed.tourIds)
+        ? parsed.tourIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : [],
+      startDate: parsed.startDate ?? null,
+      endDate: parsed.endDate ?? null,
+      baseArea: parsed.baseArea ?? null,
+      companionType: parsed.companionType ?? null,
+      startLatitude: parsed.startLatitude ?? null,
+      startLongitude: parsed.startLongitude ?? null,
+    }
+  } catch {
+    return null
+  }
 }
 
 export default function CoursePreviewPage() {
@@ -127,8 +136,10 @@ export default function CoursePreviewPage() {
   const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
   const [request, setRequest] = useState<any>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
   const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
-  const [selectedTourTitle, setSelectedTourTitle] = useState<string | null>(null)
+  const [selectedItems, setSelectedItems] =
+    useState<SelectedRecommendationItems | null>(null)
 
   function toggleRestaurant(id: number) {
     setSelectedRestaurantId((prev) => (prev === id ? null : id))
@@ -139,8 +150,13 @@ export default function CoursePreviewPage() {
   }
 
   useEffect(() => {
-    setSelectedTourIds(readSelectedTourIds())
-    setSelectedTourTitle(readSelectedTourTitle())
+    const savedItems = readSelectedRecommendationItems()
+
+    if (!savedItems) return
+
+    setSelectedItems(savedItems)
+    setSelectedEventIds(savedItems.eventIds ?? [])
+    setSelectedTourIds(savedItems.tourIds ?? [])
   }, [])
 
   useEffect(() => {
@@ -156,22 +172,39 @@ export default function CoursePreviewPage() {
 
         const requestFromUrl = params.get("request")
         const localRequest = localStorage.getItem("coursePreviewRequest")
-
         const rawRequest = requestFromUrl || localRequest
+        const savedItems = readSelectedRecommendationItems()
 
-        if (!rawRequest) {
-          setErrorMessage("추천 조건 정보를 찾을 수 없습니다.")
+        let legacyRequest: any = {}
+
+        if (rawRequest) {
+          try {
+            legacyRequest = JSON.parse(rawRequest)
+          } catch (error) {
+            console.error("request JSON 깨짐:", rawRequest, error)
+            setErrorMessage("추천 조건 정보가 깨졌습니다.")
+            return
+          }
+        }
+
+        if (!rawRequest && !savedItems) {
+          setErrorMessage("선택한 추천 장소 정보를 찾을 수 없습니다.")
           return
         }
 
-        let requestBody: any
-
-        try {
-          requestBody = JSON.parse(rawRequest)
-        } catch (error) {
-          console.error("request JSON 깨짐:", rawRequest, error)
-          setErrorMessage("추천 조건 정보가 깨졌습니다.")
-          return
+        const requestBody = {
+          ...legacyRequest,
+          eventIds: savedItems?.eventIds ?? legacyRequest.eventIds ?? [],
+          tourIds: savedItems?.tourIds ?? legacyRequest.tourIds ?? [],
+          startDate: savedItems?.startDate ?? legacyRequest.startDate ?? null,
+          endDate: savedItems?.endDate ?? legacyRequest.endDate ?? null,
+          baseArea: savedItems?.baseArea ?? legacyRequest.baseArea ?? null,
+          companionType:
+            savedItems?.companionType ?? legacyRequest.companionType ?? null,
+          startLatitude:
+            savedItems?.startLatitude ?? legacyRequest.startLatitude ?? null,
+          startLongitude:
+            savedItems?.startLongitude ?? legacyRequest.startLongitude ?? null,
         }
 
         setRequest(requestBody)
@@ -352,6 +385,12 @@ export default function CoursePreviewPage() {
                 추천 코스
               </Badge>
 
+              {selectedEventIds.length > 0 && (
+                <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
+                  행사 {selectedEventIds.length}개 선택됨
+                </Badge>
+              )}
+
               {selectedTourIds.length > 0 && (
                 <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                   관광지 {selectedTourIds.length}개 선택됨
@@ -361,15 +400,6 @@ export default function CoursePreviewPage() {
 
             <h1 className="mt-6 text-3xl font-extrabold">추천 코스 상세</h1>
 
-            {selectedTourTitle && (
-              <Card className="mt-5 border-primary/30 bg-secondary/50 p-5">
-                <p className="font-semibold">선택한 관광지</p>
-                <p className="mt-1 text-lg font-bold">{selectedTourTitle}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  코스 생성 시 tourIds에 포함됩니다.
-                </p>
-              </Card>
-            )}
 
             <div className="mt-6">
               {mapLoaded ? (
@@ -395,7 +425,7 @@ export default function CoursePreviewPage() {
             </div>
 
             <p className="mt-3 text-muted-foreground">
-              맛집과 카페가 함께 구성된 추천 일정입니다.
+              선택한 행사·관광지 주변의 맛집과 카페를 골라 최종 코스를 완성하세요.
             </p>
 
             <section className="mt-10">
@@ -498,31 +528,17 @@ export default function CoursePreviewPage() {
                   return
                 }
 
-                const eventIds = (() => {
-                  try {
-                    const storedEventIds = JSON.parse(
-                      localStorage.getItem("recommendedEventIds") ?? "[]",
-                    )
+                const eventIds = selectedEventIds.length > 0
+                  ? selectedEventIds
+                  : course.eventIds ?? []
 
-                    if (Array.isArray(storedEventIds) && storedEventIds.length > 0) {
-                      return storedEventIds
-                    }
-
-                    return course.eventIds ?? []
-                  } catch {
-                    return course.eventIds ?? []
-                  }
-                })()
-
-                const tourIds = readSelectedTourIds()
+                const tourIds = selectedTourIds
 
                 const payload = {
                   title: "추천 코스",
-                  description: selectedTourTitle
-                    ? `${selectedTourTitle}, 맛집과 카페를 함께 즐기는 코스`
-                    : "맛집과 카페를 함께 즐기는 코스",
+                  description: "선택한 행사와 관광지, 맛집과 카페를 함께 즐기는 코스",
 
-                  courseType: request.courseType,
+                  courseType: request.courseType ?? "RECOMMENDED",
                   startDate: request.startDate,
                   endDate: request.endDate,
                   baseArea: request.baseArea,
@@ -534,8 +550,8 @@ export default function CoursePreviewPage() {
                   restaurantId: selectedRestaurant.id,
                   cafeId: selectedCafe.id,
 
-                  startLatitude: request.startLatitude,
-                  startLongitude: request.startLongitude,
+                  startLatitude: request.startLatitude ?? selectedItems?.startLatitude ?? null,
+                  startLongitude: request.startLongitude ?? selectedItems?.startLongitude ?? null,
                 }
 
                 try {
@@ -585,9 +601,8 @@ export default function CoursePreviewPage() {
                     return
                   }
 
-                  localStorage.removeItem("selectedTourId")
-                  localStorage.removeItem("selectedTourIds")
-                  localStorage.removeItem("selectedTourTitle")
+                  sessionStorage.removeItem("selectedRecommendationItems")
+                  sessionStorage.removeItem("recommendationCandidates")
 
                   window.location.href = `/course/${courseId}`
                 } catch (error) {

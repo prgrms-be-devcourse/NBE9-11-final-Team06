@@ -1,5 +1,10 @@
 package come.back.gotoday.event.service;
 
+import come.back.gotoday.admin.service.KakaoPlaceSyncService;
+import come.back.gotoday.tour.service.TourSyncService;
+import come.back.gotoday.external.weather.KmaWeatherClient;
+import come.back.gotoday.external.kakao.service.KakaoLocalService;
+import come.back.gotoday.course.service.CourseService;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.external.seoul.api_client.SeoulEventApiClient;
@@ -23,7 +28,8 @@ import static org.mockito.BDDMockito.given;
 
 @SpringBootTest(properties = {
         "SEOUL_CROWD_AREA_NAMES=강남역,홍대 관광특구,성수카페거리",
-        "crowd.scheduler.enabled=false"
+        "crowd.scheduler.enabled=false",
+        "TOUR_API_KEY=test-tour-api-key"
 })
 @Transactional
 class EventBatchServiceTest {
@@ -36,6 +42,24 @@ class EventBatchServiceTest {
 
     @MockitoBean
     private SeoulEventApiClient apiClient; // 외부 API 호출을 격리하기 위해 가짜 빈으로 등록
+
+    @MockitoBean
+    private KakaoPlaceSyncService kakaoPlaceSyncService;
+
+    @MockitoBean
+    private TourSyncService tourSyncService;
+
+    @MockitoBean
+    private KmaWeatherClient kmaWeatherClient;
+
+    @MockitoBean
+    private CourseService courseService;
+
+    @MockitoBean
+    private KakaoLocalService kakaoLocalService;
+
+    @MockitoBean(name = "apiKeyCheckConfig")
+    private Object apiKeyCheckConfig;
 
     @Autowired
     private jakarta.persistence.EntityManager em;

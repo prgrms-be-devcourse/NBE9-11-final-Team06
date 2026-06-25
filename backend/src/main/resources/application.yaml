@@ -70,15 +70,9 @@ external:
   seoul:
     base-url: http://openapi.seoul.go.kr:8088
     api-key: ${SEOUL_API_KEY:dummy-key}
-
   tour:
     base-url: https://apis.data.go.kr/B551011/KorService2
-    api-key: ${TOUR_API_KEY:dummy-key}
-    mobile-os: ETC
-    mobile-app: gotoday
-    auto-sync:
-      enabled: true
-      area-code: 1
+    api-key: ${TOUR_API_KEY}
 
 cors:
   allowed-origins:
@@ -122,3 +116,4 @@ toss:
 weather:
   kma:
     service-key: ${KMA_WEATHER_API_KEY:dummy-key}
+

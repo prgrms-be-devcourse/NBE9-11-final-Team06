@@ -2,13 +2,12 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
   CalendarDays,
+  Check,
   Clock,
-  ExternalLink,
-  Landmark,
   MapPin,
   Route,
   Sparkles,
@@ -50,17 +49,6 @@ type CoursePlace = {
   reason?: string
 }
 
-type TourPlaceItem = {
-  tourId?: number
-  placeId?: number
-  title: string
-  categoryName: string
-  address: string | null
-  latitude: number | null
-  longitude: number | null
-  url: string | null
-  recommendationReason: string | null
-}
 
 type CourseDetail = {
   id?: number
@@ -76,6 +64,27 @@ type CourseDetail = {
   reason?: string
   places?: CoursePlace[]
   coursePlaces?: CoursePlace[]
+}
+
+type RecommendationCandidate = {
+  type?: "EVENT" | "TOUR"
+  eventId?: number | null
+  tourId?: number | null
+  title?: string
+  categoryName?: string | null
+  address?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
+  score?: number
+  recommendationReason?: string | null
+}
+
+type RecommendationCandidateDraft = {
+  startDate?: string
+  endDate?: string
+  baseArea?: string
+  companionType?: string
+  candidates?: RecommendationCandidate[]
 }
 
 function normalizeAccessToken(value: string | null | undefined) {
@@ -178,17 +187,6 @@ function extractCourse(result: any) {
   ) as CourseDetail | null
 }
 
-function extractTourPlaces(result: any): TourPlaceItem[] {
-  const data =
-    result?.data ??
-    result?.result ??
-    result?.body ??
-    result?.content ??
-    result?.response ??
-    result
-
-  return Array.isArray(data) ? data : []
-}
 
 function getSavedRecommendedCourse(courseId?: string) {
   if (typeof window === "undefined") return null
@@ -210,18 +208,47 @@ function getSavedRecommendedCourse(courseId?: string) {
   }
 }
 
-function normalizeTourArea(area?: string) {
-  if (!area) return area
+function getSavedRecommendationCandidates() {
+  if (typeof window === "undefined") return null
 
-  const trimmedArea = area.trim()
-  const districtMatch = trimmedArea.match(/[가-힣]+구/)
+  const saved = sessionStorage.getItem("recommendationCandidates")
+  if (!saved) return null
 
-  if (districtMatch) {
-    return districtMatch[0]
+  try {
+    return JSON.parse(saved) as RecommendationCandidateDraft
+  } catch {
+    return null
   }
-
-  return trimmedArea
 }
+
+function createCandidateCourse(draft: RecommendationCandidateDraft): CourseDetail {
+  const places: CoursePlace[] = (draft.candidates ?? []).map((candidate, index) => ({
+    itemType: candidate.type,
+    eventId: candidate.eventId ?? null,
+    tourId: candidate.tourId ?? null,
+    title: candidate.title,
+    categoryName: candidate.categoryName ?? undefined,
+    address: candidate.address ?? null,
+    latitude: candidate.latitude ?? null,
+    longitude: candidate.longitude ?? null,
+    visitOrder: index + 1,
+    recommendationReason:
+      candidate.recommendationReason ??
+      "선택한 조건과 출발 위치를 바탕으로 추천된 장소입니다.",
+  }))
+
+  return {
+    title: `${draft.baseArea ?? "선택한 지역"} 추천 후보`,
+    description: "행사와 관광지 후보를 확인한 뒤 원하는 장소를 선택해 코스로 저장하세요.",
+    startDate: draft.startDate,
+    endDate: draft.endDate,
+    baseArea: draft.baseArea,
+    companionType: draft.companionType,
+    recommendationReason: "선택한 취향, 동행 유형, 출발 위치를 함께 고려해 행사와 관광지를 추천했어요.",
+    places,
+  }
+}
+
 
 function formatDate(dateStr?: string) {
   return dateStr
@@ -345,15 +372,16 @@ function RecommendEmptyState() {
 
 function RecommendContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [isLoadingCourse, setIsLoadingCourse] = useState(false)
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null)
-
-  const [tourPlaces, setTourPlaces] = useState<TourPlaceItem[]>([])
-  const [isTourLoading, setIsTourLoading] = useState(false)
-  const [tourErrorMessage, setTourErrorMessage] = useState<string | null>(null)
+  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
+  const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
+  const [selectionMessage, setSelectionMessage] = useState<string | null>(null)
 
   const courseId = searchParams.get("courseId") ?? undefined
+  const candidateMode = searchParams.get("candidateMode") === "true"
   const areaParam = searchParams.get("area") ?? undefined
   const locationNameParam = searchParams.get("locationName") ?? undefined
   const locationSource = searchParams.get("locationSource") ?? "preset"
@@ -381,8 +409,11 @@ function RecommendContent() {
 
   useEffect(() => {
     const savedCourse = getSavedRecommendedCourse(courseId)
+    const savedCandidateDraft = getSavedRecommendationCandidates()
 
-    if (savedCourse) {
+    if (candidateMode && savedCandidateDraft) {
+      setCourse(createCandidateCourse(savedCandidateDraft))
+    } else if (savedCourse) {
       setCourse(savedCourse)
     }
 
@@ -427,98 +458,71 @@ function RecommendContent() {
     }
 
     fetchCourse()
-  }, [courseId])
+  }, [candidateMode, courseId])
 
-  useEffect(() => {
-    const baseArea = course?.baseArea ?? areaParam ?? locationNameParam
-
-    if (!hasRecommendContext || !baseArea) {
+  function toggleCandidateSelection(place: CoursePlace) {
+    if (place.itemType === "EVENT" && place.eventId) {
+      setSelectedEventIds((currentIds) =>
+        currentIds.includes(place.eventId!)
+          ? currentIds.filter((id) => id !== place.eventId)
+          : [...currentIds, place.eventId!],
+      )
+      setSelectionMessage(null)
       return
     }
 
-    let isMounted = true
+    if (place.itemType === "TOUR" && place.tourId) {
+      setSelectedTourIds((currentIds) =>
+        currentIds.includes(place.tourId!)
+          ? currentIds.filter((id) => id !== place.tourId)
+          : [...currentIds, place.tourId!],
+      )
+      setSelectionMessage(null)
+    }
+  }
 
-    async function fetchTourPlaces() {
-      setIsTourLoading(true)
-      setTourErrorMessage(null)
-
-      try {
-        const accessToken = getAccessToken()
-
-        const startLatitude = parseNullableNumber(latitude)
-        const startLongitude = parseNullableNumber(longitude)
-        const normalizedTourArea = normalizeTourArea(baseArea)
-
-        const tourPlaceRequest = {
-          area: normalizedTourArea,
-          baseArea: normalizedTourArea,
-          topK: 3,
-          categories: ["TOUR"],
-          startLatitude,
-          startLongitude,
-        }
-
-        const response = await fetch(
-          `${API_BASE_URL}/api/recommendations/tour-places/preview`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json; charset=UTF-8",
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-            },
-            body: JSON.stringify(tourPlaceRequest),
-          },
-        )
-
-        const result = await readJsonSafely(response)
-
-        console.log("recommend tour places requestBody:", tourPlaceRequest)
-        console.log("recommend tour places status:", response.status)
-        console.log("recommend tour places response:", result)
-
-        if (!response.ok) {
-          if (isMounted) {
-            setTourErrorMessage(
-              result?.message ?? "관광지 추천 정보를 불러오지 못했습니다.",
-            )
-          }
-          return
-        }
-
-        const fetchedTourPlaces = extractTourPlaces(result)
-
-        if (isMounted) {
-          setTourPlaces(fetchedTourPlaces)
-        }
-      } catch (error) {
-        console.error(error)
-
-        if (isMounted) {
-          setTourErrorMessage("관광지 추천 정보를 불러오지 못했습니다.")
-        }
-      } finally {
-        if (isMounted) {
-          setIsTourLoading(false)
-        }
-      }
+  function isCandidateSelected(place: CoursePlace) {
+    if (place.itemType === "EVENT") {
+      return Boolean(place.eventId && selectedEventIds.includes(place.eventId))
     }
 
-    fetchTourPlaces()
-
-    return () => {
-      isMounted = false
+    if (place.itemType === "TOUR") {
+      return Boolean(place.tourId && selectedTourIds.includes(place.tourId))
     }
-  }, [
-    course?.baseArea,
-    areaParam,
-    locationNameParam,
-    latitude,
-    longitude,
-    hasRecommendContext,
-  ])
 
-  if (!course && !courseId && !hasRecommendContext) {
+    return false
+  }
+
+  function saveSelectedCandidates() {
+    const selectedCount = selectedEventIds.length + selectedTourIds.length
+
+    if (selectedCount === 0) {
+      setSelectionMessage("최소 한 곳 이상의 행사 또는 관광지를 선택해주세요.")
+      return
+    }
+
+    sessionStorage.setItem(
+      "selectedRecommendationItems",
+      JSON.stringify({
+        eventIds: selectedEventIds,
+        tourIds: selectedTourIds,
+        startDate: course?.startDate ?? dateParam ?? null,
+        endDate: course?.endDate ?? dateParam ?? null,
+        baseArea: course?.baseArea ?? areaParam ?? null,
+        companionType: course?.companionType ?? companionParam ?? null,
+        startLatitude: parseNullableNumber(latitude),
+        startLongitude: parseNullableNumber(longitude),
+      }),
+    )
+
+    setSelectionMessage(
+      `행사 ${selectedEventIds.length}개, 관광지 ${selectedTourIds.length}개를 선택했어요.`,
+    )
+
+    router.push("/course/preview")
+  }
+
+  if (!course && !courseId && !candidateMode && !hasRecommendContext) {
     return <RecommendEmptyState />
   }
 
@@ -572,9 +576,11 @@ function RecommendContent() {
       </div>
 
       <h1 className="mt-6 text-balance text-3xl font-extrabold tracking-tight sm:text-4xl">
-        {course
-          ? `${courseTitle}가 생성됐어요`
-          : "선택한 조건으로 추천 코스를 확인해보세요"}
+        {candidateMode
+          ? "행사와 관광지 추천 후보를 확인해보세요"
+          : course
+            ? `${courseTitle}가 생성됐어요`
+            : "선택한 조건으로 추천 코스를 확인해보세요"}
       </h1>
 
       <Card className="mt-6 flex-row flex-wrap items-start gap-4 bg-background p-5">
@@ -630,7 +636,9 @@ function RecommendContent() {
             <div>
               <h3 className="text-xl font-bold">{courseTitle}</h3>
               <p className="mt-1 leading-relaxed text-muted-foreground">
-                {courseDescription}
+                {candidateMode
+                  ? "마음에 드는 행사와 관광지를 선택한 뒤 최종 코스로 저장할 수 있어요."
+                  : courseDescription}
               </p>
             </div>
 
@@ -662,8 +670,31 @@ function RecommendContent() {
                 {courseReason}
               </p>
             </div>
+            {candidateMode ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={saveSelectedCandidates}
+                >
+                  선택한 장소 확정
+                  <Check className="size-4" />
+                </Button>
 
-            {displayCourseId ? (
+                <Button asChild variant="outline" className="gap-2">
+                  <Link href="/plan">
+                    조건 다시 선택하기
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+
+                {selectionMessage && (
+                  <p className="w-full text-sm text-muted-foreground">
+                    {selectionMessage}
+                  </p>
+                )}
+              </div>
+            ) : displayCourseId ? (
               <div className="flex flex-wrap gap-3">
                 <Button asChild className="gap-2">
                   <Link href={`/course/${displayCourseId}`}>
@@ -692,10 +723,19 @@ function RecommendContent() {
       </section>
 
       <section className="mt-12">
-        <h2 className="text-2xl font-bold tracking-tight">생성된 코스 장소</h2>
+        <h2 className="text-2xl font-bold tracking-tight">
+          {candidateMode ? "추천 후보 장소" : "생성된 코스 장소"}
+        </h2>
         <p className="mt-1 text-muted-foreground">
-          추천 알고리즘으로 생성된 코스의 방문 순서입니다.
+          {candidateMode
+            ? "행사와 관광지 후보를 함께 비교해 원하는 장소를 선택하세요."
+            : "추천 알고리즘으로 생성된 코스의 방문 순서입니다."}
         </p>
+        {candidateMode && (
+          <p className="mt-2 text-sm font-medium text-primary">
+            현재 선택: 행사 {selectedEventIds.length}개 · 관광지 {selectedTourIds.length}개
+          </p>
+        )}
 
         {coursePlaces.length > 0 ? (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -703,12 +743,32 @@ function RecommendContent() {
               .slice()
               .sort((a, b) => getVisitOrder(a, 0) - getVisitOrder(b, 0))
               .map((place, index) => (
-                <Card key={getPlaceKey(place, index)} className="p-5">
+                <Card
+                  key={getPlaceKey(place, index)}
+                  className={`p-5 transition-colors ${
+                    candidateMode && isCandidateSelected(place)
+                      ? "border-primary bg-primary/5"
+                      : ""
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <Badge className="shrink-0">
                       {getVisitOrder(place, index)}번째
                     </Badge>
-                    <Badge variant="secondary">{getPlaceCategory(place)}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{getPlaceCategory(place)}</Badge>
+                      {candidateMode && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={isCandidateSelected(place) ? "default" : "outline"}
+                          className="shrink-0"
+                          onClick={() => toggleCandidateSelection(place)}
+                        >
+                          {isCandidateSelected(place) ? "선택됨" : "선택"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   <h3 className="mt-4 text-lg font-bold leading-tight">
@@ -754,98 +814,6 @@ function RecommendContent() {
           <Card className="mt-5 p-6 text-center text-muted-foreground">
             아직 표시할 코스 장소가 없습니다. 조건을 다시 선택해 코스를
             생성해주세요.
-          </Card>
-        )}
-      </section>
-
-      <section className="mt-12">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">추천 관광지</h2>
-            <p className="mt-1 text-muted-foreground">
-              선택한 지역의 관광지 데이터를 기반으로 추천합니다.
-            </p>
-          </div>
-        </div>
-
-        {isTourLoading && (
-          <Card className="mt-5 p-6 text-sm text-muted-foreground">
-            관광지 추천 정보를 불러오는 중입니다.
-          </Card>
-        )}
-
-        {tourErrorMessage && !isTourLoading && (
-          <Card className="mt-5 border-destructive/30 bg-destructive/5 p-6">
-            <p className="font-semibold text-destructive">
-              {tourErrorMessage}
-            </p>
-          </Card>
-        )}
-
-        {!isTourLoading && !tourErrorMessage && tourPlaces.length > 0 && (
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {tourPlaces.map((place) => (
-              <Card
-                key={place.tourId ?? place.placeId ?? place.title}
-                className="p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Badge variant="secondary">
-                    {place.categoryName || "관광지"}
-                  </Badge>
-
-                  <Landmark className="size-5 shrink-0 text-primary" />
-                </div>
-
-                <h3 className="mt-4 text-lg font-bold leading-tight">
-                  {place.title}
-                </h3>
-
-                <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
-                  {place.address && (
-                    <p className="flex items-start gap-1.5">
-                      <MapPin className="mt-0.5 size-3.5 shrink-0" />
-                      {place.address}
-                    </p>
-                  )}
-
-                  {place.latitude !== null && place.longitude !== null && (
-                    <p className="text-xs">
-                      관광지 좌표: 위도 {place.latitude}, 경도 {place.longitude}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-secondary/50 p-4">
-                  <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-                    <Sparkles className="size-4 text-accent" />
-                    추천 이유
-                  </p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {place.recommendationReason ??
-                      "선택한 지역에 맞는 관광지입니다."}
-                  </p>
-                </div>
-
-                {place.url && (
-                  <a
-                    href={place.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-1 text-sm text-blue-500"
-                  >
-                    상세 보기
-                    <ExternalLink className="size-3" />
-                  </a>
-                )}
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {!isTourLoading && !tourErrorMessage && tourPlaces.length === 0 && (
-          <Card className="mt-5 p-6 text-center text-muted-foreground">
-            추천 관광지가 없습니다.
           </Card>
         )}
       </section>

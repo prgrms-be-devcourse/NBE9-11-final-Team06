@@ -33,4 +33,22 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             @Param("area") String area,
             Pageable pageable
     );
+    @Query("""
+            SELECT t
+            FROM Tour t
+            WHERE t.isActive = true
+              AND t.cat3 IN :cat3Codes
+              AND t.latitude IS NOT NULL
+              AND t.longitude IS NOT NULL
+              AND t.latitude BETWEEN :minLatitude AND :maxLatitude
+              AND t.longitude BETWEEN :minLongitude AND :maxLongitude
+            ORDER BY t.id ASC
+            """)
+    List<Tour> findActiveToursByCat3WithinBounds(
+            @Param("cat3Codes") List<String> cat3Codes,
+            @Param("minLatitude") double minLatitude,
+            @Param("maxLatitude") double maxLatitude,
+            @Param("minLongitude") double minLongitude,
+            @Param("maxLongitude") double maxLongitude
+    );
 }

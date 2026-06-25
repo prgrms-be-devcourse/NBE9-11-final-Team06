@@ -2,11 +2,9 @@ package come.back.gotoday.recommend.controller;
 
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
-import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
-import come.back.gotoday.course.service.CourseService;
+import come.back.gotoday.recommend.service.RecommendationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -21,15 +19,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/recommendations")
 public class RecommendationController {
 
-    private final CourseService courseService;
+    private final RecommendationService recommendationService;
 
-    @PostMapping("/courses")
-    public ResponseEntity<ApiResponse<RecommendationCourseResponse>> createRecommendedCourse(
+    @PostMapping("/candidates")
+    public ResponseEntity<ApiResponse<RecommendationService.RecommendationCandidateDraft>> previewRecommendationCandidates(
             @AuthenticationPrincipal(expression = "memberId") Long memberId,
             @Valid @RequestBody RecommendationCourseCreateRequest request
     ) {
-        RecommendationCourseResponse response = courseService.createRecommendedCourse(memberId, request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "추천 코스 생성 성공"));
+        RecommendationService.RecommendationCandidateDraft response =
+                recommendationService.recommendCandidates(memberId, request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(response, "추천 후보 조회 성공")
+        );
     }
+
 }

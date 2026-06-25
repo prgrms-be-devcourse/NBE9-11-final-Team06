@@ -37,7 +37,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "KMA_WEATHER_API_KEY=mock_api_key",
         "weather.kma.service-key=mock_api_key",
-        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역"
+        "TOUR_API_KEY=mock_tour_api_key",
+        "external.tour.api-key=mock_tour_api_key",
+        "KAKAO_REST_API_KEY=mock_kakao_rest_api_key",
+        "external.kakao.api-key=mock_kakao_rest_api_key",
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역",
+        "crowd.scheduler.enabled=false"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")

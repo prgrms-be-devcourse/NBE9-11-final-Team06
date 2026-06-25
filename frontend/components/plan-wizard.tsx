@@ -258,20 +258,6 @@ export function PlanWizard() {
         )
     }
 
-    function extractCourseId(value: any): number | string | null {
-        if (!value || typeof value !== "object") return null
-
-        if (value.courseId !== undefined && value.courseId !== null) return value.courseId
-        if (value.course_id !== undefined && value.course_id !== null) return value.course_id
-        if (value.id !== undefined && value.id !== null) return value.id
-
-        for (const key of ["data", "result", "body", "content", "response", "course"]) {
-            const nestedCourseId = extractCourseId(value[key])
-            if (nestedCourseId !== null) return nestedCourseId
-        }
-
-        return null
-    }
 
     async function submit() {
         if (!date || !selectedLocation) return
@@ -344,16 +330,15 @@ export function PlanWizard() {
                 headers.Authorization = `Bearer ${accessToken}`
             }
 
-            const response = await fetch(`/api/recommendations/courses`, {
+            const response = await fetch(`/api/recommendations/candidates`, {
                 method: "POST",
                 redirect: "manual",
                 credentials: "include",
                 headers,
                 body: JSON.stringify({
-                    title: `${baseArea} 추천 코스`,
+                    title: `${baseArea} 추천 후보`,
                     startDate: selectedDate,
                     endDate: selectedDate,
-                    topK: 3,
                     area: baseArea,
                     categories: recommendationCategories,
                     companionType: companion,
@@ -377,39 +362,41 @@ export function PlanWizard() {
                 throw new Error(result?.message ?? result?.error ?? "코스 추천 생성에 실패했습니다.")
             }
 
-            const recommendedCourse = extractRecommendedCourse(result)
-            const courseId = extractCourseId(result) ?? extractCourseId(recommendedCourse)
+            const recommendationResult = extractRecommendedCourse(result)
+            const candidates = Array.isArray(recommendationResult?.candidates)
+                ? recommendationResult.candidates
+                : []
 
-            const eventIds =
-                (recommendedCourse?.places ?? [])
-                    .map((place: any) => place.eventId)
-                    .filter((eventId: any) => eventId !== null && eventId !== undefined)
-                    .map(Number)
-                    .filter(Number.isFinite)
+            if (candidates.length === 0) {
+                throw new Error("추천 후보를 찾지 못했습니다.")
+            }
 
-            localStorage.setItem(
-                "recommendedEventIds",
-                JSON.stringify(eventIds)
+            const eventIds = candidates
+                .filter((candidate: any) => candidate?.type === "EVENT")
+                .map((candidate: any) => Number(candidate.eventId))
+                .filter(Number.isFinite)
+
+            const tourIds = candidates
+                .filter((candidate: any) => candidate?.type === "TOUR")
+                .map((candidate: any) => Number(candidate.tourId))
+                .filter(Number.isFinite)
+
+            localStorage.setItem("recommendedEventIds", JSON.stringify(eventIds))
+            localStorage.setItem("recommendedTourIds", JSON.stringify(tourIds))
+            sessionStorage.setItem(
+                "recommendationCandidates",
+                JSON.stringify(recommendationResult)
             )
 
-            console.log("추천 코스 생성 응답:", result)
-            console.log("추출된 추천 코스:", recommendedCourse)
-            console.log("추출된 courseId:", courseId)
+            console.log("추천 후보 조회 응답:", result)
+            console.log("추출된 추천 후보:", recommendationResult)
             console.log("추천 eventIds:", eventIds)
+            console.log("추천 tourIds:", tourIds)
 
-            if (typeof window !== "undefined") {
-                sessionStorage.setItem("recommendedCourse", JSON.stringify(recommendedCourse))
-            }
-
-            if (!courseId) {
-                throw new Error("추천 코스는 생성됐지만 courseId를 찾지 못했습니다.")
-            }
-
-            params.set("courseId", String(courseId))
-
+            params.set("candidateMode", "true")
             router.push(`/recommend?${params.toString()}`)
         } catch (error) {
-            setSubmitError(error instanceof Error ? error.message : "코스 추천 생성에 실패했습니다.")
+            setSubmitError(error instanceof Error ? error.message : "추천 후보 조회에 실패했습니다.")
         } finally {
             setIsSubmitting(false)
         }
@@ -673,7 +660,7 @@ export function PlanWizard() {
                                 className="gap-1"
                             >
                                 <Sparkles className="size-4" />
-                                {isSubmitting ? "추천 코스 생성 중..." : "코스 추천받기"}
+                                {isSubmitting ? "추천 후보 찾는 중..." : "코스 추천받기"}
                             </Button>
                         )}
                     </div>
