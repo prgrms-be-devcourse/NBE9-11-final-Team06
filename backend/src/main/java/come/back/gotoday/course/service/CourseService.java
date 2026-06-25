@@ -1,17 +1,7 @@
 package come.back.gotoday.course.service;
-
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
-import come.back.gotoday.course.dto.CourseBookmarkResponse;
-import come.back.gotoday.course.dto.CourseCreateRequest;
-import come.back.gotoday.course.dto.CourseDetailResponse;
-import come.back.gotoday.course.dto.CourseListResponse;
-import come.back.gotoday.course.dto.CoursePlaceResponse;
-import come.back.gotoday.course.dto.CoursePreviewRequest;
-import come.back.gotoday.course.dto.CoursePreviewResponse;
-import come.back.gotoday.course.dto.PlacePreviewResponse;
-import come.back.gotoday.course.dto.SavedCoursePageResponse;
-import come.back.gotoday.course.dto.SavedCourseResponse;
+import come.back.gotoday.course.dto.*;
 import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.course.entity.CoursePlace;
 import come.back.gotoday.course.entity.SavedCourse;
@@ -21,6 +11,7 @@ import come.back.gotoday.course.repository.SavedCourseRepository;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.global.exception.BusinessException;
@@ -361,55 +352,6 @@ public class CourseService {
         );
     }
 
-    @Transactional
-    public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
-        getMemberOrThrow(memberId);
-
-        if (hasTourCategory(request.categories())) {
-            log.info(
-                    "관광지 기반 코스 미리보기 분기 진입: memberId={}, categories={}",
-                    memberId,
-                    request.categories()
-            );
-
-            return previewTourCourse(request);
-        }
-
-        log.info(
-                "행사 기반 코스 미리보기 분기 진입: memberId={}, categories={}",
-                memberId,
-                request.categories()
-        );
-
-        RecommendationService.RecommendedCourseDraft draft =
-                recommendationService.recommendCourse(
-                        memberId,
-                        toRecommendationCourseCreateRequest(request)
-                );
-
-        List<Long> recommendedEventIds = draft.events()
-                .stream()
-                .map(RecommendationService.RecommendedEvent::eventId)
-                .toList();
-
-        List<Event> events = eventRepository.findAllById(recommendedEventIds);
-
-        if (events.isEmpty()) {
-            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
-        }
-
-        Event centerEvent = events.size() > 1 ? events.get(1) : events.get(0);
-
-        double centerLat = centerEvent.getLatitude();
-        double centerLng = centerEvent.getLongitude();
-
-        return createCoursePreviewResponse(
-                recommendedEventIds,
-                centerLat,
-                centerLng,
-                request
-        );
-    }
 
     private RecommendationCourseCreateRequest toRecommendationCourseCreateRequest(
             CoursePreviewRequest request
@@ -441,89 +383,23 @@ public class CourseService {
             throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
         }
 
-        Place centerPlace = tourPlaces.stream()
-                .filter(place -> place.getLatitude() != null && place.getLongitude() != null)
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
-
-        return createCoursePreviewResponse(
-                List.of(),
-                centerPlace.getLatitude().doubleValue(),
-                centerPlace.getLongitude().doubleValue(),
-                request
-        );
-    }
-
-    private CoursePreviewResponse createCoursePreviewResponse(
-            List<Long> recommendedEventIds,
-            double centerLat,
-            double centerLng,
-            CoursePreviewRequest request
-    ) {
-        KakaoPlaceResponse cafeResponse =
-                kakaoLocalService.searchCafe(centerLat, centerLng);
-
-        RestaurantType restaurantType =
-                request.restaurantType() != null
-                        ? request.restaurantType()
-                        : RestaurantType.KOREAN;
-
-        KakaoPlaceResponse restaurantResponse =
-                kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
-
-        Category restaurantCategory = getCategoryByName("맛집");
-        Category cafeCategory = getCategoryByName("카페");
-
-        List<Place> savedRestaurants = restaurantResponse.documents()
-                .stream()
-                .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(
-                        centerLat,
-                        centerLng,
-                        Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())
-                ) <= 500)
-                .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
-                .toList();
-
-        List<Place> savedCafes = cafeResponse.documents()
-                .stream()
-                .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(
-                        centerLat,
-                        centerLng,
-                        Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())
-                ) <= 500)
-                .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
+        List<EventNearbyPlaceResponse> events = tourPlaces.stream()
+                .map(place -> new EventNearbyPlaceResponse(
+                        null,
+                        place.getName(),
+                        List.of(),
+                        List.of()
+                ))
                 .toList();
 
         return new CoursePreviewResponse(
-                recommendedEventIds,
-                savedRestaurants.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()
-                        ))
-                        .toList(),
-                savedCafes.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()
-                        ))
-                        .toList(),
+                List.of(),
+                events,
                 request.startLatitude(),
                 request.startLongitude()
         );
     }
+
 
     private Category getCategoryByName(String name) {
         return categoryRepository.findFirstByNameOrderByIdAsc(name)
@@ -596,6 +472,121 @@ public class CourseService {
         return savedPlace;
     }
 
+    // 행사 데이터를 바탕으로, 주변 식당과 카페 리스트 (최신버전)
+    @Transactional
+    public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
+        String queryText = recommendationService.createQueryText(
+                request.baseArea(),
+                request.courseType(),
+                request.companionType()
+        );
+
+        //추천 알고리즘을 통해서 나온 이벤트 아이디
+        List<Long> recommendedEventIds =
+                recommendationService.getRecommendedEventIds(
+                        memberId,
+                        queryText,
+                        request.startDate(),
+                        request.endDate(),
+                        3
+                );
+
+        //실제 이벤트 형식으로 리스트
+        List<Event> events = eventRepository.findAllById(recommendedEventIds);
+
+        List<EventNearbyPlaceResponse> nearbyPlaces = new ArrayList<>();
+
+
+        Category restaurantCategory = categoryRepository.findByName("맛집")
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        Category cafeCategory = categoryRepository.findByName("카페")
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        RestaurantType restaurantType =
+                request.restaurantType() != null
+                        ? request.restaurantType()
+                        : RestaurantType.KOREAN;
+
+
+        for (Event event : events) {
+
+            //이벤트의 위경도가 null이 아님을 증명
+            if (event.getLatitude() == null || event.getLongitude() == null) {
+                continue;
+            }
+
+            //이벤트의 위경도
+            double lat = event.getLatitude();
+            double lng = event.getLongitude();
+
+
+            KakaoPlaceResponse restaurantResponse =
+                    kakaoLocalService.searchRestaurant(lat, lng, restaurantType);
+
+            KakaoPlaceResponse cafeResponse =
+                    kakaoLocalService.searchCafe(lat, lng);
+
+
+            List<KakaoPlaceDocument> restaurantDocs =
+                    restaurantResponse != null
+                            ? restaurantResponse.documents()
+                            : List.of();
+
+
+            List<KakaoPlaceDocument> cafeDocs =
+                    cafeResponse != null
+                            ? cafeResponse.documents()
+                            : List.of();
+
+            List<PlacePreviewResponse> restaurants =
+                    restaurantDocs.stream()
+                            .limit(3)
+                            .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
+                            .map(place -> new PlacePreviewResponse(
+                                    place.getId(),
+                                    place.getName(),
+                                    place.getAddress(),
+                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
+                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
+                                    place.getPlaceUrl()
+                            ))
+                            .toList();
+
+
+            List<PlacePreviewResponse> cafes =
+                    cafeDocs.stream()
+                            .limit(3)
+                            .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
+                            .map(place -> new PlacePreviewResponse(
+                                    place.getId(),
+                                    place.getName(),
+                                    place.getAddress(),
+                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
+                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
+                                    place.getPlaceUrl()
+                            ))
+                            .toList();
+
+            nearbyPlaces.add(
+                    new EventNearbyPlaceResponse(
+                            event.getId(),
+                            event.getTitle(),
+                            restaurants,
+                            cafes
+                    )
+            );
+        }
+        return new CoursePreviewResponse(
+                recommendedEventIds,
+                nearbyPlaces,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+    }
+
+
+    // 코스 상세조회
     @Transactional(readOnly = true)
     public CourseDetailResponse getCourse(Long courseId) {
         log.info("코스 단건 조회 처리 시작: courseId={}", courseId);
@@ -773,19 +764,4 @@ public class CourseService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
     }
 
-    private double distance(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371;
-
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1))
-                * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c * 1000;
-    }
 }

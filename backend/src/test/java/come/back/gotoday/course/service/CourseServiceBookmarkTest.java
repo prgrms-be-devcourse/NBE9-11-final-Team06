@@ -225,6 +225,7 @@ class CourseServiceBookmarkTest {
         return member;
     }
 
+    //성수역 위경도 추가
     private Course createCourse(Long id, Member member) {
         Course course = Course.create(
                 member,
@@ -235,8 +236,8 @@ class CourseServiceBookmarkTest {
                 LocalDate.of(2026, 6, 22),
                 "성수",
                 "FRIEND",
-                null,
-                null,
+                37.54444,
+                127.05611,
                 null,
                 null,
                 "사용자 선호 정보를 기반으로 추천되었습니다."
