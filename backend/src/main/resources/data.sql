@@ -307,6 +307,153 @@ WHERE p.name = '새로운 경험'
 );
 
 -- =================================================================================
+-- Preference → Tour Category Mapping
+-- 선택한 취향 카테고리를 관광공사 관광지 세부 분류(tour_cat3)로 변환하기 위한 매핑 데이터
+-- =================================================================================
+
+-- 조용한 힐링 → 공원, 정원, 계곡, 사찰, 스파·찜질
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A01010500' AS tour_cat3
+    UNION ALL SELECT 'A01010700'
+    UNION ALL SELECT 'A01010900'
+    UNION ALL SELECT 'A02010800'
+    UNION ALL SELECT 'A02010900'
+    UNION ALL SELECT 'A02011000'
+    UNION ALL SELECT 'A02020300'
+    UNION ALL SELECT 'A02020400'
+    UNION ALL SELECT 'A02020700'
+) codes
+WHERE p.name = '조용한 힐링'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- 문화생활 → 궁궐, 유적, 한옥, 전통문화 체험, 박물관·예술공간, 기념시설
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A02010100' AS tour_cat3
+    UNION ALL SELECT 'A02010200'
+    UNION ALL SELECT 'A02010300'
+    UNION ALL SELECT 'A02010400'
+    UNION ALL SELECT 'A02010500'
+    UNION ALL SELECT 'A02010600'
+    UNION ALL SELECT 'A02010700'
+    UNION ALL SELECT 'A02010800'
+    UNION ALL SELECT 'A02010900'
+    UNION ALL SELECT 'A02011000'
+    UNION ALL SELECT 'A02030200'
+    UNION ALL SELECT 'A02040800'
+    UNION ALL SELECT 'A02050200'
+    UNION ALL SELECT 'A02050400'
+    UNION ALL SELECT 'A02050600'
+) codes
+WHERE p.name = '문화생활'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- 자연·산책 → 산, 공원, 정원, 계곡, 강·하천, 다리
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A01010400' AS tour_cat3
+    UNION ALL SELECT 'A01010500'
+    UNION ALL SELECT 'A01010700'
+    UNION ALL SELECT 'A01010900'
+    UNION ALL SELECT 'A01011800'
+    UNION ALL SELECT 'A02020700'
+    UNION ALL SELECT 'A02050100'
+) codes
+WHERE p.name = '자연·산책'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- 감성·사진 → 한옥, 공원, 강변, 유람선, 마을·거리, 다리, 전망대
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A01010500' AS tour_cat3
+    UNION ALL SELECT 'A01010700'
+    UNION ALL SELECT 'A01011800'
+    UNION ALL SELECT 'A02010400'
+    UNION ALL SELECT 'A02010600'
+    UNION ALL SELECT 'A02020700'
+    UNION ALL SELECT 'A02020800'
+    UNION ALL SELECT 'A02030100'
+    UNION ALL SELECT 'A02030600'
+    UNION ALL SELECT 'A02050100'
+    UNION ALL SELECT 'A02050600'
+) codes
+WHERE p.name = '감성·사진'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- 활동적인 하루 → 산행, 테마시설, 이색 체험
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A01010400' AS tour_cat3
+    UNION ALL SELECT 'A02020600'
+    UNION ALL SELECT 'A02030400'
+) codes
+WHERE p.name = '활동적인 하루'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- 새로운 경험 → 테마시설, 마을 탐방, 전통 체험, 이색 체험, 거리, 산업·기술문화공간
+INSERT INTO `preference_tour_category_mapping` (`preference_category_id`, `tour_cat3`)
+SELECT p.id, codes.tour_cat3
+FROM `category` p
+CROSS JOIN (
+    SELECT 'A02020600' AS tour_cat3
+    UNION ALL SELECT 'A02030100'
+    UNION ALL SELECT 'A02030200'
+    UNION ALL SELECT 'A02030400'
+    UNION ALL SELECT 'A02030600'
+    UNION ALL SELECT 'A02040800'
+    UNION ALL SELECT 'A02040900'
+) codes
+WHERE p.name = '새로운 경험'
+  AND p.type = 'PREFERENCE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `preference_tour_category_mapping` m
+      WHERE m.preference_category_id = p.id
+        AND m.tour_cat3 = codes.tour_cat3
+  );
+
+-- =================================================================================
 -- 1. 기초 인프라 데이터 (회원, 선호도, 카테고리 선호, 장소) 삽입
 -- =================================================================================
 
@@ -546,5 +693,6 @@ ALTER TABLE `member` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `user_preference` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `user_preference_category` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `preference_event_category_mapping` ALTER COLUMN `id` RESTART WITH 100;
+ALTER TABLE `preference_tour_category_mapping` ALTER COLUMN `id` RESTART WITH 100;
 ALTER TABLE `place` ALTER COLUMN `id` RESTART WITH 1000;
 ALTER TABLE `event` ALTER COLUMN `id` RESTART WITH 1000;

@@ -206,6 +206,9 @@ public class Tour {
             String imageUrl,
             String thumbnailUrl,
             String overview,
+            String cat1,
+            String cat2,
+            String cat3,
             String area,
             Double latitude,
             Double longitude
@@ -219,6 +222,9 @@ public class Tour {
         this.imageUrl = imageUrl;
         this.thumbnailUrl = thumbnailUrl;
         this.overview = overview;
+        this.cat1 = cat1;
+        this.cat2 = cat2;
+        this.cat3 = cat3;
         this.area = area;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -234,6 +240,9 @@ public class Tour {
             String imageUrl,
             String thumbnailUrl,
             String overview,
+            String cat1,
+            String cat2,
+            String cat3,
             String area,
             Double latitude,
             Double longitude
@@ -246,6 +255,9 @@ public class Tour {
                 !Objects.equals(this.imageUrl, imageUrl) ||
                 !Objects.equals(this.thumbnailUrl, thumbnailUrl) ||
                 !Objects.equals(this.overview, overview) ||
+                !Objects.equals(this.cat1, cat1) ||
+                !Objects.equals(this.cat2, cat2) ||
+                !Objects.equals(this.cat3, cat3) ||
                 !Objects.equals(this.area, area) ||
                 !Objects.equals(this.latitude, latitude) ||
                 !Objects.equals(this.longitude, longitude);

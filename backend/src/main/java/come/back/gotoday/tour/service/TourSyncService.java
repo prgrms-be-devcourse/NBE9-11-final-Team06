@@ -112,6 +112,9 @@ public class TourSyncService {
                 item.firstimage(),
                 item.firstimage2(),
                 tour.getOverview(),
+                item.cat1(),
+                item.cat2(),
+                item.cat3(),
                 area,
                 latitude,
                 longitude
@@ -131,6 +134,9 @@ public class TourSyncService {
                 item.firstimage(),
                 item.firstimage2(),
                 tour.getOverview(),
+                item.cat1(),
+                item.cat2(),
+                item.cat3(),
                 area,
                 latitude,
                 longitude

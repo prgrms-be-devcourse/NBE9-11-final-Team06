@@ -17,8 +17,6 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class Place {
 
-    public static final String TOUR_API_SOURCE = "TOUR_API";
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -126,34 +124,6 @@ public class Place {
         );
     }
 
-    public static Place createTourPlace(
-            Category category,
-            String name,
-            String address,
-            String roadAddress,
-            BigDecimal latitude,
-            BigDecimal longitude,
-            String phone,
-            String placeUrl,
-            String description,
-            String externalId
-    ) {
-        return new Place(
-                category,
-                name,
-                address,
-                roadAddress,
-                latitude,
-                longitude,
-                phone,
-                placeUrl,
-                description,
-                TOUR_API_SOURCE,
-                externalId,
-                true
-        );
-    }
-
     public void update(
             Category category,
             String name,
@@ -176,30 +146,6 @@ public class Place {
         this.placeUrl = placeUrl;
         this.description = description;
         this.externalId = externalId;
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    public void updateTourInfo(
-            Category category,
-            String name,
-            String address,
-            String roadAddress,
-            BigDecimal latitude,
-            BigDecimal longitude,
-            String phone,
-            String placeUrl,
-            String description
-    ) {
-        this.category = category;
-        this.name = name;
-        this.address = address;
-        this.roadAddress = roadAddress;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.phone = phone;
-        this.placeUrl = placeUrl;
-        this.description = description;
-        this.isActive = true;
         this.updatedAt = LocalDateTime.now();
     }
 

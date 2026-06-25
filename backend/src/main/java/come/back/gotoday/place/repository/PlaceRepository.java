@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +39,25 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     List<Place> findActivePlacesBySourceAndArea(
             @Param("source") String source,
             @Param("area") String area
+    );
+
+    @Query("""
+        SELECT p
+        FROM Place p
+        WHERE p.isActive = true
+          AND p.source = :source
+          AND p.latitude IS NOT NULL
+          AND p.longitude IS NOT NULL
+          AND p.latitude BETWEEN :minLatitude AND :maxLatitude
+          AND p.longitude BETWEEN :minLongitude AND :maxLongitude
+        ORDER BY p.id ASC
+        """)
+    List<Place> findActivePlacesBySourceWithinBounds(
+            @Param("source") String source,
+            @Param("minLatitude") double minLatitude,
+            @Param("maxLatitude") double maxLatitude,
+            @Param("minLongitude") double minLongitude,
+            @Param("maxLongitude") double maxLongitude
     );
 
     @Query("""
