@@ -3,8 +3,8 @@ package come.back.gotoday.external.tour.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record TourApiResponse(
-        TourApiHeader header,
-        TourApiBody body
+public record TourApiHeader(
+        String resultCode,
+        String resultMsg
 ) {
 }

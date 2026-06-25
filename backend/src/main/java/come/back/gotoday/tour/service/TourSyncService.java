@@ -1,0 +1,219 @@
+package come.back.gotoday.tour.service;
+
+import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.category.repository.CategoryRepository;
+import come.back.gotoday.category.type.CategoryType;
+import come.back.gotoday.external.tour.TourApiClient;
+import come.back.gotoday.external.tour.dto.TourApiItem;
+import come.back.gotoday.tour.entity.Tour;
+import come.back.gotoday.tour.enums.TourSource;
+import come.back.gotoday.tour.repository.TourRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Objects;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class TourSyncService {
+
+    private static final int DEFAULT_PAGE_NO = 1;
+    private static final int DEFAULT_NUM_OF_ROWS = 100;
+
+    private static final String SEOUL_AREA_CODE = "1";
+
+    private static final List<String> SEOUL_SIGUNGU_CODES = List.of(
+            "1", "2", "3", "4", "5",
+            "6", "7", "8", "9", "10",
+            "11", "12", "13", "14", "15",
+            "16", "17", "18", "19", "20",
+            "21", "22", "23", "24", "25"
+    );
+
+    private final TourApiClient tourApiClient;
+    private final TourRepository tourRepository;
+    private final CategoryRepository categoryRepository;
+    private final TourCategoryMapper tourCategoryMapper;
+
+    @Transactional
+    public int syncTours(String areaCode, String sigunguCode) {
+        List<TourApiItem> items = tourApiClient.fetchTourItems(
+                areaCode,
+                sigunguCode,
+                DEFAULT_PAGE_NO,
+                DEFAULT_NUM_OF_ROWS
+        );
+
+        int syncedCount = 0;
+
+        for (TourApiItem item : items) {
+            if (isInvalidItem(item)) {
+                continue;
+            }
+
+            upsertTour(item);
+            syncedCount++;
+        }
+
+        log.info("TourAPI 관광지 동기화 완료: areaCode={}, sigunguCode={}, syncedCount={}",
+                areaCode, sigunguCode, syncedCount);
+
+        return syncedCount;
+    }
+
+    @Transactional
+    public int syncAllSeoulTours() {
+        int totalSyncedCount = 0;
+
+        for (String sigunguCode : SEOUL_SIGUNGU_CODES) {
+            int syncedCount = syncTours(SEOUL_AREA_CODE, sigunguCode);
+            totalSyncedCount += syncedCount;
+
+            log.info("TourAPI 서울 구별 관광지 동기화 완료: sigunguCode={}, syncedCount={}",
+                    sigunguCode, syncedCount);
+        }
+
+        log.info("TourAPI 서울 전체 관광지 동기화 완료: totalSyncedCount={}", totalSyncedCount);
+
+        return totalSyncedCount;
+    }
+
+    private boolean isInvalidItem(TourApiItem item) {
+        return item == null
+                || isBlank(item.contentid())
+                || isBlank(item.title());
+    }
+
+    private void upsertTour(TourApiItem item) {
+        tourRepository.findByContentId(item.contentid())
+                .ifPresentOrElse(
+                        existingTour -> updateTourIfChanged(existingTour, item),
+                        () -> saveNewTour(item)
+                );
+    }
+
+    private void updateTourIfChanged(Tour tour, TourApiItem item) {
+        Category category = findCategory(item);
+        String area = extractArea(item.addr1());
+        Double latitude = parseDouble(item.mapy());
+        Double longitude = parseDouble(item.mapx());
+
+        boolean categoryChanged = isCategoryChanged(tour, category);
+        boolean tourInfoChanged = tour.isChanged(
+                item.title(),
+                item.addr1(),
+                item.addr2(),
+                item.tel(),
+                tour.getHomepageUrl(),
+                item.firstimage(),
+                item.firstimage2(),
+                tour.getOverview(),
+                area,
+                latitude,
+                longitude
+        );
+
+        if (!categoryChanged && !tourInfoChanged) {
+            return;
+        }
+
+        tour.updateInfo(
+                category,
+                item.title(),
+                item.addr1(),
+                item.addr2(),
+                item.tel(),
+                tour.getHomepageUrl(),
+                item.firstimage(),
+                item.firstimage2(),
+                tour.getOverview(),
+                area,
+                latitude,
+                longitude
+        );
+    }
+
+    private void saveNewTour(TourApiItem item) {
+        Tour tour = Tour.create(
+                findCategory(item),
+                item.contentid(),
+                item.contenttypeid(),
+                item.title(),
+                item.addr1(),
+                item.addr2(),
+                item.tel(),
+                null,
+                item.firstimage(),
+                item.firstimage2(),
+                null,
+                item.areacode(),
+                item.sigungucode(),
+                item.cat1(),
+                item.cat2(),
+                item.cat3(),
+                extractArea(item.addr1()),
+                parseDouble(item.mapy()),
+                parseDouble(item.mapx()),
+                TourSource.TOUR_API,
+                null
+        );
+
+        tourRepository.save(tour);
+    }
+
+    private Category findCategory(TourApiItem item) {
+        return tourCategoryMapper.mapToCategoryName(
+                        item.cat1(),
+                        item.cat2(),
+                        item.cat3()
+                )
+                .flatMap(categoryName -> categoryRepository.findByNameAndType(categoryName, CategoryType.TOUR))
+                .orElse(null);
+    }
+
+    private boolean isCategoryChanged(Tour tour, Category category) {
+        Long currentCategoryId = tour.getCategory() == null ? null : tour.getCategory().getId();
+        Long newCategoryId = category == null ? null : category.getId();
+
+        return !Objects.equals(currentCategoryId, newCategoryId);
+    }
+
+    private String extractArea(String address) {
+        if (isBlank(address)) {
+            return null;
+        }
+
+        String[] parts = address.trim().split("\\s+");
+
+        if (parts.length >= 2 && parts[0].contains("서울")) {
+            return parts[1];
+        }
+
+        if (parts.length >= 2) {
+            return parts[1];
+        }
+
+        return address.trim();
+    }
+
+    private Double parseDouble(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("TourAPI 좌표 파싱 실패: value={}", value);
+            return null;
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+}
