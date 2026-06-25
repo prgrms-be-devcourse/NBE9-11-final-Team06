@@ -9,6 +9,7 @@ import come.back.gotoday.course.dto.CourseListResponse;
 import come.back.gotoday.course.dto.CoursePlaceResponse;
 import come.back.gotoday.course.dto.CoursePreviewRequest;
 import come.back.gotoday.course.dto.CoursePreviewResponse;
+import come.back.gotoday.course.dto.EventNearbyPlaceResponse;
 import come.back.gotoday.course.dto.PlacePreviewResponse;
 import come.back.gotoday.course.dto.SavedCoursePageResponse;
 import come.back.gotoday.course.dto.SavedCourseResponse;
@@ -22,6 +23,7 @@ import come.back.gotoday.course.type.CourseItemType;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.global.exception.BusinessException;
@@ -60,6 +62,7 @@ public class CourseService {
     private static final int SAVED_COURSE_PAGE_SIZE = 10;
     private static final int DEFAULT_PREVIEW_EVENT_COUNT = 3;
     private static final int DEFAULT_TOUR_PLACE_COUNT = 3;
+    private static final double NEARBY_PLACE_RADIUS_METER = 500.0;
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -400,19 +403,17 @@ public class CourseService {
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        if (events.isEmpty()) {
-            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
-        }
-
-        Event centerEvent = events.size() > 1 ? events.get(1) : events.get(0);
-
-        double centerLat = centerEvent.getLatitude();
-        double centerLng = centerEvent.getLongitude();
+        Event centerEvent = events.stream()
+                .filter(event -> event.getLatitude() != null && event.getLongitude() != null)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("추천 가능한 행사가 없습니다."));
 
         return createCoursePreviewResponse(
                 recommendedEventIds,
-                centerLat,
-                centerLng,
+                centerEvent.getId(),
+                centerEvent.getTitle(),
+                centerEvent.getLatitude(),
+                centerEvent.getLongitude(),
                 request
         );
     }
@@ -451,6 +452,8 @@ public class CourseService {
 
         return createCoursePreviewResponse(
                 List.of(),
+                null,
+                centerTour.getTitle(),
                 centerTour.getLatitude(),
                 centerTour.getLongitude(),
                 request
@@ -459,6 +462,8 @@ public class CourseService {
 
     private CoursePreviewResponse createCoursePreviewResponse(
             List<Long> recommendedEventIds,
+            Long eventId,
+            String eventTitle,
             double centerLat,
             double centerLng,
             CoursePreviewRequest request
@@ -477,7 +482,7 @@ public class CourseService {
         Category restaurantCategory = getCategoryByName("맛집");
         Category cafeCategory = getCategoryByName("카페");
 
-        List<Place> savedRestaurants = restaurantResponse.documents()
+        List<PlacePreviewResponse> restaurants = getDocumentsOrEmpty(restaurantResponse)
                 .stream()
                 .filter(doc -> doc.y() != null && doc.x() != null)
                 .filter(doc -> distance(
@@ -485,11 +490,12 @@ public class CourseService {
                         centerLng,
                         Double.parseDouble(doc.y()),
                         Double.parseDouble(doc.x())
-                ) <= 500)
+                ) <= NEARBY_PLACE_RADIUS_METER)
                 .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
+                .map(this::toPlacePreviewResponse)
                 .toList();
 
-        List<Place> savedCafes = cafeResponse.documents()
+        List<PlacePreviewResponse> cafes = getDocumentsOrEmpty(cafeResponse)
                 .stream()
                 .filter(doc -> doc.y() != null && doc.x() != null)
                 .filter(doc -> distance(
@@ -497,34 +503,42 @@ public class CourseService {
                         centerLng,
                         Double.parseDouble(doc.y()),
                         Double.parseDouble(doc.x())
-                ) <= 500)
+                ) <= NEARBY_PLACE_RADIUS_METER)
                 .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
+                .map(this::toPlacePreviewResponse)
                 .toList();
+
+        EventNearbyPlaceResponse nearbyPlaceResponse = new EventNearbyPlaceResponse(
+                eventId,
+                eventTitle,
+                restaurants,
+                cafes
+        );
 
         return new CoursePreviewResponse(
                 recommendedEventIds,
-                savedRestaurants.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()
-                        ))
-                        .toList(),
-                savedCafes.stream()
-                        .map(p -> new PlacePreviewResponse(
-                                p.getId(),
-                                p.getName(),
-                                p.getAddress(),
-                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
-                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
-                                p.getPlaceUrl()
-                        ))
-                        .toList(),
+                List.of(nearbyPlaceResponse),
                 request.startLatitude(),
                 request.startLongitude()
+        );
+    }
+
+    private List<KakaoPlaceDocument> getDocumentsOrEmpty(KakaoPlaceResponse response) {
+        if (response == null || response.documents() == null) {
+            return List.of();
+        }
+
+        return response.documents();
+    }
+
+    private PlacePreviewResponse toPlacePreviewResponse(Place place) {
+        return new PlacePreviewResponse(
+                place.getId(),
+                place.getName(),
+                place.getAddress(),
+                place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
+                place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
+                place.getPlaceUrl()
         );
     }
 
@@ -860,7 +874,7 @@ public class CourseService {
     }
 
     private double distance(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371;
+        double radius = 6371;
 
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
@@ -872,6 +886,6 @@ public class CourseService {
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        return R * c * 1000;
+        return radius * c * 1000;
     }
 }
