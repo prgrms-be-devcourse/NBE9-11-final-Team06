@@ -136,7 +136,13 @@ export default function AdminPage() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [loading, setLoading] = useState(false)
 
+  const PLACE_PAGE_SIZE = 20
+
   const [places, setPlaces] = useState<AdminPlaceResponse[]>([])
+  const [placePage, setPlacePage] = useState(0)
+  const [placeTotalPages, setPlaceTotalPages] = useState(0)
+  const [placeTotalElements, setPlaceTotalElements] = useState(0)
+  
   const [members, setMembers] = useState<AdminMemberResponse[]>([])
 
   const [keyword, setKeyword] = useState("")
@@ -148,7 +154,7 @@ export default function AdminPage() {
   const [editingPlaceId, setEditingPlaceId] = useState<number | null>(null)
 
   const stats = [
-    { label: "등록 장소", value: places.length, icon: MapPin },
+    { label: "등록 장소", value: placeTotalElements, icon: MapPin },
     { label: "진행 행사", value: EVENTS.length, icon: CalendarDays },
     { label: "회원 수", value: members.length, icon: Users },
     { label: "관리 지역", value: SEOUL_AREAS.length, icon: LayoutGrid },
@@ -178,32 +184,43 @@ export default function AdminPage() {
     }
   }
 
-  async function loadPlaces() {
+  async function loadPlaces(page = placePage) {
     const params = new URLSearchParams()
-    params.set("page", "0")
-    params.set("size", "20")
-
+    params.set("page", String(page))
+    params.set("size", String(PLACE_PAGE_SIZE))
+  
     if (keyword.trim()) {
       params.set("keyword", keyword.trim())
     }
-
+  
     if (categoryId.trim()) {
       params.set("categoryId", categoryId.trim())
     }
-
+  
     if (isActive.trim()) {
       params.set("isActive", isActive.trim())
     }
-
+  
     if (source.trim()) {
       params.set("source", source.trim())
     }
-
+  
     const response = await apiFetch<PageResponse<AdminPlaceResponse>>(
-        `/api/admin/places?${params.toString()}`
+      `/api/admin/places?${params.toString()}`
     )
-
+  
     setPlaces(response.content)
+    setPlacePage(response.number)
+    setPlaceTotalPages(response.totalPages)
+    setPlaceTotalElements(response.totalElements)
+  }
+
+  async function handleChangePlacePage(nextPage: number) {
+    if (nextPage < 0 || nextPage >= placeTotalPages) {
+      return
+    }
+  
+    await loadPlaces(nextPage)
   }
 
   async function loadMembers() {
@@ -299,7 +316,7 @@ export default function AdminPage() {
 
       setPlaceForm(emptyPlaceForm)
       setEditingPlaceId(null)
-      await loadPlaces()
+      await loadPlaces(0)
     } catch (error) {
       console.error(error)
       alert(error instanceof Error ? error.message : "장소 저장에 실패했습니다.")
@@ -572,7 +589,7 @@ export default function AdminPage() {
                         value={source}
                         onChange={(e) => setSource(e.target.value)}
                     />
-                    <Button type="button" onClick={loadPlaces}>
+                    <Button type="button" onClick={() => loadPlaces(0)}>
                       검색
                     </Button>
                   </div>
@@ -660,6 +677,34 @@ export default function AdminPage() {
                       )}
                     </TableBody>
                   </Table>
+
+                  <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                    <div>
+                      총 {placeTotalElements}개 ·{" "}
+                      {placeTotalPages === 0 ? 0 : placePage + 1} / {placeTotalPages} 페이지
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage === 0}
+                        onClick={() => handleChangePlacePage(placePage - 1)}
+                      >
+                        이전
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={placePage + 1 >= placeTotalPages}
+                        onClick={() => handleChangePlacePage(placePage + 1)}
+                      >
+                        다음
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -722,7 +767,8 @@ export default function AdminPage() {
                                         }
 
                                         handleDeleteMember(memberId)
-                                      }}                                  >
+                                      }}                               
+                                      >
                                     탈퇴 처리
                                   </Button>
                                 </TableCell>
