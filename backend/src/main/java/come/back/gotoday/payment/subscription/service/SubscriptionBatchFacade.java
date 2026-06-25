@@ -4,7 +4,11 @@ package come.back.gotoday.payment.subscription.service;
 import come.back.gotoday.external.toss.TossPaymentsClient;
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentRequest;
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentResponse;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
+import come.back.gotoday.payment.subscription.entity.Subscription;
 import come.back.gotoday.payment.subscription.enums.SubscriptionStatus;
+import come.back.gotoday.payment.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,6 +23,7 @@ public class SubscriptionBatchFacade {
 
     private final TossPaymentsClient tossPaymentsClient;
     private final SubscriptionBatchService subscriptionBatchService;
+    private final SubscriptionRepository subscriptionRepository;
     // private final NotificationService notificationService; // 알림톡/이메일 발송 서비스 (가정)
 
     private static final int GRACE_PERIOD_DAYS = 7; // 유예 기간 정책: 7일
@@ -67,6 +72,23 @@ public class SubscriptionBatchFacade {
 
             throw e;
         }
+    }
+
+    public void finalizeSubscription(Long subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
+
+        // 2. 상태 검증 (이미 해지되었거나 다른 상태일 경우 방어)
+        if (subscription.getStatus() != SubscriptionStatus.CANCELED_RESERVED) {
+            log.warn("[배치] 구독 ID: {}는 해지 예약 상태가 아니므로 최종 해지를 건너뜁니다.", subscriptionId);
+            return;
+        }
+
+        // 3. 강제 해지 메서드 호출
+        subscription.cancel();
+
+        // @Transactional에 의해 자동으로 Dirty Checking되어 DB 반영됨
+        log.info("[배치] 구독 ID: {} 최종 해지 완료.", subscriptionId);
     }
 
 

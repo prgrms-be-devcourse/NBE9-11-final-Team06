@@ -118,6 +118,11 @@ public class Subscription {
     }
 
     // 구독 해지 요청 처리
+    public void reserveCancellation() {
+        this.status = SubscriptionStatus.CANCELED_RESERVED;
+        this.updatedAt = LocalDateTime.now();
+    }
+    //강제 해지 (결제 실패, 유예 기간 만료, 결제 취소 등 즉시 종료)
     public void cancel() {
         this.status = SubscriptionStatus.CANCELED;
         this.updatedAt = LocalDateTime.now(); // 데이터 변경 시 업데이트 시간 갱신
