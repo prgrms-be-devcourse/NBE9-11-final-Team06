@@ -2,13 +2,15 @@ package come.back.gotoday.course.entity;
 
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.place.entity.Place;
+import come.back.gotoday.tour.entity.Tour;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "course_place")
@@ -27,6 +29,10 @@ public class CoursePlace {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id")
     private Place place;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tour_id")
+    private Tour tour;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id")
@@ -59,11 +65,23 @@ public class CoursePlace {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private CoursePlace(Course course, Place place, Event event, Integer visitOrder, LocalDate visitDate,
-                        LocalTime startTime, LocalTime endTime, Integer stayMinutes, Integer moveMinutesFromPrev,
-                        Double distanceFromPrev, String recommendationReason) {
+    private CoursePlace(
+            Course course,
+            Place place,
+            Tour tour,
+            Event event,
+            Integer visitOrder,
+            LocalDate visitDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            Integer stayMinutes,
+            Integer moveMinutesFromPrev,
+            Double distanceFromPrev,
+            String recommendationReason
+    ) {
         this.course = course;
         this.place = place;
+        this.tour = tour;
         this.event = event;
         this.visitOrder = visitOrder;
         this.visitDate = visitDate;
@@ -76,11 +94,61 @@ public class CoursePlace {
         this.createdAt = LocalDateTime.now();
     }
 
-    // [규칙 반영] 정적 팩토리 메서드
-    public static CoursePlace create(Course course, Place place, Event event, Integer visitOrder, LocalDate visitDate,
-                                     LocalTime startTime, LocalTime endTime, Integer stayMinutes, Integer moveMinutesFromPrev,
-                                     Double distanceFromPrev, String recommendationReason) {
-        return new CoursePlace(course, place, event, visitOrder, visitDate, startTime, endTime, stayMinutes, moveMinutesFromPrev, distanceFromPrev, recommendationReason);
+    public static CoursePlace create(
+            Course course,
+            Place place,
+            Event event,
+            Integer visitOrder,
+            LocalDate visitDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            Integer stayMinutes,
+            Integer moveMinutesFromPrev,
+            Double distanceFromPrev,
+            String recommendationReason
+    ) {
+        return new CoursePlace(
+                course,
+                place,
+                null,
+                event,
+                visitOrder,
+                visitDate,
+                startTime,
+                endTime,
+                stayMinutes,
+                moveMinutesFromPrev,
+                distanceFromPrev,
+                recommendationReason
+        );
+    }
+
+    public static CoursePlace createWithTour(
+            Course course,
+            Tour tour,
+            Integer visitOrder,
+            LocalDate visitDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            Integer stayMinutes,
+            Integer moveMinutesFromPrev,
+            Double distanceFromPrev,
+            String recommendationReason
+    ) {
+        return new CoursePlace(
+                course,
+                null,
+                tour,
+                null,
+                visitOrder,
+                visitDate,
+                startTime,
+                endTime,
+                stayMinutes,
+                moveMinutesFromPrev,
+                distanceFromPrev,
+                recommendationReason
+        );
     }
 
     public void setCourse(Course course) {

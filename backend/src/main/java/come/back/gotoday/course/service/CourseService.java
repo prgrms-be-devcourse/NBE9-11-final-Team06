@@ -18,6 +18,7 @@ import come.back.gotoday.course.entity.SavedCourse;
 import come.back.gotoday.course.repository.CoursePlaceRepository;
 import come.back.gotoday.course.repository.CourseRepository;
 import come.back.gotoday.course.repository.SavedCourseRepository;
+import come.back.gotoday.course.type.CourseItemType;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
@@ -34,6 +35,8 @@ import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
 import come.back.gotoday.recommend.dto.RecommendationCourseResponse;
 import come.back.gotoday.recommend.dto.RecommendedCoursePlaceResponse;
 import come.back.gotoday.recommend.service.RecommendationService;
+import come.back.gotoday.tour.entity.Tour;
+import come.back.gotoday.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,6 +66,7 @@ public class CourseService {
     private final SavedCourseRepository savedCourseRepository;
     private final MemberRepository memberRepository;
     private final PlaceRepository placeRepository;
+    private final TourRepository tourRepository;
     private final CategoryRepository categoryRepository;
 
     private final RecommendationService recommendationService;
@@ -74,19 +78,8 @@ public class CourseService {
     public Long createCourse(Long memberId, CourseCreateRequest request) {
         Member member = getMemberOrThrow(memberId);
 
-        List<Event> events = List.of();
-
-        if (request.eventIds() != null && !request.eventIds().isEmpty()) {
-            Map<Long, Event> eventMap = eventRepository.findAllById(request.eventIds())
-                    .stream()
-                    .collect(Collectors.toMap(Event::getId, event -> event));
-
-            events = request.eventIds()
-                    .stream()
-                    .map(eventMap::get)
-                    .filter(event -> event != null)
-                    .toList();
-        }
+        List<Event> events = findEventsByIds(request.eventIds());
+        List<Tour> tours = findToursByIds(request.tourIds());
 
         Course course = Course.create(
                 member,
@@ -120,6 +113,23 @@ public class CourseService {
                             null,
                             null,
                             "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+                    )
+            );
+        }
+
+        for (Tour tour : tours) {
+            course.addCoursePlace(
+                    CoursePlace.createWithTour(
+                            course,
+                            tour,
+                            order++,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "선택한 관광지입니다."
                     )
             );
         }
@@ -280,15 +290,12 @@ public class CourseService {
             Member member,
             RecommendationCourseCreateRequest request
     ) {
-        List<Place> tourPlaces = placeRepository.findActivePlacesBySourceAndArea(
-                        Place.TOUR_API_SOURCE,
-                        normalizeArea(request.area())
-                )
-                .stream()
-                .limit(request.getTopKOrDefault())
-                .toList();
+        List<Tour> tours = tourRepository.findRecommendedToursByArea(
+                normalizeArea(request.area()),
+                PageRequest.of(0, request.getTopKOrDefault())
+        );
 
-        if (tourPlaces.isEmpty()) {
+        if (tours.isEmpty()) {
             throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
         }
 
@@ -312,14 +319,13 @@ public class CourseService {
 
         int visitOrder = 1;
 
-        for (Place place : tourPlaces) {
+        for (Tour tour : tours) {
             String reason = "선택한 지역의 관광지 데이터를 기반으로 추천되었습니다.";
 
             course.addCoursePlace(
-                    CoursePlace.create(
+                    CoursePlace.createWithTour(
                             course,
-                            place,
-                            null,
+                            tour,
                             visitOrder,
                             null,
                             null,
@@ -334,14 +340,14 @@ public class CourseService {
             places.add(
                     new RecommendedCoursePlaceResponse(
                             null,
-                            place.getId(),
-                            place.getName(),
-                            place.getCategory().getName(),
-                            place.getAddress(),
+                            null,
+                            tour.getTitle(),
+                            getTourCategoryName(tour),
+                            tour.getAddress(),
                             null,
                             null,
-                            place.getLatitude(),
-                            place.getLongitude(),
+                            toBigDecimal(tour.getLatitude()),
+                            toBigDecimal(tour.getLongitude()),
                             visitOrder,
                             reason
                     )
@@ -429,27 +435,24 @@ public class CourseService {
     }
 
     private CoursePreviewResponse previewTourCourse(CoursePreviewRequest request) {
-        List<Place> tourPlaces = placeRepository.findActivePlacesBySourceAndArea(
-                        Place.TOUR_API_SOURCE,
-                        normalizeArea(request.baseArea())
-                )
-                .stream()
-                .limit(DEFAULT_TOUR_PLACE_COUNT)
-                .toList();
+        List<Tour> tours = tourRepository.findRecommendedToursByArea(
+                normalizeArea(request.baseArea()),
+                PageRequest.of(0, DEFAULT_TOUR_PLACE_COUNT)
+        );
 
-        if (tourPlaces.isEmpty()) {
+        if (tours.isEmpty()) {
             throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
         }
 
-        Place centerPlace = tourPlaces.stream()
-                .filter(place -> place.getLatitude() != null && place.getLongitude() != null)
+        Tour centerTour = tours.stream()
+                .filter(tour -> tour.getLatitude() != null && tour.getLongitude() != null)
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
 
         return createCoursePreviewResponse(
                 List.of(),
-                centerPlace.getLatitude().doubleValue(),
-                centerPlace.getLongitude().doubleValue(),
+                centerTour.getLatitude(),
+                centerTour.getLongitude(),
                 request
         );
     }
@@ -605,48 +608,7 @@ public class CourseService {
         List<CoursePlaceResponse> places =
                 coursePlaceRepository.findDetailByCourseId(courseId)
                         .stream()
-                        .map(cp -> {
-                            Long placeId = null;
-                            String placeName = "알 수 없는 장소";
-
-                            if (cp.getEvent() != null) {
-                                placeName = cp.getEvent().getTitle();
-
-                                if (cp.getEvent().getPlace() != null) {
-                                    placeId = cp.getEvent().getPlace().getId();
-                                }
-                            } else if (cp.getPlace() != null) {
-                                placeId = cp.getPlace().getId();
-                                placeName = cp.getPlace().getName();
-                            }
-
-                            Place placeEntity = cp.getPlace();
-                            Event eventEntity = cp.getEvent();
-
-                            BigDecimal lat = null;
-                            BigDecimal lng = null;
-                            String address = null;
-
-                            if (placeEntity != null) {
-                                lat = placeEntity.getLatitude();
-                                lng = placeEntity.getLongitude();
-                                address = placeEntity.getAddress();
-                            } else if (eventEntity != null && eventEntity.getPlace() != null) {
-                                lat = eventEntity.getPlace().getLatitude();
-                                lng = eventEntity.getPlace().getLongitude();
-                                address = eventEntity.getPlace().getAddress();
-                            }
-
-                            return new CoursePlaceResponse(
-                                    placeId,
-                                    placeName,
-                                    cp.getVisitOrder(),
-                                    cp.getRecommendationReason(),
-                                    lat,
-                                    lng,
-                                    address
-                            );
-                        })
+                        .map(this::toCoursePlaceResponse)
                         .toList();
 
         return new CourseDetailResponse(
@@ -663,6 +625,84 @@ public class CourseService {
                 places,
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
+        );
+    }
+
+    private CoursePlaceResponse toCoursePlaceResponse(CoursePlace coursePlace) {
+        if (coursePlace.getTour() != null) {
+            Tour tour = coursePlace.getTour();
+
+            return new CoursePlaceResponse(
+                    CourseItemType.TOUR,
+                    null,
+                    null,
+                    tour.getId(),
+                    tour.getTitle(),
+                    coursePlace.getVisitOrder(),
+                    coursePlace.getRecommendationReason(),
+                    toBigDecimal(tour.getLatitude()),
+                    toBigDecimal(tour.getLongitude()),
+                    tour.getAddress()
+            );
+        }
+
+        if (coursePlace.getEvent() != null) {
+            Event event = coursePlace.getEvent();
+            Place eventPlace = event.getPlace();
+
+            Long placeId = eventPlace != null ? eventPlace.getId() : null;
+            BigDecimal latitude = eventPlace != null
+                    ? eventPlace.getLatitude()
+                    : toBigDecimal(event.getLatitude());
+            BigDecimal longitude = eventPlace != null
+                    ? eventPlace.getLongitude()
+                    : toBigDecimal(event.getLongitude());
+            String address = eventPlace != null
+                    ? eventPlace.getAddress()
+                    : event.getArea();
+
+            return new CoursePlaceResponse(
+                    CourseItemType.EVENT,
+                    placeId,
+                    event.getId(),
+                    null,
+                    event.getTitle(),
+                    coursePlace.getVisitOrder(),
+                    coursePlace.getRecommendationReason(),
+                    latitude,
+                    longitude,
+                    address
+            );
+        }
+
+        if (coursePlace.getPlace() != null) {
+            Place place = coursePlace.getPlace();
+
+            return new CoursePlaceResponse(
+                    CourseItemType.PLACE,
+                    place.getId(),
+                    null,
+                    null,
+                    place.getName(),
+                    coursePlace.getVisitOrder(),
+                    coursePlace.getRecommendationReason(),
+                    place.getLatitude(),
+                    place.getLongitude(),
+                    place.getAddress()
+            );
+        }
+
+        return new CoursePlaceResponse(
+                null,
+                null,
+                null,
+                null,
+                "알 수 없는 장소",
+                coursePlace.getVisitOrder(),
+                coursePlace.getRecommendationReason(),
+                null,
+                null,
+                null
         );
     }
 
@@ -761,6 +801,52 @@ public class CourseService {
 
             throw new IllegalArgumentException("이미 북마크한 코스입니다.");
         }
+    }
+
+    private List<Event> findEventsByIds(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Event> eventMap = eventRepository.findAllById(eventIds)
+                .stream()
+                .collect(Collectors.toMap(Event::getId, event -> event));
+
+        return eventIds.stream()
+                .map(eventMap::get)
+                .filter(event -> event != null)
+                .toList();
+    }
+
+    private List<Tour> findToursByIds(List<Long> tourIds) {
+        if (tourIds == null || tourIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Tour> tourMap = tourRepository.findAllById(tourIds)
+                .stream()
+                .collect(Collectors.toMap(Tour::getId, tour -> tour));
+
+        return tourIds.stream()
+                .map(tourMap::get)
+                .filter(tour -> tour != null)
+                .toList();
+    }
+
+    private String getTourCategoryName(Tour tour) {
+        if (tour.getCategory() == null) {
+            return "관광지";
+        }
+
+        return tour.getCategory().getName();
+    }
+
+    private BigDecimal toBigDecimal(Double value) {
+        if (value == null) {
+            return null;
+        }
+
+        return BigDecimal.valueOf(value);
     }
 
     private Member getMemberOrThrow(Long memberId) {

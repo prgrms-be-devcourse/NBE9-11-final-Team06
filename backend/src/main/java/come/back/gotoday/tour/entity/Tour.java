@@ -1,6 +1,7 @@
 package come.back.gotoday.tour.entity;
 
 import come.back.gotoday.category.entity.Category;
+import come.back.gotoday.tour.enums.TourSource;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,13 +21,16 @@ public class Tour {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 관광지 카테고리
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
+    // TourAPI contentid
     @Column(name = "content_id", nullable = false, unique = true, length = 100)
     private String contentId;
 
+    // TourAPI contenttypeid
     @Column(name = "content_type_id", length = 50)
     private String contentTypeId;
 
@@ -69,6 +73,7 @@ public class Tour {
     @Column(length = 50)
     private String cat3;
 
+    // 추천 조회용 지역명 예: 성동구, 마포구
     @Column(name = "area", length = 50)
     private String area;
 
@@ -163,7 +168,7 @@ public class Tour {
             String area,
             Double latitude,
             Double longitude,
-            String source,
+            TourSource source,
             float[] embeddingVector
     ) {
         return new Tour(
@@ -186,7 +191,7 @@ public class Tour {
                 area,
                 latitude,
                 longitude,
-                source,
+                source.getCode(),
                 embeddingVector
         );
     }
@@ -246,6 +251,11 @@ public class Tour {
                 !Objects.equals(this.longitude, longitude);
     }
 
+    public void deactivate() {
+        this.isActive = false;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public float[] getEmbeddingVector() {
         if (embeddingVectorBytes == null) {
             return null;
@@ -274,10 +284,5 @@ public class Tour {
         }
 
         this.embeddingVectorBytes = buffer.array();
-    }
-
-    public void deactivate() {
-        this.isActive = false;
-        this.updatedAt = LocalDateTime.now();
     }
 }

@@ -1,6 +1,5 @@
 package come.back.gotoday.course.dto;
 
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -15,6 +14,7 @@ public record CourseCreateRequest(
         Double startLatitude,
         Double startLongitude,
         List<Long> eventIds,
+        List<Long> tourIds,
         Long restaurantId,
         Long cafeId
 ) {
