@@ -28,9 +28,8 @@ public class PaymentHistoryFacade {
         TossCancelResponse tossResponse = tossPaymentsClient.cancelPayment(paymentKey, tossCancelRequest);
 
         // 3. 외부 취소 성공 시 내부 DB 상태 변경 및 반영
-        if ("CANCELED".equals(tossResponse.status())) {
-            paymentHistoryService.completeCancelPayment(paymentHistoryId, memberId);
-            paymentHistoryService.cancelAssociatedSubscription(paymentHistoryId);
+        if (tossResponse != null &&"CANCELED".equals(tossResponse.status())) {
+            paymentHistoryService.cancelPaymentAndSubscription(paymentHistoryId, memberId);
         } else {
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }

@@ -5,6 +5,7 @@ import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.payment.subscription.dto.PaymentHistoryResponse;
 import come.back.gotoday.payment.subscription.entity.PaymentHistory;
 import come.back.gotoday.payment.subscription.entity.Subscription;
+import come.back.gotoday.payment.subscription.enums.PaymentStatus;
 import come.back.gotoday.payment.subscription.repository.PaymentHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class PaymentHistoryService {
         PaymentHistory history = paymentHistoryRepository.findByIdAndMemberId(paymentHistoryId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_HISTORY_NOT_FOUND));
 
-        if (history.getPaymentKey() == null) {
+        if (history.getStatus() != PaymentStatus.SUCCESS) {
             throw new BusinessException(ErrorCode.CANNOT_CANCEL_FAILED_PAYMENT); // "실패한 결제는 취소할 수 없습니다." 관련 에러
         }
 
@@ -46,20 +47,16 @@ public class PaymentHistoryService {
      * 외부 API 성공 후, 내부 DB 상태를 CANCELED로 최종 변경하는 단계
      */
     @Transactional
-    public void completeCancelPayment(Long paymentHistoryId, Long memberId) {
+    public void cancelPaymentAndSubscription(Long paymentHistoryId, Long memberId) {
+        // 1. 단 한 번의 조회로 영속성 컨텍스트에 로드 (페치 조인을 쓰면 성능이 더 올라갑니다)
         PaymentHistory history = paymentHistoryRepository.findByIdAndMemberId(paymentHistoryId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_HISTORY_NOT_FOUND));
 
-        history.cancel(); // 엔티티 내부에서 상태를 CANCELED로 변환
-    }
+        // 2. 결제 상태를 CANCELED로 변경
+        history.cancel();
 
-    @Transactional
-    public void cancelAssociatedSubscription(Long paymentHistoryId) {
-        PaymentHistory paymentHistory = paymentHistoryRepository.findById(paymentHistoryId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_HISTORY_NOT_FOUND));
-
-        Subscription subscription = paymentHistory.getSubscription();
-
+        // 3. 연관된 구독 해지 (동일 트랜잭션 내에서 안전하게 처리)
+        Subscription subscription = history.getSubscription();
         if (subscription != null) {
             subscription.cancel();
         }

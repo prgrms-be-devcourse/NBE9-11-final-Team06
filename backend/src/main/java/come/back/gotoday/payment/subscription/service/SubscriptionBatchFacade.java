@@ -75,20 +75,8 @@ public class SubscriptionBatchFacade {
     }
 
     public void finalizeSubscription(Long subscriptionId) {
-        Subscription subscription = subscriptionRepository.findById(subscriptionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
-
-        // 2. 상태 검증 (이미 해지되었거나 다른 상태일 경우 방어)
-        if (subscription.getStatus() != SubscriptionStatus.CANCELED_RESERVED) {
-            log.warn("[배치] 구독 ID: {}는 해지 예약 상태가 아니므로 최종 해지를 건너뜁니다.", subscriptionId);
-            return;
-        }
-
-        // 3. 강제 해지 메서드 호출
-        subscription.cancel();
-
-        // @Transactional에 의해 자동으로 Dirty Checking되어 DB 반영됨
-        log.info("[배치] 구독 ID: {} 최종 해지 완료.", subscriptionId);
+        // 서비스의 트랜잭션 메서드를 호출하도록 위임
+        subscriptionBatchService.finalizeSubscription(subscriptionId);
     }
 
 
