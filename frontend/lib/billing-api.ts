@@ -26,4 +26,20 @@ export const billingApi = {
     })
     return response.json()
   },
+
+  // [신규] 결제 내역 조회
+  getMyPaymentHistories: async (): Promise<ApiResponse<PaymentHistoryResponse[]>> => {
+    const response = await fetch("/api/v1/subscriptions/payments/me")
+    return response.json()
+  },
+
+  // [신규] 결제 취소
+  cancelPayment: async (paymentHistoryId: number, cancelReason: string): Promise<ApiResponse<void>> => {
+    const response = await fetch(`/api/v1/subscriptions/payments/${paymentHistoryId}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cancelReason }),
+    })
+    return response.json()
+  },
 }
