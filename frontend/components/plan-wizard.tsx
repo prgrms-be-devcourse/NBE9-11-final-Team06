@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
     CalendarDays,
@@ -49,10 +49,13 @@ export function PlanWizard() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [restaurantType, setRestaurantType] = useState<RestaurantType | null>(null)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const maxDate = new Date(today)
-    maxDate.setMonth(maxDate.getMonth() + 1)
+    const disabledDays = useMemo(() => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const maxDate = new Date(today)
+      maxDate.setMonth(maxDate.getMonth() + 1)
+      return [{ before: today }, { after: maxDate }]
+  }, [])
 
     const canNext =
         (step === 0 && !!date) ||
@@ -465,10 +468,7 @@ export function PlanWizard() {
                                     mode="single"
                                     selected={date}
                                     onSelect={setDate}
-                                    disabled={[
-                                      { before: today },
-                                      { after: maxDate }
-                                  ]}
+                                    disabled={disabledDays}
                                     className="rounded-2xl border"
                                 />
                             </div>
