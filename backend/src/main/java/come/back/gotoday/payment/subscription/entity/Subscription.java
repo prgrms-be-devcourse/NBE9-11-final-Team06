@@ -1,6 +1,7 @@
 package come.back.gotoday.payment.subscription.entity;
 
 import come.back.gotoday.payment.billing.entity.BillingInfo;
+import come.back.gotoday.payment.plan.entity.Plan;
 import come.back.gotoday.payment.subscription.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "subscription")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Subscription { // BaseEntity 상속 제거
+public class Subscription {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,8 +25,9 @@ public class Subscription { // BaseEntity 상속 제거
     @JoinColumn(name = "billing_info_id", nullable = false)
     private BillingInfo billingInfo;
 
-    @Column(nullable = false)
-    private String planName; // 이용 중인 요금제/상품명 (예: 프리미엄 멤버십)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "plan_id", nullable = false)
+    private Plan plan;
 
     @Column(nullable = false)
     private Long amount; // 매달 결제될 정기 결제 금액
@@ -49,12 +51,14 @@ public class Subscription { // BaseEntity 상속 제거
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "payment_failed_at")
+    private LocalDate paymentFailedAt; // 자동 결제 실패일 (정상 결제 시 null로 초기화)
 
-    private Subscription(BillingInfo billingInfo, String planName, Long amount, LocalDate nextBillingDate, int paymentDay, SubscriptionStatus status) {
+    private Subscription(BillingInfo billingInfo,Plan plan,Long amount, LocalDate nextBillingDate, int paymentDay, SubscriptionStatus status) {
         validateAmount(amount); // [추가] 금액 검증
 
         this.billingInfo = billingInfo;
-        this.planName = planName;
+        this.plan = plan;
         this.amount = amount;
         this.nextBillingDate = nextBillingDate;
         this.paymentDay = paymentDay;
@@ -63,31 +67,36 @@ public class Subscription { // BaseEntity 상속 제거
         this.updatedAt = LocalDateTime.now();
     }
 
-    public static Subscription startSubscription(BillingInfo billingInfo, String planName, Long amount, LocalDate startDate) {
-        LocalDate nextBillingDate = startDate.plusMonths(1);
-
+    public static Subscription startSubscription(BillingInfo billingInfo, Plan plan, Long amount, LocalDate startDate) {
         return new Subscription(
                 billingInfo,
-                planName,
+                plan,
                 amount,
-                nextBillingDate,
+                startDate,
                 startDate.getDayOfMonth(), // 시작일의 '일'을 기준 결제일로 저장
-                SubscriptionStatus.ACTIVE
+                SubscriptionStatus.PENDING
         );
     }
 
     /**
      * 비즈니스 요구사항에 따라 다음과 같이 유연하게 생성 메서드를 추가할 수 있습니다.
      */
-    public static Subscription startFreePromotionSubscription(BillingInfo billingInfo, String planName, Long amount, LocalDate startDate) {
+    public static Subscription startFreePromotionSubscription(BillingInfo billingInfo, Plan plan, Long amount, LocalDate startDate) {
         return new Subscription(
                 billingInfo,
-                planName,
+                plan,
                 amount,
                 startDate.plusMonths(2), // 첫 달 무료이므로 다음 결제일은 2달 뒤!
                 startDate.getDayOfMonth(),
                 SubscriptionStatus.ACTIVE
         );
+    }
+
+    public void activate() {
+        this.status = SubscriptionStatus.ACTIVE;
+        // 첫 결제가 완료되었으므로 다음 자동 결제일을 한 달 뒤로 미룹니다.
+        renewNextBillingDate();
+        this.updatedAt = LocalDateTime.now();
     }
 
     //  결제 성공 시 다음 결제일 갱신
@@ -104,6 +113,7 @@ public class Subscription { // BaseEntity 상속 제거
 
         // 4. 최종 보정된 날짜로 세팅합니다. (withDayOfMonth 사용)
         this.nextBillingDate = nextMonthDate.withDayOfMonth(targetDay);
+        this.paymentFailedAt = null; // 실패 기록 초기화
         this.updatedAt = LocalDateTime.now();
     }
 
@@ -111,6 +121,30 @@ public class Subscription { // BaseEntity 상속 제거
     public void cancel() {
         this.status = SubscriptionStatus.CANCELED;
         this.updatedAt = LocalDateTime.now(); // 데이터 변경 시 업데이트 시간 갱신
+    }
+
+    public void changeToManualCheck() {
+        this.status = SubscriptionStatus.MANUAL_CHECK;
+    }
+    public void changeStatus() {
+        this.status = SubscriptionStatus.PENDING;
+        this.updatedAt = LocalDateTime.now();
+    }
+    /**
+     *  결제 실패 시 즉시 해지하지 않고 유예 상태로 전환합니다.
+     * 이때 최초 실패라면 실패 날짜를 기록합니다.
+     */
+    public void changeToPaymentBatchFail(LocalDate today) {
+        this.status = SubscriptionStatus.EXPIRED_PAYMENT_PENDING;
+        if (this.paymentFailedAt == null) {
+            this.paymentFailedAt = today; // 최초 실패일 기록
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isGracePeriodExpired(LocalDate today, int graceDays) {
+        if (this.paymentFailedAt == null) return false;
+        return this.paymentFailedAt.plusDays(graceDays).isBefore(today);
     }
 
     // 결제 금액 검증 비즈니스 로직

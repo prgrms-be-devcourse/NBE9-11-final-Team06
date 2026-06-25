@@ -4,10 +4,12 @@ import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
+import come.back.gotoday.external.naver.NaverReverseGeocodingClient;
 import come.back.gotoday.external.naver.dto.NaverLocalSearchResponse;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.dto.PlaceSearchResponse;
+import come.back.gotoday.place.dto.ReverseGeocodingResponse;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class PlaceService {
     private final PlaceRepository placeRepository;
     private final CategoryRepository categoryRepository;
     private final NaverLocalSearchClient naverLocalSearchClient;
+    private final NaverReverseGeocodingClient naverReverseGeocodingClient;
 
     @Transactional
     public Long createPlace(PlaceCreateRequest request) {
@@ -123,6 +126,28 @@ public class PlaceService {
 
         log.info("장소 검색 처리 완료: query={}, resultCount={}", query, places.size());
         return places;
+    }
+
+    public ReverseGeocodingResponse reverseGeocode(double latitude, double longitude) {
+        log.info("좌표 기반 지역명 조회 처리 시작: latitude={}, longitude={}", latitude, longitude);
+
+        NaverReverseGeocodingClient.ReverseGeocodingResult result =
+                naverReverseGeocodingClient.reverseGeocode(latitude, longitude);
+
+        ReverseGeocodingResponse response = new ReverseGeocodingResponse(
+                result.areaName(),
+                result.district(),
+                result.neighborhood()
+        );
+
+        log.info(
+                "좌표 기반 지역명 조회 처리 완료: latitude={}, longitude={}, areaName={}",
+                latitude,
+                longitude,
+                response.areaName()
+        );
+
+        return response;
     }
 
     @Transactional

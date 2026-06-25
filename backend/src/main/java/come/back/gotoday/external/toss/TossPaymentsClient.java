@@ -1,5 +1,7 @@
 package come.back.gotoday.external.toss;
 
+import come.back.gotoday.external.toss.dto.TossAutomatedPaymentRequest;
+import come.back.gotoday.external.toss.dto.TossAutomatedPaymentResponse;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.payment.billing.dto.TossBillingKeyResponse;
@@ -155,6 +157,73 @@ public class TossPaymentsClient {
 
     @Recover
     public void recoverDelete(BusinessException e, String plainBillingKey) {
+        throw e;
+    }
+
+    /**
+     * 토스페이먼츠 빌링키 결제 승인 API 호출 - POST 방식
+     */
+    @Retryable(
+            retryFor = { ResourceAccessException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public TossAutomatedPaymentResponse requestPayment(String plainBillingKey, TossAutomatedPaymentRequest request) {
+        log.info("토스페이먼츠 빌링키 결제 승인 API 호출 시작: orderId={}, customerKey={}",
+                request.orderId(), request.customerKey());
+
+        try {
+            String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
+
+            TossAutomatedPaymentResponse response = restClient.post()
+                    .uri("/billing/{billingKey}", plainBillingKey)
+                    .header("Authorization", "Basic " + encodedKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(TossAutomatedPaymentResponse.class);
+
+            log.info("토스페이먼츠 빌링키 결제 승인 API 완료: orderId={}, status={}",
+                    request.orderId(), response != null ? response.status() : "NULL");
+            return response;
+
+        } catch (ResourceAccessException e) {
+            log.error("토스페이먼츠 결제 승인 서버 타임아웃 또는 네트워크 연결 실패: orderId={}, message={}",
+                    request.orderId(), e.getMessage(), e);
+            throw e;
+
+        } catch (RestClientResponseException e) {
+            log.error("토스페이먼츠 결제 승인 HTTP 에러 발생: orderId={}, statusCode={}, responseBody={}",
+                    request.orderId(), e.getStatusCode(), e.getResponseBodyAsString());
+
+            tossErrorHandler.handleTossError(e);
+            throw e;
+
+        } catch (BusinessException e) {
+            throw e;
+
+        } catch (Exception e) {
+            log.error("토스페이먼츠 결제 승인 데이터 처리 중 알 수 없는 오류 발생: orderId={}, message={}",
+                    request.orderId(), e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
+
+    /**
+     * 결제 승인 API 최대 재시도 횟수 초과 시 최종 타임아웃 복구 핸들러
+     */
+    @Recover
+    public TossAutomatedPaymentResponse recoverPayment(ResourceAccessException e, String plainBillingKey, TossAutomatedPaymentRequest request) {
+        log.error("토스페이먼츠 결제 승인 API 최대 재시도 횟수 초과 (최종 네트워크 실패): orderId={}", request.orderId(), e);
+        throw new BusinessException(ErrorCode.NETWORK_ERROR_FINAL_FAILED);
+    }
+
+    /**
+     * 결제 승인 API BusinessException 발생 시 예외 상신 핸들러
+     */
+    @Recover
+    public TossAutomatedPaymentResponse recoverPayment(BusinessException e, String plainBillingKey, TossAutomatedPaymentRequest request) {
+        log.warn("토스페이먼츠 결제 승인 API BusinessException 발생 및 상신 처리: orderId={}, message={}", request.orderId(), e.getMessage());
         throw e;
     }
 }

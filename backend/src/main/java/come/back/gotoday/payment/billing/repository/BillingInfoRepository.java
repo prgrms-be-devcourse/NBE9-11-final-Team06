@@ -12,4 +12,6 @@ public interface BillingInfoRepository extends JpaRepository<BillingInfo, Long> 
 
     // 특정 회원의 특정 빌링 정보 단건 조회 (보안 및 소유권 검증용)
     Optional<BillingInfo> findByIdAndMemberId(Long id, Long memberId);
+
+    Optional<BillingInfo> findByCustomerKey(String customerkey);
 }
