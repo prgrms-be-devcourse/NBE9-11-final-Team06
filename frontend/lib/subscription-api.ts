@@ -8,7 +8,7 @@ export type PlanResponse = {
   amount: number
 }
 
-export type SubscriptionStatus = "ACTIVE" | "PAUSED" | "CANCELED"
+export type SubscriptionStatus = "PENDING" | "ACTIVE" | "PAUSED" | "CANCELED_RESERVED" | "CANCELED" | "MANUAL_CHECK" | "EXPIRED_PAYMENT_PENDING"
 
 export type SubscriptionResponse = {
   subscriptionId: number

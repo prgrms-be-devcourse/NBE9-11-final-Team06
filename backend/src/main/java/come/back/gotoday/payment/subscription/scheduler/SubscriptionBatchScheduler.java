@@ -37,7 +37,8 @@ public class SubscriptionBatchScheduler {
         // 대상 상태: 활성 상태(ACTIVE) + 결제 미수 유예 상태(EXPIRED_PAYMENT_PENDING)
         List<SubscriptionStatus> targetStatuses = List.of(
                 SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.EXPIRED_PAYMENT_PENDING
+                SubscriptionStatus.EXPIRED_PAYMENT_PENDING,
+                SubscriptionStatus.CANCELED_RESERVED
         );
 
         PageRequest pageRequest = PageRequest.of(0, CHUNK_SIZE, Sort.by("id").ascending());
@@ -50,7 +51,17 @@ public class SubscriptionBatchScheduler {
             }
             for (Subscription subscription : targetSlice.getContent()) {
                 try {
-                    subscriptionBatchFacade.executeScheduledPayment(subscription.getId());
+                    if (subscription.getStatus() == SubscriptionStatus.CANCELED_RESERVED) {
+                        // 결제일이 지났는지 확인
+                        if (subscription.getNextBillingDate().isBefore(today.plusDays(1))) {
+                            // 최종적으로 영구 해지 처리 (forceCancel 호출)
+                            subscriptionBatchFacade.finalizeSubscription(subscription.getId());
+                            log.info("[정기 정산 배치] 해지 예약된 구독 ID: {}가 최종 해지되었습니다.", subscription.getId());
+                        }
+                    } else {
+                        // ACTIVE 또는 EXPIRED_PAYMENT_PENDING 인 경우에만 결제 시도
+                        subscriptionBatchFacade.executeScheduledPayment(subscription.getId());
+                    }
                 } catch (Exception e) {
                     // 한 건이 실패하더라도 로그만 남기고 다음 사람 결제는 계속 진행되어야 함
                     log.error("[정기 정산 배치] 구독 ID: {} 결제 승인 중 예외 발생. 다음 건으로 넘어갑니다. 사유: {}",

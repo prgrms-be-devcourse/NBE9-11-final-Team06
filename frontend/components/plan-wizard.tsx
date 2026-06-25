@@ -446,7 +446,6 @@ export function PlanWizard() {
                                         {s}
                                     </span>
                                 </div>
-
                                 {i < STEPS.length - 1 && (
                                     <div
                                         className={cn(
