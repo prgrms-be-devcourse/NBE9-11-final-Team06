@@ -263,8 +263,10 @@ public class CourseService {
 
             places.add(
                     new RecommendedCoursePlaceResponse(
+                            CourseItemType.EVENT,
                             event.getId(),
                             place.getId(),
+                            null,
                             event.getTitle(),
                             event.getCategory().getName(),
                             event.getArea(),
@@ -342,8 +344,10 @@ public class CourseService {
 
             places.add(
                     new RecommendedCoursePlaceResponse(
+                            CourseItemType.TOUR,
                             null,
                             null,
+                            tour.getId(),
                             tour.getTitle(),
                             getTourCategoryName(tour),
                             tour.getAddress(),
