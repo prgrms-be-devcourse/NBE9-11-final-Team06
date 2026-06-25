@@ -44,6 +44,7 @@ import static org.mockito.ArgumentMatchers.eq;
         "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역"
 })
 @Slf4j
+@org.junit.jupiter.api.Disabled("로컬에서만 테스트 운영환경에 영향을 주기 않기 위함")
 public class SubscriptionBatchIntegrationTest {
 
     @Autowired
