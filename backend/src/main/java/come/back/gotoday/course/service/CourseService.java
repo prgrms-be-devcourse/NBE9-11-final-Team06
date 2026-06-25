@@ -9,7 +9,6 @@ import come.back.gotoday.course.dto.CourseListResponse;
 import come.back.gotoday.course.dto.CoursePlaceResponse;
 import come.back.gotoday.course.dto.CoursePreviewRequest;
 import come.back.gotoday.course.dto.CoursePreviewResponse;
-import come.back.gotoday.course.dto.EventNearbyPlaceResponse;
 import come.back.gotoday.course.dto.PlacePreviewResponse;
 import come.back.gotoday.course.dto.SavedCoursePageResponse;
 import come.back.gotoday.course.dto.SavedCourseResponse;
@@ -23,7 +22,6 @@ import come.back.gotoday.course.type.CourseItemType;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
-import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
 import come.back.gotoday.global.exception.BusinessException;
@@ -369,33 +367,6 @@ public class CourseService {
         );
     }
 
-    private CoursePreviewResponse previewTourCourse(CoursePreviewRequest request) {
-        List<Tour> tours = tourRepository.findRecommendedToursByArea(
-                normalizeArea(request.baseArea()),
-                PageRequest.of(0, DEFAULT_TOUR_PLACE_COUNT)
-        );
-
-        if (tours.isEmpty()) {
-            throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
-        }
-
-        List<EventNearbyPlaceResponse> tourPreviewItems = tours.stream()
-                .map(tour -> new EventNearbyPlaceResponse(
-                        null,
-                        tour.getTitle(),
-                        List.of(),
-                        List.of()
-                ))
-                .toList();
-
-        return new CoursePreviewResponse(
-                List.of(),
-                tourPreviewItems,
-                request.startLatitude(),
-                request.startLongitude()
-        );
-    }
-
     @Transactional
     public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
         getMemberOrThrow(memberId);
@@ -410,101 +381,148 @@ public class CourseService {
             return previewTourCourse(request);
         }
 
-        String queryText = recommendationService.createQueryText(
-                request.baseArea(),
-                request.courseType(),
-                request.companionType()
+        log.info(
+                "행사 기반 코스 미리보기 분기 진입: memberId={}, categories={}",
+                memberId,
+                request.categories()
         );
 
-        List<Long> recommendedEventIds =
-                recommendationService.getRecommendedEventIds(
+        RecommendationService.RecommendedCourseDraft draft =
+                recommendationService.recommendCourse(
                         memberId,
-                        queryText,
-                        request.startDate(),
-                        request.endDate(),
-                        DEFAULT_PREVIEW_EVENT_COUNT
+                        toRecommendationCourseCreateRequest(request)
                 );
+
+        List<Long> recommendedEventIds = draft.events()
+                .stream()
+                .map(RecommendationService.RecommendedEvent::eventId)
+                .toList();
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        List<EventNearbyPlaceResponse> nearbyPlaces = new ArrayList<>();
+        if (events.isEmpty()) {
+            throw new IllegalArgumentException("추천 가능한 행사가 없습니다.");
+        }
 
-        Category restaurantCategory = categoryRepository.findByName("맛집")
-                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        Event centerEvent = events.size() > 1 ? events.get(1) : events.get(0);
 
-        Category cafeCategory = categoryRepository.findByName("카페")
-                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        double centerLat = centerEvent.getLatitude();
+        double centerLng = centerEvent.getLongitude();
+
+        return createCoursePreviewResponse(
+                recommendedEventIds,
+                centerLat,
+                centerLng,
+                request
+        );
+    }
+
+    private RecommendationCourseCreateRequest toRecommendationCourseCreateRequest(
+            CoursePreviewRequest request
+    ) {
+        return new RecommendationCourseCreateRequest(
+                null,
+                request.startDate(),
+                request.endDate(),
+                DEFAULT_PREVIEW_EVENT_COUNT,
+                request.baseArea(),
+                request.categories(),
+                request.companionType(),
+                null,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+    }
+
+    private CoursePreviewResponse previewTourCourse(CoursePreviewRequest request) {
+        List<Tour> tours = tourRepository.findRecommendedToursByArea(
+                normalizeArea(request.baseArea()),
+                PageRequest.of(0, DEFAULT_TOUR_PLACE_COUNT)
+        );
+
+        if (tours.isEmpty()) {
+            throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
+        }
+
+        Tour centerTour = tours.stream()
+                .filter(tour -> tour.getLatitude() != null && tour.getLongitude() != null)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
+
+        return createCoursePreviewResponse(
+                List.of(),
+                centerTour.getLatitude(),
+                centerTour.getLongitude(),
+                request
+        );
+    }
+
+    private CoursePreviewResponse createCoursePreviewResponse(
+            List<Long> recommendedEventIds,
+            double centerLat,
+            double centerLng,
+            CoursePreviewRequest request
+    ) {
+        KakaoPlaceResponse cafeResponse =
+                kakaoLocalService.searchCafe(centerLat, centerLng);
 
         RestaurantType restaurantType =
                 request.restaurantType() != null
                         ? request.restaurantType()
                         : RestaurantType.KOREAN;
 
-        for (Event event : events) {
-            if (event.getLatitude() == null || event.getLongitude() == null) {
-                continue;
-            }
+        KakaoPlaceResponse restaurantResponse =
+                kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
 
-            double lat = event.getLatitude();
-            double lng = event.getLongitude();
+        Category restaurantCategory = getCategoryByName("맛집");
+        Category cafeCategory = getCategoryByName("카페");
 
-            KakaoPlaceResponse restaurantResponse =
-                    kakaoLocalService.searchRestaurant(lat, lng, restaurantType);
+        List<Place> savedRestaurants = restaurantResponse.documents()
+                .stream()
+                .filter(doc -> doc.y() != null && doc.x() != null)
+                .filter(doc -> distance(
+                        centerLat,
+                        centerLng,
+                        Double.parseDouble(doc.y()),
+                        Double.parseDouble(doc.x())
+                ) <= 500)
+                .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
+                .toList();
 
-            KakaoPlaceResponse cafeResponse =
-                    kakaoLocalService.searchCafe(lat, lng);
-
-            List<KakaoPlaceDocument> restaurantDocs =
-                    restaurantResponse != null
-                            ? restaurantResponse.documents()
-                            : List.of();
-
-            List<KakaoPlaceDocument> cafeDocs =
-                    cafeResponse != null
-                            ? cafeResponse.documents()
-                            : List.of();
-
-            List<PlacePreviewResponse> restaurants =
-                    restaurantDocs.stream()
-                            .limit(3)
-                            .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
-                            .map(place -> new PlacePreviewResponse(
-                                    place.getId(),
-                                    place.getName(),
-                                    place.getAddress(),
-                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
-                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
-                                    place.getPlaceUrl()
-                            ))
-                            .toList();
-
-            List<PlacePreviewResponse> cafes =
-                    cafeDocs.stream()
-                            .limit(3)
-                            .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
-                            .map(place -> new PlacePreviewResponse(
-                                    place.getId(),
-                                    place.getName(),
-                                    place.getAddress(),
-                                    place.getLatitude() != null ? place.getLatitude().doubleValue() : null,
-                                    place.getLongitude() != null ? place.getLongitude().doubleValue() : null,
-                                    place.getPlaceUrl()
-                            ))
-                            .toList();
-
-            nearbyPlaces.add(
-                    new EventNearbyPlaceResponse(
-                            event.getId(),
-                            event.getTitle(),
-                            restaurants,
-                            cafes
-                    )
-            );
-        }
+        List<Place> savedCafes = cafeResponse.documents()
+                .stream()
+                .filter(doc -> doc.y() != null && doc.x() != null)
+                .filter(doc -> distance(
+                        centerLat,
+                        centerLng,
+                        Double.parseDouble(doc.y()),
+                        Double.parseDouble(doc.x())
+                ) <= 500)
+                .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
+                .toList();
 
         return new CoursePreviewResponse(
                 recommendedEventIds,
-                nearbyPlaces,
+                savedRestaurants.stream()
+                        .map(p -> new PlacePreviewResponse(
+                                p.getId(),
+                                p.getName(),
+                                p.getAddress(),
+                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
+                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
+                                p.getPlaceUrl()
+                        ))
+                        .toList(),
+                savedCafes.stream()
+                        .map(p -> new PlacePreviewResponse(
+                                p.getId(),
+                                p.getName(),
+                                p.getAddress(),
+                                p.getLatitude() != null ? p.getLatitude().doubleValue() : null,
+                                p.getLongitude() != null ? p.getLongitude().doubleValue() : null,
+                                p.getPlaceUrl()
+                        ))
+                        .toList(),
                 request.startLatitude(),
                 request.startLongitude()
         );
@@ -839,5 +857,21 @@ public class CourseService {
     private Course getCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
+    }
+
+    private double distance(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371;
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c * 1000;
     }
 }
