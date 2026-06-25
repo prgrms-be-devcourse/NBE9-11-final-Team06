@@ -1,14 +1,12 @@
 package come.back.gotoday.external.toss;
 
-import come.back.gotoday.external.toss.dto.TossAutomatedPaymentRequest;
-import come.back.gotoday.external.toss.dto.TossAutomatedPaymentResponse;
-import come.back.gotoday.external.toss.dto.TossCancelRequest;
-import come.back.gotoday.external.toss.dto.TossCancelResponse;
+import come.back.gotoday.external.toss.dto.*;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.payment.billing.dto.TossBillingKeyResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.retry.annotation.Backoff;
@@ -19,7 +17,9 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.LocalDate;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -294,6 +294,76 @@ public class TossPaymentsClient {
     @Recover
     public TossCancelResponse recoverCancel(BusinessException e, String paymentKey, TossCancelRequest request) {
         log.warn("토스페이먼츠 결제 취소 API BusinessException 발생 및 상신 처리: paymentKey={}, message={}", paymentKey, e.getMessage());
+        throw e;
+    }
+
+    /**
+     * 토스페이먼츠 정산 내역 조회 API 호출 - GET 방식
+     * 지정된 정산지급일(paidOutDate) 범위를 기준으로 정산 완료 목록을 가져옵니다.
+     */
+    @Retryable(
+            retryFor = { ResourceAccessException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public List<SettlementDto.TossSettlementResponse> fetchSettlements(LocalDate startDate, LocalDate endDate) {
+        log.info("토스페이먼츠 정산 조회 API 호출 시작: startDate={}, endDate={}", startDate, endDate);
+
+        try {
+            // 시크릿 키 Base64 인증 헤더 구성
+            String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
+
+            // GET /v1/settlements?startDate={startDate}&endDate={endDate}
+            List<SettlementDto.TossSettlementResponse> response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/v1/settlements")
+                            .queryParam("startDate", startDate.toString())
+                            .queryParam("endDate", endDate.toString())
+                            .build())
+                    .header("Authorization", "Basic " + encodedKey)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<List<SettlementDto.TossSettlementResponse>>() {});
+
+            log.info("토스페이먼츠 정산 조회 API 완료: 수집된 데이터 개수={}건", response != null ? response.size() : 0);
+            return response != null ? response : List.of();
+
+        } catch (ResourceAccessException e) {
+            log.error("토스페이먼츠 정산 조회 서버 타임아웃 또는 네트워크 연결 실패: startDate={}, endDate={}, message={}",
+                    startDate, endDate, e.getMessage(), e);
+            throw e;
+
+        } catch (RestClientResponseException e) {
+            log.error("토스페이먼츠 정산 조회 HTTP 에러 발생: statusCode={}, responseBody={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+
+            tossErrorHandler.handleTossError(e);
+            throw e;
+
+        } catch (BusinessException e) {
+            throw e;
+
+        } catch (Exception e) {
+            log.error("토스페이먼츠 정산 조회 데이터 처리 중 알 수 없는 오류 발생: message={}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
+
+    /**
+     * 정산 조회 API 최대 재시도 횟수 초과 시 최종 타임아웃 복구 핸들러
+     */
+    @Recover
+    public List<SettlementDto.TossSettlementResponse> recoverSettlement(ResourceAccessException e, LocalDate startDate, LocalDate endDate) {
+        log.error("토스페이먼츠 정산 조회 API 최대 재시도 횟수 초과 (최종 네트워크 실패): startDate={}, endDate={}", startDate, endDate, e);
+        throw new BusinessException(ErrorCode.NETWORK_ERROR_FINAL_FAILED);
+    }
+
+    /**
+     * 정산 조회 API BusinessException 발생 시 예외 상신 핸들러
+     */
+    @Recover
+    public List<SettlementDto.TossSettlementResponse> recoverSettlement(BusinessException e, LocalDate startDate, LocalDate endDate) {
+        log.warn("토스페이먼츠 정산 조회 API BusinessException 발생 및 상신 처리: message={}", e.getMessage());
         throw e;
     }
 }
