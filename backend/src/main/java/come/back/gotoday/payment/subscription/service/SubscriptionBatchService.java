@@ -114,6 +114,21 @@ public class SubscriptionBatchService {
         );
         paymentHistoryRepository.save(successHistory);
     }
+
+    @Transactional
+    public void finalizeSubscription(Long subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
+
+        if (subscription.getStatus() != SubscriptionStatus.CANCELED_RESERVED) {
+            log.warn("[배치] 구독 ID: {}는 해지 예약 상태가 아니므로 최종 해지를 건너뜁니다.", subscriptionId);
+            return;
+        }
+
+        subscription.cancel();
+        log.info("[배치 서비스] 구독 ID: {} 최종 해지 완료.", subscriptionId);
+    }
+
     @Getter
     @Builder
     public static class BatchPaymentParameters {

@@ -49,6 +49,8 @@ public enum ErrorCode {
     SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIPTION_NOT_FOUND", "구독 정보를 찾을 수 없습니다."),
     ACTIVE_SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "ACTIVE_SUBSCRIPTION_NOT_FOUND", "현재 활성화된 구독을 찾을 수 없습니다."),
     UNAUTHORIZED_SUBSCRIPTION_ACCESS(HttpStatus.FORBIDDEN, "UNAUTHORIZED_SUBSCRIPTION_ACCESS", "해당 구독 정보에 대한 접근 권한이 없습니다."),
+    PAYMENT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_HISTORY_NOT_FOUND", "결제 내역을 찾을 수 없습니다."),
+    CANNOT_CANCEL_FAILED_PAYMENT(HttpStatus.BAD_REQUEST, "CANNOT_CANCEL_FAILED_PAYMENT", "실패한 결제는 취소할 수 없습니다."),
 
     // --- 주문 아이디 관련 에러 코드 ---
     INVALID_ORDER_ID_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_ORDER_ID_FORMAT", "주문 ID 형식이 올바르지 않습니다."),

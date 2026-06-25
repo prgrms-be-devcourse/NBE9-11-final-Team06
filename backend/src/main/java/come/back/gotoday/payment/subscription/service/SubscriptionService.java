@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -37,7 +38,7 @@ public class SubscriptionService {
     private final PlanRepository planRepository;
     private final ObjectMapper objectMapper;
     /**
-     * 1단계: 구독 정보 검증 및 주문 ID 조기 생성 (가결제 단계)
+     *구독 정보 검증 및 주문 ID 조기 생성 (가결제 단계)
      */
     @Transactional
     public String prepareSubscription(Long memberId, SubscriptionRequest request) {
@@ -124,7 +125,7 @@ public class SubscriptionService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED_SUBSCRIPTION_ACCESS);
         }
 
-        subscription.cancel();
+        subscription.reserveCancellation();
     }
 
     private Long extractSubscriptionId(String orderId) {
@@ -138,7 +139,11 @@ public class SubscriptionService {
 
     //현재 회원의 활성화된 구독 정보 조회
     public SubscriptionResponse getActiveSubscription(Long memberId) {
-        Subscription subscription = subscriptionRepository.findActiveSubscriptionByMemberId(memberId, SubscriptionStatus.ACTIVE)
+        List<SubscriptionStatus> targetStatuses = List.of(
+                SubscriptionStatus.ACTIVE,
+                SubscriptionStatus.CANCELED_RESERVED
+        );
+        Subscription subscription = subscriptionRepository.findActiveSubscriptionByMemberId(memberId, targetStatuses)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ACTIVE_SUBSCRIPTION_NOT_FOUND));
 
         return SubscriptionResponse.from(subscription);
@@ -174,7 +179,7 @@ public class SubscriptionService {
             // 데이터 보존을 위해 에러 로그 메시지를 기록하고 싶다면 History 엔티ti 설계에 따라 필드를 채웁니다.
             paymentHistoryRepository.save(mismatchHistory);
 
-            // 3. 🚨 대시보드 인지용 통합 로그 출력 및 알림 Trigger (Slack 등 Hook 연동 권장)
+            // 3. 대시보드 인지용 통합 로그 출력 및 알림 Trigger (Slack 등 Hook 연동 권장)
             log.error("[CRITICAL DATA MISMATCH] 토스 결제는 성공했으나 내부 DB 갱신 중 에러가 발생하여 수동 정산 대상으로 분류합니다. " +
                     "주문ID: {}, 결제Key: {}, 사유: {}", orderId, paymentKey, failureReason);
         });

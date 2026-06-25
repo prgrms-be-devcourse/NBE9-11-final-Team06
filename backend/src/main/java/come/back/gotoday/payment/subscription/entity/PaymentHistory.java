@@ -68,4 +68,9 @@ public class PaymentHistory { // BaseEntity 상속 제거
     public static PaymentHistory createFailureHistory(Subscription subscription, String orderId, Long amount, String failureReason) {
         return new PaymentHistory(subscription, null, orderId, amount, PaymentStatus.FAILED, failureReason, null);
     }
+
+    public void cancel() {
+        this.status = PaymentStatus.CANCELED;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

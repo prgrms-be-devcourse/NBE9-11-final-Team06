@@ -4,7 +4,11 @@ package come.back.gotoday.payment.subscription.service;
 import come.back.gotoday.external.toss.TossPaymentsClient;
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentRequest;
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentResponse;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
+import come.back.gotoday.payment.subscription.entity.Subscription;
 import come.back.gotoday.payment.subscription.enums.SubscriptionStatus;
+import come.back.gotoday.payment.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,6 +23,7 @@ public class SubscriptionBatchFacade {
 
     private final TossPaymentsClient tossPaymentsClient;
     private final SubscriptionBatchService subscriptionBatchService;
+    private final SubscriptionRepository subscriptionRepository;
     // private final NotificationService notificationService; // 알림톡/이메일 발송 서비스 (가정)
 
     private static final int GRACE_PERIOD_DAYS = 7; // 유예 기간 정책: 7일
@@ -67,6 +72,11 @@ public class SubscriptionBatchFacade {
 
             throw e;
         }
+    }
+
+    public void finalizeSubscription(Long subscriptionId) {
+        // 서비스의 트랜잭션 메서드를 호출하도록 위임
+        subscriptionBatchService.finalizeSubscription(subscriptionId);
     }
 
 

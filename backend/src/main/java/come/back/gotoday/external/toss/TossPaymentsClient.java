@@ -2,6 +2,8 @@ package come.back.gotoday.external.toss;
 
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentRequest;
 import come.back.gotoday.external.toss.dto.TossAutomatedPaymentResponse;
+import come.back.gotoday.external.toss.dto.TossCancelRequest;
+import come.back.gotoday.external.toss.dto.TossCancelResponse;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.payment.billing.dto.TossBillingKeyResponse;
@@ -224,6 +226,74 @@ public class TossPaymentsClient {
     @Recover
     public TossAutomatedPaymentResponse recoverPayment(BusinessException e, String plainBillingKey, TossAutomatedPaymentRequest request) {
         log.warn("토스페이먼츠 결제 승인 API BusinessException 발생 및 상신 처리: orderId={}, message={}", request.orderId(), e.getMessage());
+        throw e;
+    }
+
+    /**
+     * 토스페이먼츠 결제 취소 API 호출 - POST 방식
+     */
+    @Retryable(
+            retryFor = { ResourceAccessException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public TossCancelResponse cancelPayment(String paymentKey, TossCancelRequest request) {
+        log.info("토스페이먼츠 결제 취소 API 호출 시작: paymentKey={}", paymentKey);
+
+        try {
+            // 기존과 동일한 시크릿 키 Base64 인증 헤더 구성
+            String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
+
+            // curl --request POST https://api.tosspayments.com/v1/payments/{paymentKey}/cancel
+            TossCancelResponse response = restClient.post()
+                    .uri("/payments/{paymentKey}/cancel", paymentKey)
+                    .header("Authorization", "Basic " + encodedKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(TossCancelResponse.class);
+
+            log.info("토스페이먼츠 결제 취소 API 완료: paymentKey={}, status={}",
+                    paymentKey, response != null ? response.status() : "NULL");
+            return response;
+
+        } catch (ResourceAccessException e) {
+            log.error("토스페이먼츠 결제 취소 서버 타임아웃 또는 네트워크 연결 실패: paymentKey={}, message={}",
+                    paymentKey, e.getMessage(), e);
+            throw e;
+
+        } catch (RestClientResponseException e) {
+            log.error("토스페이먼츠 결제 취소 HTTP 에러 발생: paymentKey={}, statusCode={}, responseBody={}",
+                    paymentKey, e.getStatusCode(), e.getResponseBodyAsString());
+
+            tossErrorHandler.handleTossError(e);
+            throw e;
+
+        } catch (BusinessException e) {
+            throw e;
+
+        } catch (Exception e) {
+            log.error("토스페이먼츠 결제 취소 데이터 처리 중 알 수 없는 오류 발생: paymentKey={}, message={}",
+                    paymentKey, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
+
+    /**
+     * 결제 취소 API 최대 재시도 횟수 초과 시 최종 타임아웃 복구 핸들러
+     */
+    @Recover
+    public TossCancelResponse recoverCancel(ResourceAccessException e, String paymentKey, TossCancelRequest request) {
+        log.error("토스페이먼츠 결제 취소 API 최대 재시도 횟수 초과 (최종 네트워크 실패): paymentKey={}", paymentKey, e);
+        throw new BusinessException(ErrorCode.NETWORK_ERROR_FINAL_FAILED);
+    }
+
+    /**
+     * 결제 취소 API BusinessException 발생 시 예외 상신 핸들러
+     */
+    @Recover
+    public TossCancelResponse recoverCancel(BusinessException e, String paymentKey, TossCancelRequest request) {
+        log.warn("토스페이먼츠 결제 취소 API BusinessException 발생 및 상신 처리: paymentKey={}, message={}", paymentKey, e.getMessage());
         throw e;
     }
 }
