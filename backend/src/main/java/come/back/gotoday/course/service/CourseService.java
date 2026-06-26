@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
@@ -187,20 +188,42 @@ public class CourseService {
                 request.categories()
         );
 
-
-        List<Long> recommendedEventIds = request.eventIds();
+        List<Long> recommendedEventIds = distinctIds(request.eventIds());
+        List<Long> recommendedTourIds = distinctIds(request.tourIds());
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
+        List<Tour> tours = tourRepository.findAllById(recommendedTourIds);
 
-        List<EventNearbyPlaceResponse> nearbyPlaceResponses =
-                events.stream()
-                        .filter(event -> event.getLatitude() != null
-                                && event.getLongitude() != null)
-                        .map(event -> createNearbyPlaceResponse(event, request))
-                        .toList();
+        Category restaurantCategory = getCategoryByName("식당");
+        Category cafeCategory = getCategoryByName("카페");
+
+        List<EventNearbyPlaceResponse> nearbyPlaceResponses = new ArrayList<>();
+
+        events.stream()
+                .filter(event -> event.getLatitude() != null
+                        && event.getLongitude() != null)
+                .map(event -> createNearbyPlaceResponse(
+                        event,
+                        request,
+                        restaurantCategory,
+                        cafeCategory
+                ))
+                .forEach(nearbyPlaceResponses::add);
+
+        tours.stream()
+                .filter(tour -> tour.getLatitude() != null
+                        && tour.getLongitude() != null)
+                .map(tour -> createNearbyPlaceResponse(
+                        tour,
+                        request,
+                        restaurantCategory,
+                        cafeCategory
+                ))
+                .forEach(nearbyPlaceResponses::add);
 
         return new CoursePreviewResponse(
                 recommendedEventIds,
+                recommendedTourIds,
                 nearbyPlaceResponses,
                 request.startLatitude(),
                 request.startLongitude()
@@ -209,11 +232,50 @@ public class CourseService {
 
     private EventNearbyPlaceResponse createNearbyPlaceResponse(
             Event event,
-            CoursePreviewRequest request
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
     ) {
-        double latitude = event.getLatitude();
-        double longitude = event.getLongitude();
+        return createNearbyPlaceResponse(
+                CourseItemType.EVENT,
+                event.getId(),
+                event.getTitle(),
+                event.getLatitude(),
+                event.getLongitude(),
+                request,
+                restaurantCategory,
+                cafeCategory
+        );
+    }
 
+    private EventNearbyPlaceResponse createNearbyPlaceResponse(
+            Tour tour,
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
+    ) {
+        return createNearbyPlaceResponse(
+                CourseItemType.TOUR,
+                tour.getId(),
+                tour.getTitle(),
+                tour.getLatitude(),
+                tour.getLongitude(),
+                request,
+                restaurantCategory,
+                cafeCategory
+        );
+    }
+
+    private EventNearbyPlaceResponse createNearbyPlaceResponse(
+            CourseItemType itemType,
+            Long itemId,
+            String title,
+            Double latitude,
+            Double longitude,
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
+    ) {
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(latitude, longitude);
 
@@ -225,8 +287,6 @@ public class CourseService {
         KakaoPlaceResponse restaurantResponse =
                 kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
 
-        Category restaurantCategory = getCategoryByName("맛집");
-        Category cafeCategory = getCategoryByName("카페");
 
         List<PlacePreviewResponse> restaurants =
                 getDocumentsOrEmpty(restaurantResponse)
@@ -259,8 +319,11 @@ public class CourseService {
                         .toList();
 
         return new EventNearbyPlaceResponse(
-                event.getId(),
-                event.getTitle(),
+                itemType.name(),
+                itemId,
+                title,
+                latitude,
+                longitude,
                 restaurants,
                 cafes
         );

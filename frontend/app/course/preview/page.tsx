@@ -29,16 +29,20 @@ type PlaceItem = {
   placeUrl?: string | null
 }
 
-type EventNearbyPlaceResponse = {
-  eventId: number | null
-  eventTitle: string
+type NearbyPlaceResponse = {
+  itemType: "EVENT" | "TOUR"
+  itemId: number
+  title: string
+  latitude: number | null
+  longitude: number | null
   restaurants: PlaceItem[]
   cafes: PlaceItem[]
 }
 
 type CoursePreviewResponse = {
   eventIds: number[]
-  events: EventNearbyPlaceResponse[]
+  tourIds: number[]
+  events: NearbyPlaceResponse[]
 }
 
 type SelectedRecommendationItems = {
@@ -192,8 +196,14 @@ export default function CoursePreviewPage() {
           return
         }
 
+        const {
+          categories: _categories,
+          categoryIds: _categoryIds,
+          ...requestWithoutRecommendationFilters
+        } = legacyRequest
+
         const requestBody = {
-          ...legacyRequest,
+          ...requestWithoutRecommendationFilters,
           eventIds: savedItems?.eventIds ?? legacyRequest.eventIds ?? [],
           tourIds: savedItems?.tourIds ?? legacyRequest.tourIds ?? [],
           startDate: savedItems?.startDate ?? legacyRequest.startDate ?? null,
@@ -245,7 +255,7 @@ export default function CoursePreviewPage() {
         const fetched = extractCourse(result)
 
         console.log("preview fetched:", fetched)
-        console.log("preview events:", fetched?.events)
+        console.log("preview nearby places:", fetched?.events)
 
         if (isMounted) {
           setCourse(fetched)
@@ -309,19 +319,13 @@ export default function CoursePreviewPage() {
   )
 
   const points = [
-    ...((course?.events ?? []).map((event, index) => ({
-      id: event.eventId ?? index,
-      title: event.eventTitle,
-      latitude:
-        event.restaurants?.[0]?.latitude ??
-        event.cafes?.[0]?.latitude ??
-        null,
-      longitude:
-        event.restaurants?.[0]?.longitude ??
-        event.cafes?.[0]?.longitude ??
-        null,
+    ...((course?.events ?? []).map((place, index) => ({
+      id: `${place.itemType}-${place.itemId}`,
+      title: place.title,
+      latitude: place.latitude,
+      longitude: place.longitude,
       order: index,
-      type: "event",
+      type: place.itemType === "TOUR" ? "tour" : "event",
     })) ?? []),
 
     ...restaurants.map((restaurant, index) => ({
@@ -532,7 +536,9 @@ export default function CoursePreviewPage() {
                   ? selectedEventIds
                   : course.eventIds ?? []
 
-                const tourIds = selectedTourIds
+                const tourIds = selectedTourIds.length > 0
+                  ? selectedTourIds
+                  : course.tourIds ?? []
 
                 const payload = {
                   title: "추천 코스",
