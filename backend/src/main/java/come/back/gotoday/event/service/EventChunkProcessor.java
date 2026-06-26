@@ -6,7 +6,6 @@ import come.back.gotoday.event.enums.EventSource;
 import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.external.seoul.dto.SeoulEventResponse;
 import come.back.gotoday.recommend.engine.VectorEmbeddingEngine;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,6 +63,7 @@ public class EventChunkProcessor {
             }
 
             Event existingEvent = eventMap.get(extId);
+            Category targetCategory = resolveTargetCategory(row.codeName(), categoryMap, defaultCategory);
             String docText = String.format(
                     "[지역: %s] [카테고리: %s] [타겟/대상: %s] [행사명: %s]",
                     row.guName(),
@@ -75,7 +75,9 @@ public class EventChunkProcessor {
 
             if (existingEvent != null) {
                 // 업데이트 대상인데 데이터가 변경되었을 때만 벡터 추출 대상에 포함
-                if (existingEvent.isChanged(row.title(), startDate, endDate, row.orgLink(), row.mainImg(), row.lat(), row.lot())) {
+                if (existingEvent.isChanged(row.codeName(), row.title(), startDate, endDate,
+                        row.orgLink(), row.mainImg(), row.lat(), row.lot())
+                        || existingEvent.isCategoryChanged(targetCategory)) {
                     validRows.add(row);
                     textsToEmbed.add(docText);
                 }
@@ -102,18 +104,23 @@ public class EventChunkProcessor {
                     LocalDate startDate = parseDate(row.startDate());
                     LocalDate endDate = parseDate(row.endDate());
                     Event existingEvent = eventMap.get(extId);
+                    Category targetCategory = resolveTargetCategory(row.codeName(), categoryMap, defaultCategory);
 
                     if (existingEvent != null) {
                         // 진짜 업데이트 수행
-                        existingEvent.updateInfo(row.title(), startDate, endDate, row.orgLink(), row.mainImg(), row.lat(), row.lot());
+                        existingEvent.updateInfo(row.codeName(), row.title(), startDate, endDate,
+                                row.orgLink(), row.mainImg(), row.lat(), row.lot());
+                        if (existingEvent.isCategoryChanged(targetCategory)) {
+                            existingEvent.updateCategory(targetCategory);
+                        }
                         existingEvent.setEmbeddingVector(embeddingVector);
-                        log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}", row.title());
+                        log.info("행사 정보 변경 감지 - 업데이트 수행: TITLE={}, CATEGORY={}",
+                                row.title(), targetCategory.getName());
                     } else {
                         // 진짜 인서트 수행
                         //todo 카카오맵 api가 연동되면 행사의 위치를 카카오 맵에서 찾아서 place객체를 만들고 event에 넣어주는 작업 필요
-                        Category targetCategory = categoryMap.getOrDefault(row.codeName(), defaultCategory);
                         Event newEvent = Event.create(
-                                null, targetCategory, row.title(), startDate, endDate,
+                                null, targetCategory, row.codeName(), row.title(), startDate, endDate,
                                 row.eventTime(), row.useFee(), row.useTrgt(), row.orgLink(), row.mainImg(),
                                 null, EventSource.SEOUL_API, extId, embeddingVector, row.guName()
                                 ,row.lat(), row.lot()
@@ -125,6 +132,36 @@ public class EventChunkProcessor {
                 }
             }
         });
+    }
+
+    private Category resolveTargetCategory(String eventCategory,
+                                           Map<String, Category> categoryMap,
+                                           Category defaultCategory) {
+        if (eventCategory == null || eventCategory.isBlank()) {
+            return categoryMap.getOrDefault("기타행사", defaultCategory);
+        }
+
+        String serviceCategoryName;
+        if (eventCategory.equals("축제") || eventCategory.startsWith("축제-")) {
+            serviceCategoryName = "축제";
+        } else if (eventCategory.equals("전시/미술")) {
+            serviceCategoryName = "전시";
+        } else if (eventCategory.equals("교육/체험")) {
+            serviceCategoryName = "교육/체험";
+        } else if (eventCategory.equals("클래식")
+                || eventCategory.equals("콘서트")
+                || eventCategory.equals("무용")
+                || eventCategory.equals("국악")
+                || eventCategory.equals("연극")
+                || eventCategory.equals("영화")
+                || eventCategory.equals("독주/독창회")
+                || eventCategory.equals("뮤지컬/오페라")) {
+            serviceCategoryName = "공연";
+        } else {
+            serviceCategoryName = "기타행사";
+        }
+
+        return categoryMap.getOrDefault(serviceCategoryName, defaultCategory);
     }
 
     private LocalDate parseDate(String dateStr) {

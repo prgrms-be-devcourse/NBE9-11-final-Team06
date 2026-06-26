@@ -245,6 +245,7 @@ public class RecommendationService {
                     null,
                     event.getTitle(),
                     event.getCategory() != null ? event.getCategory().getName() : null,
+                    event.getEventCategory(),
                     event.getPlace() != null ? event.getPlace().getAddress() : event.getArea(),
                     event.getLatitude(),
                     event.getLongitude(),
@@ -300,6 +301,7 @@ public class RecommendationService {
                                     tour.getId(),
                                     tour.getTitle(),
                                     tour.getCategory() != null ? tour.getCategory().getName() : "관광지",
+                                    tour.getDetailCategoryName(),
                                     tour.getAddress(),
                                     tour.getLatitude(),
                                     tour.getLongitude(),
@@ -620,9 +622,10 @@ public class RecommendationService {
 
         for (var event : candidateEvents) {
             String docText = String.format(
-                    "[지역: %s] [카테고리: %s] [타겟/대상: %s] [행사명: %s]",
+                    "[지역: %s] [카테고리: %s] [세부분류: %s] [타겟/대상: %s] [행사명: %s]",
                     event.getArea(),
                     event.getCategory().getName(),
+                    event.getEventCategory(),
                     event.getTarget(),
                     event.getTitle()
             );
@@ -959,6 +962,7 @@ public class RecommendationService {
             Long tourId,
             String title,
             String categoryName,
+            String detailCategoryName,
             String address,
             Double latitude,
             Double longitude,

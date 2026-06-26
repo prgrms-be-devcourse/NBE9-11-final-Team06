@@ -9,6 +9,7 @@ public record EventDetailResponse(
         String placeName,
         Long categoryId,
         String categoryName,
+        String eventCategory,
         String title,
         LocalDate startDate,
         LocalDate endDate,
@@ -30,6 +31,7 @@ public record EventDetailResponse(
                 event.getPlace() != null ? event.getPlace().getName() : null, // 필요시 수정
                 event.getCategory().getId(),
                 event.getCategory().getName(), // 필요시 수정
+                event.getEventCategory(),
                 event.getTitle(),
                 event.getStartDate(),
                 event.getEndDate(),

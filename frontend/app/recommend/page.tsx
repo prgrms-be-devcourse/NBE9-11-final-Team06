@@ -37,6 +37,7 @@ type CoursePlace = {
   eventTitle?: string
   category?: string
   categoryName?: string
+  detailCategoryName?: string | null
   area?: string
   address?: string | null
   latitude?: number | string | null
@@ -72,6 +73,7 @@ type RecommendationCandidate = {
   tourId?: number | null
   title?: string
   categoryName?: string | null
+  detailCategoryName?: string | null
   address?: string | null
   latitude?: number | string | null
   longitude?: number | string | null
@@ -228,6 +230,7 @@ function createCandidateCourse(draft: RecommendationCandidateDraft): CourseDetai
     tourId: candidate.tourId ?? null,
     title: candidate.title,
     categoryName: candidate.categoryName ?? undefined,
+    detailCategoryName: candidate.detailCategoryName ?? undefined,
     address: candidate.address ?? null,
     latitude: candidate.latitude ?? null,
     longitude: candidate.longitude ?? null,
@@ -277,7 +280,9 @@ function getPlaceTitle(place: CoursePlace) {
 }
 
 function getPlaceCategory(place: CoursePlace) {
-  if (place.itemType === "TOUR") return "관광지"
+  if (place.itemType === "TOUR") {
+    return place.detailCategoryName ?? place.categoryName ?? "관광지"
+  }
   if (place.itemType === "EVENT") {
     return place.categoryName ?? place.category ?? "행사"
   }
@@ -285,7 +290,7 @@ function getPlaceCategory(place: CoursePlace) {
     return place.categoryName ?? place.category ?? "장소"
   }
 
-  return place.categoryName ?? place.category ?? "추천"
+  return place.detailCategoryName ?? place.categoryName ?? place.category ?? "추천"
 }
 
 function getPlaceReason(place: CoursePlace) {
