@@ -44,4 +44,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Subscription s WHERE s.id = :id")
     Optional<Subscription> findByIdForUpdate(@Param("id") Long id);
+
+    boolean existsByBillingInfoIdAndStatus(Long billingInfoId, SubscriptionStatus status);
+
+    // 웹훅 연동 시 지연 로딩 방지를 위해 billingInfo를 패치 조인으로 함께 묶어 가져옵니다.
+    @Query("SELECT s FROM Subscription s " +
+            "JOIN FETCH s.billingInfo b " +
+            "WHERE b.id = :billingInfoId AND s.status = :status")
+    List<Subscription> findAllByBillingInfoIdAndStatus(
+            @Param("billingInfoId") Long billingInfoId,
+            @Param("status") SubscriptionStatus status
+    );
 }

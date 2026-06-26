@@ -24,9 +24,13 @@ public class BillingController {
     @PostMapping("/issue")
     public ResponseEntity<ApiResponse<BillingIssueResponse>> issueBillingKey(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody BillingIssueRequest request) {
         System.out.println(request.authKey()+" / 커스텀 키: "+request.customerKey());
-        BillingIssueResponse response = billingFacade.issueBillingKey(userDetails.getMemberId(), request);
+        BillingIssueResponse response = billingFacade.issueBillingKey(
+                userDetails.getMemberId(),
+                idempotencyKey,
+                request);
         return ResponseEntity.ok(
                 ApiResponse.success(response, "빌링키 발급에 성공했습니다.")
         );
