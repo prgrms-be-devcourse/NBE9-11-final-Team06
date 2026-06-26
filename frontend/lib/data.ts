@@ -23,6 +23,7 @@ export type RestaurantType =
   | "WESTERN"
   | "JAPANESE"
   | "CHINESE"
+  | "NOTHING"
 
 export type CrowdLevel = "여유" | "보통" | "혼잡" | "매우혼잡"
 
