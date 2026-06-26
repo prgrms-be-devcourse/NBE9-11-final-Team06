@@ -47,6 +47,19 @@ public class IdempotencyManager {
             if (existingKey.getStatus() == IdempotencyStatus.FAILED) {
                 throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
             }
+
+            if (existingKey.getStatus() == IdempotencyStatus.TIMEOUT) {
+                int updatedRows = idempotencyKeyRepository.updateStatusFromTimeoutToProcessing(existingKey.getId());
+
+                if (updatedRows > 0) {
+                    // 성공적으로 상태를 PROCESSING으로 바꾼 스레드만 진행
+                    existingKey.startProcessingAgain(rawBody);
+                    return existingKey;
+                } else {
+                    // 이미 다른 스레드가 찰나의 순간에 먼저 성공했으므로 중복 예외
+                    throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
+                }
+            }
         }
 
         try {
@@ -77,5 +90,11 @@ public class IdempotencyManager {
         } catch (Exception e) {
             // 요청하신 대로 에러 로그를 비워두거나 swallow 처리
         }
+    }
+
+    @Transactional
+    public void updateToTimeout(IdempotencyKey idempotencyKey, int responseCode, String responseBody) {
+        idempotencyKey.updateTimeout(responseCode, responseBody);
+        idempotencyKeyRepository.save(idempotencyKey);
     }
 }

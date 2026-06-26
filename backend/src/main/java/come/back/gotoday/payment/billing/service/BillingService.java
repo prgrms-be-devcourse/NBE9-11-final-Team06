@@ -9,6 +9,7 @@ import come.back.gotoday.payment.billing.dto.BillingDetailsResponse;
 import come.back.gotoday.payment.billing.dto.BillingIssueResponse;
 import come.back.gotoday.payment.billing.dto.TossBillingKeyResponse;
 import come.back.gotoday.payment.billing.entity.BillingInfo;
+import come.back.gotoday.payment.billing.enums.BillingStatus;
 import come.back.gotoday.payment.billing.repository.BillingInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -69,22 +70,26 @@ public class BillingService {
      * 회원의 빌링 키 리스트 조회
      */
     public List<BillingDetailsResponse> getBillingKeys(Long memberId) {
-        return billingInfoRepository.findByMemberIdOrderByCreatedAtDesc(memberId).stream()
+        return billingInfoRepository.findByMemberIdAndStatusOrderByCreatedAtDesc(memberId, BillingStatus.ACTIVE)
+                .stream()
                 .map(BillingDetailsResponse::from)
                 .toList();
     }
 
-    /**
-     * 빌링 정보 단건 조회 (소유권 검증 포함)
-     */
-    public BillingInfo getBillingInfoValidated(Long billingInfoId, Long memberId) {
-        return billingInfoRepository.findByIdAndMemberId(billingInfoId, memberId)
+    // 검증을 위한 조회 트랜잭션 (성능을 위해 readOnly 설정)
+    @Transactional(readOnly = true)
+    public BillingInfo validateBeforeDelete(Long billingInfoId, Long memberId) {
+        return billingInfoRepository.findByIdAndMemberIdAndStatus(billingInfoId, memberId, BillingStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN_REQUEST));
-        // 임의의 에러코드 매핑, 존재하지 않거나 본인 카드가 아닐 때 안전하게 차단
     }
 
+    // 최종 상태 변경을 위한 쓰기 트랜잭션
     @Transactional
-    public void deleteBillingInfo(BillingInfo billingInfo) {
-        billingInfoRepository.delete(billingInfo);
+    public void deleteBillingInfoStatus(Long billingInfoId) {
+        // 영속성 컨텍스트를 새로 얻어와 더티 체킹으로 상태 변경
+        BillingInfo billingInfo = billingInfoRepository.findById(billingInfoId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_BILLING_INFO));
+
+        billingInfo.delete(); // status = DELETED 변경
     }
 }

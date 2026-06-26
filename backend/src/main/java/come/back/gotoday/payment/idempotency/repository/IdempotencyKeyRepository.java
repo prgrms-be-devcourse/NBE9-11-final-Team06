@@ -16,4 +16,9 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
     @Modifying(clearAutomatically = true) // 삭제 후 1차 캐시를 비워 동기화 유시
     @Query("DELETE FROM IdempotencyKey i WHERE i.createdAt < :thresholdDateTime")
     int deleteExpiredKeys(@Param("thresholdDateTime") LocalDateTime thresholdDateTime);
+
+    @Modifying
+    @Query("UPDATE IdempotencyKey i SET i.status = 'PROCESSING', i.updatedAt = CURRENT_TIMESTAMP " +
+            "WHERE i.id = :id AND i.status = 'TIMEOUT'")
+    int updateStatusFromTimeoutToProcessing(@Param("id") Long id);
 }

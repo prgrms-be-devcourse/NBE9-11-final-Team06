@@ -2,6 +2,7 @@ package come.back.gotoday.payment.billing.entity;
 
 import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.payment.billing.config.BillingKeyConverter;
+import come.back.gotoday.payment.billing.enums.BillingStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -46,6 +47,16 @@ public class BillingInfo {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private BillingStatus status = BillingStatus.ACTIVE;
+
+
+    public void delete() {
+        this.status = BillingStatus.DELETED;
+        this.updatedAt = LocalDateTime.now();
+    }
 
     private BillingInfo(Member member, String customerKey, String billingKey, String cardCompany, String cardNumber) {
         this.member = member;
