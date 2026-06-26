@@ -23,7 +23,6 @@ const COMPANION_OPTIONS: { value: CompanionType; label: string }[] = [
   { value: "COUPLE", label: "커플" },
   { value: "FRIEND", label: "친구" },
   { value: "FAMILY", label: "가족" },
-  { value: "PARENT", label: "부모님" },
 ]
 
 const MOBILITY_OPTIONS: { value: MobilityLevel; label: string }[] = [

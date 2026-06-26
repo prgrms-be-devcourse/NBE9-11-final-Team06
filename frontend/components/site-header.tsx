@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/use-auth"
 
 const NAV = [
   { href: "/", label: "홈" },
-  { href: "/pricing", label: "구독하기" }, //1
+  { href: "/pricing", label: "구독하기" },
   { href: "/plan", label: "코스 추천받기" },
   { href: "/events", label: "행사 둘러보기" },
   { href: "/mypage", label: "마이페이지" },
@@ -61,14 +61,16 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button
-            render={<Link href="/pricing" />}
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex border-primary text-primary hover:bg-primary/5"
+          <Link
+            href="/pricing"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "hidden sm:inline-flex border-primary text-primary hover:bg-primary/5",
+            )}
           >
             멤버십 구독
-          </Button>
+          </Link>
+
           {!isAuthLoading &&
             (isLoggedIn ? (
               <Button
@@ -82,19 +84,26 @@ export function SiteHeader() {
                 {isLogoutLoading ? "로그아웃 중..." : "로그아웃"}
               </Button>
             ) : (
-              <Button
-                render={<Link href="/login" />}
-                variant="ghost"
-                size="sm"
-                className="hidden sm:inline-flex"
+              <Link
+                href="/login"
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  "hidden sm:inline-flex",
+                )}
               >
                 로그인
-              </Button>
+              </Link>
             ))}
 
-          <Button render={<Link href="/plan" />} size="sm" className="hidden sm:inline-flex">
+          <Link
+            href="/plan"
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "hidden sm:inline-flex",
+            )}
+          >
             코스 추천받기
-          </Button>
+          </Link>
 
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -109,7 +118,10 @@ export function SiteHeader() {
 
             <DropdownMenuContent align="end" className="w-44">
               {NAV.map((item) => (
-                <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>
+                <DropdownMenuItem
+                  key={item.href}
+                  render={<Link href={item.href} />}
+                >
                   {item.label}
                 </DropdownMenuItem>
               ))}
