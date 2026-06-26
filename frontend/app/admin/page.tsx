@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CrowdBadge } from "@/components/crowd-badge"
-import { SEOUL_AREAS, CROWD_META } from "@/lib/data"
+import { SEOUL_AREAS, CROWD_META, type CrowdLevel } from "@/lib/data"
 import { Plus, MapPin, CalendarDays, Users, LayoutGrid } from "lucide-react"
 
 type ApiResponse<T> = {
@@ -82,6 +82,26 @@ type AdminMemberResponse = {
   updatedAt: string
 }
 
+type CrowdApiResponse = {
+  areaName: string
+  areaCode: string
+  congestionLevel: "RELAXED" | "NORMAL" | "CROWDED" | "VERY_CROWDED"
+  congestionText: string
+  message: string
+  populationMin: number | null
+  populationMax: number | null
+  measuredAt: string | null
+}
+
+type AdminSeoulAreaWithCrowd = (typeof SEOUL_AREAS)[number] & {
+  apiAreaName: string | null
+  populationMin: number | null
+  populationMax: number | null
+  measuredAt: string | null
+  message: string | null
+  isRealtime: boolean
+}
+
 type PlaceForm = {
   categoryId: string
   name: string
@@ -98,6 +118,27 @@ type PlaceForm = {
 const PLACE_PAGE_SIZE = 20
 const EVENT_PAGE_SIZE = 20
 
+const CROWD_API_AREA_NAMES: Record<string, string> = {
+  성수: "성수카페거리",
+  연남동: "연남동",
+  익선동: "익선동",
+  삼청동: "북촌한옥마을",
+  여의도: "여의도한강공원",
+  잠실: "잠실 관광특구",
+  홍대: "홍대 관광특구",
+  이태원: "이태원 관광특구",
+}
+
+const DEFAULT_ADMIN_SEOUL_AREAS: AdminSeoulAreaWithCrowd[] = SEOUL_AREAS.map((area) => ({
+  ...area,
+  apiAreaName: CROWD_API_AREA_NAMES[area.name] ?? null,
+  populationMin: null,
+  populationMax: null,
+  measuredAt: null,
+  message: null,
+  isRealtime: false,
+}))
+
 const emptyPlaceForm: PlaceForm = {
   categoryId: "",
   name: "",
@@ -109,6 +150,52 @@ const emptyPlaceForm: PlaceForm = {
   placeUrl: "",
   description: "",
   externalId: "",
+}
+
+const normalizeCrowdLevel = (congestionLevel: CrowdApiResponse["congestionLevel"]): CrowdLevel => {
+  switch (congestionLevel) {
+    case "RELAXED":
+      return "여유"
+    case "NORMAL":
+      return "보통"
+    case "CROWDED":
+      return "혼잡"
+    case "VERY_CROWDED":
+      return "매우혼잡"
+    default:
+      return "보통"
+  }
+}
+
+const formatPopulationRange = (
+  populationMin: number | null,
+  populationMax: number | null,
+  fallback: string,
+) => {
+  if (populationMin === null || populationMax === null) {
+    return fallback
+  }
+
+  return `${populationMin.toLocaleString()}~${populationMax.toLocaleString()}명`
+}
+
+const formatMeasuredAt = (measuredAt: string | null) => {
+  if (!measuredAt) {
+    return null
+  }
+
+  const date = new Date(measuredAt)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -162,6 +249,12 @@ export default function AdminPage() {
 
   const [members, setMembers] = useState<AdminMemberResponse[]>([])
 
+  const [areaCrowds, setAreaCrowds] = useState<AdminSeoulAreaWithCrowd[]>(
+    DEFAULT_ADMIN_SEOUL_AREAS,
+  )
+  const [areaCrowdLoading, setAreaCrowdLoading] = useState(false)
+  const [areaCrowdError, setAreaCrowdError] = useState<string | null>(null)
+
   const [keyword, setKeyword] = useState("")
   const [categoryId, setCategoryId] = useState("")
   const [isActive, setIsActive] = useState("")
@@ -174,7 +267,7 @@ export default function AdminPage() {
     { label: "등록 장소", value: placeTotalElements, icon: MapPin },
     { label: "등록 행사", value: eventTotalElements, icon: CalendarDays },
     { label: "회원 수", value: members.length, icon: Users },
-    { label: "관리 지역", value: SEOUL_AREAS.length, icon: LayoutGrid },
+    { label: "관리 지역", value: areaCrowds.length, icon: LayoutGrid },
   ]
 
   useEffect(() => {
@@ -194,7 +287,7 @@ export default function AdminPage() {
       }
 
       setCheckingAuth(false)
-      await Promise.all([loadPlaces(0), loadMembers(), loadEvents(0)])
+      await Promise.all([loadPlaces(0), loadMembers(), loadEvents(0), loadAreaCrowds()])
     } catch (error) {
       console.error(error)
       router.replace("/login")
@@ -223,7 +316,7 @@ export default function AdminPage() {
     }
 
     const response = await apiFetch<PageResponse<AdminPlaceResponse>>(
-      `/api/admin/places?${params.toString()}`
+      `/api/admin/places?${params.toString()}`,
     )
 
     setPlaces(response.content)
@@ -246,7 +339,7 @@ export default function AdminPage() {
     params.set("size", String(EVENT_PAGE_SIZE))
 
     const response = await apiFetch<PageResponse<AdminEventResponse>>(
-      `/api/admin/events?${params.toString()}`
+      `/api/admin/events?${params.toString()}`,
     )
 
     setEvents(response.content)
@@ -265,10 +358,63 @@ export default function AdminPage() {
 
   async function loadMembers() {
     const response = await apiFetch<PageResponse<AdminMemberResponse>>(
-      "/api/admin/members?page=0&size=20"
+      "/api/admin/members?page=0&size=20",
     )
 
     setMembers(response.content)
+  }
+
+  async function loadAreaCrowds() {
+    setAreaCrowdLoading(true)
+    setAreaCrowdError(null)
+
+    try {
+      const updatedAreas = await Promise.all(
+        DEFAULT_ADMIN_SEOUL_AREAS.map(async (area) => {
+          if (!area.apiAreaName) {
+            return area
+          }
+
+          try {
+            const crowdData = await apiFetch<CrowdApiResponse>(
+              `/api/crowds?areaName=${encodeURIComponent(area.apiAreaName)}`,
+            )
+
+            return {
+              ...area,
+              crowd: normalizeCrowdLevel(crowdData.congestionLevel),
+              populationMin: crowdData.populationMin,
+              populationMax: crowdData.populationMax,
+              measuredAt: crowdData.measuredAt,
+              message: crowdData.message,
+              isRealtime: true,
+            }
+          } catch (error) {
+            console.warn(`관리자 혼잡도 조회 실패: ${area.name}`, error)
+            return {
+              ...area,
+              isRealtime: false,
+            }
+          }
+        }),
+      )
+
+      const failedCount = updatedAreas.filter((area) => !area.isRealtime).length
+
+      if (failedCount > 0) {
+        setAreaCrowdError(
+          `일부 지역(${failedCount}개)의 실시간 혼잡도 조회에 실패해 기본값을 표시합니다.`,
+        )
+      }
+
+      setAreaCrowds(updatedAreas)
+    } catch (error) {
+      console.error(error)
+      setAreaCrowdError("지역별 혼잡도 조회 중 오류가 발생했습니다.")
+      setAreaCrowds(DEFAULT_ADMIN_SEOUL_AREAS)
+    } finally {
+      setAreaCrowdLoading(false)
+    }
   }
 
   function validatePlaceForm() {
@@ -911,25 +1057,68 @@ export default function AdminPage() {
 
           <TabsContent value="areas" className="mt-6">
             <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="text-base">지역별 실시간 혼잡도</CardTitle>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">지역별 실시간 혼잡도</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    서울시 실시간 도시데이터 API 기준 혼잡도입니다.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={loadAreaCrowds}
+                  disabled={areaCrowdLoading}
+                >
+                  {areaCrowdLoading ? "갱신 중..." : "새로고침"}
+                </Button>
               </CardHeader>
               <CardContent>
+                {areaCrowdError && (
+                  <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    {areaCrowdError}
+                  </div>
+                )}
+
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {SEOUL_AREAS.map((a) => (
-                    <div
-                      key={a.name}
-                      className="flex items-center justify-between rounded-xl border border-border/60 px-4 py-3"
-                    >
-                      <div>
-                        <p className="font-medium">{a.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {CROWD_META[a.crowd].range}
-                        </p>
+                  {areaCrowds.map((a) => {
+                    const measuredAt = formatMeasuredAt(a.measuredAt)
+
+                    return (
+                      <div
+                        key={a.name}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{a.name}</p>
+                            {!a.isRealtime && (
+                              <Badge variant="outline" className="text-[10px]">
+                                기본값
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatPopulationRange(
+                              a.populationMin,
+                              a.populationMax,
+                              CROWD_META[a.crowd].range,
+                            )}
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {measuredAt ? `기준 ${measuredAt}` : "실시간 기준 정보 없음"}
+                          </p>
+                          {a.message && (
+                            <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                              {a.message}
+                            </p>
+                          )}
+                        </div>
+                        <CrowdBadge level={a.crowd} />
                       </div>
-                      <CrowdBadge level={a.crowd} />
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
