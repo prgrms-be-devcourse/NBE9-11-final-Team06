@@ -194,18 +194,31 @@ public class CourseService {
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
         List<Tour> tours = tourRepository.findAllById(recommendedTourIds);
 
+        Category restaurantCategory = getCategoryByName("식당");
+        Category cafeCategory = getCategoryByName("카페");
+
         List<EventNearbyPlaceResponse> nearbyPlaceResponses = new ArrayList<>();
 
         events.stream()
                 .filter(event -> event.getLatitude() != null
                         && event.getLongitude() != null)
-                .map(event -> createNearbyPlaceResponse(event, request))
+                .map(event -> createNearbyPlaceResponse(
+                        event,
+                        request,
+                        restaurantCategory,
+                        cafeCategory
+                ))
                 .forEach(nearbyPlaceResponses::add);
 
         tours.stream()
                 .filter(tour -> tour.getLatitude() != null
                         && tour.getLongitude() != null)
-                .map(tour -> createNearbyPlaceResponse(tour, request))
+                .map(tour -> createNearbyPlaceResponse(
+                        tour,
+                        request,
+                        restaurantCategory,
+                        cafeCategory
+                ))
                 .forEach(nearbyPlaceResponses::add);
 
         return new CoursePreviewResponse(
@@ -219,7 +232,9 @@ public class CourseService {
 
     private EventNearbyPlaceResponse createNearbyPlaceResponse(
             Event event,
-            CoursePreviewRequest request
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
     ) {
         return createNearbyPlaceResponse(
                 CourseItemType.EVENT,
@@ -227,13 +242,17 @@ public class CourseService {
                 event.getTitle(),
                 event.getLatitude(),
                 event.getLongitude(),
-                request
+                request,
+                restaurantCategory,
+                cafeCategory
         );
     }
 
     private EventNearbyPlaceResponse createNearbyPlaceResponse(
             Tour tour,
-            CoursePreviewRequest request
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
     ) {
         return createNearbyPlaceResponse(
                 CourseItemType.TOUR,
@@ -241,7 +260,9 @@ public class CourseService {
                 tour.getTitle(),
                 tour.getLatitude(),
                 tour.getLongitude(),
-                request
+                request,
+                restaurantCategory,
+                cafeCategory
         );
     }
 
@@ -251,7 +272,9 @@ public class CourseService {
             String title,
             Double latitude,
             Double longitude,
-            CoursePreviewRequest request
+            CoursePreviewRequest request,
+            Category restaurantCategory,
+            Category cafeCategory
     ) {
         KakaoPlaceResponse cafeResponse =
                 kakaoLocalService.searchCafe(latitude, longitude);
@@ -264,8 +287,6 @@ public class CourseService {
         KakaoPlaceResponse restaurantResponse =
                 kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
 
-        Category restaurantCategory = getCategoryByName("식당");
-        Category cafeCategory = getCategoryByName("카페");
 
         List<PlacePreviewResponse> restaurants =
                 getDocumentsOrEmpty(restaurantResponse)
