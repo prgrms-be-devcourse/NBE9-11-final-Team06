@@ -2,9 +2,11 @@ package come.back.gotoday.admin.service;
 
 import come.back.gotoday.admin.dto.request.AdminKakaoPlaceSyncRequest;
 import come.back.gotoday.admin.dto.response.AdminSyncResponse;
+import come.back.gotoday.event.service.EventBatchService;
 import come.back.gotoday.tour.service.TourSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -13,19 +15,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminSyncService {
 
     private static final String STATUS_COMPLETED = "COMPLETED";
-    private static final String STATUS_ACCEPTED = "ACCEPTED";
-    private static final String STATUS_SKIPPED = "SKIPPED";
 
+    private final EventBatchService eventBatchService;
     private final TourSyncService tourSyncService;
     private final KakaoPlaceSyncService kakaoPlaceSyncService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AdminSyncResponse syncEvents() {
+        eventBatchService.syncSeoulEvents();
+
         return new AdminSyncResponse(
                 "EVENT",
-                STATUS_SKIPPED,
+                STATUS_COMPLETED,
                 0,
-                "서울시 행사 동기화 서비스가 현재 연결되어 있지 않습니다."
+                "서울시 행사 동기화가 완료되었습니다. 처리 건수는 배치 로그에서 확인해주세요."
         );
     }
 

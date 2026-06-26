@@ -2,6 +2,7 @@ package come.back.gotoday.admin.service;
 
 import come.back.gotoday.admin.dto.request.AdminKakaoPlaceSyncRequest;
 import come.back.gotoday.admin.dto.response.AdminSyncResponse;
+import come.back.gotoday.event.service.EventBatchService;
 import come.back.gotoday.tour.service.TourSyncService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,9 @@ import static org.mockito.BDDMockito.then;
 class AdminSyncServiceTest {
 
     @Mock
+    private EventBatchService eventBatchService;
+
+    @Mock
     private TourSyncService tourSyncService;
 
     @Mock
@@ -27,14 +31,16 @@ class AdminSyncServiceTest {
     private AdminSyncService adminSyncService;
 
     @Test
-    @DisplayName("행사 동기화 서비스가 연결되지 않은 경우 SKIPPED 응답을 반환한다")
-    void syncEventsReturnsSkippedResponse() {
+    @DisplayName("행사 동기화를 실행하고 COMPLETED 응답을 반환한다")
+    void syncEventsReturnsCompletedResponse() {
         AdminSyncResponse response = adminSyncService.syncEvents();
 
         assertThat(response.target()).isEqualTo("EVENT");
-        assertThat(response.status()).isEqualTo("SKIPPED");
+        assertThat(response.status()).isEqualTo("COMPLETED");
         assertThat(response.processedCount()).isZero();
-        assertThat(response.message()).isEqualTo("서울시 행사 동기화 서비스가 현재 연결되어 있지 않습니다.");
+        assertThat(response.message()).isEqualTo("서울시 행사 동기화가 완료되었습니다. 처리 건수는 배치 로그에서 확인해주세요.");
+
+        then(eventBatchService).should().syncSeoulEvents();
     }
 
     @Test
