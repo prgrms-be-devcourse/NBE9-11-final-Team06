@@ -14,6 +14,8 @@ public record CoursePreviewRequest(
         String companionType,
         RestaurantType restaurantType,
         Double startLatitude,
-        Double startLongitude
+        Double startLongitude,
+        List<Long> eventIds,
+        List<Long> tourIds
 ) {
 }
