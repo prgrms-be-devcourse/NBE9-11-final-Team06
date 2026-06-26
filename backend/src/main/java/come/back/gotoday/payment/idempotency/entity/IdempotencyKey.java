@@ -98,6 +98,19 @@ public class IdempotencyKey {
         this.updatedAt = LocalDateTime.now();
     }
 
+
+    public void updateTimeout(int responseCode, String responseBody) {
+        this.status = IdempotencyStatus.TIMEOUT;
+        this.responseCode = responseCode;
+        this.responseBody = responseBody;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void startProcessingAgain(String rawBody) {
+        this.status = IdempotencyStatus.PROCESSING;
+        this.requestBodyHash = hashRequestBody(rawBody);
+        this.updatedAt = LocalDateTime.now();
+    }
     // 바디 검증 메서드
     public boolean isSameBody(String currentRawBody) {
         return this.requestBodyHash.equals(hashRequestBody(currentRawBody));
