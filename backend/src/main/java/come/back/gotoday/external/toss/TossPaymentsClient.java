@@ -52,8 +52,8 @@ public class TossPaymentsClient {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public TossBillingKeyResponse requestBillingKey(String authKey, String customerKey) {
-        log.info("토스페이먼츠 빌링키 발급 API 호출 시작: customerKey={}", customerKey);
+    public TossBillingKeyResponse requestBillingKey(String idempotencyKey,String authKey, String customerKey) {
+        log.info("토스페이먼츠 빌링키 발급 API 호출 시작: customerKey={},idempotencyKey={}", customerKey,idempotencyKey);
 
         try {
             String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
@@ -61,6 +61,7 @@ public class TossPaymentsClient {
             TossBillingKeyResponse response = restClient.post()
                     .uri("/billing/authorizations/issue")
                     .header("Authorization", "Basic " + encodedKey)
+                    .header("Idempotency-Key", idempotencyKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(
                             "authKey", authKey,
@@ -99,8 +100,9 @@ public class TossPaymentsClient {
      * 최대 재시도 횟수 초과 시 최종 타임아웃 처리 복구 핸들러
      */
     @Recover
-    public TossBillingKeyResponse recover(ResourceAccessException e, String authKey, String customerKey) {
-        log.error("토스페이먼츠 빌링키 발급 API 최대 재시도 횟수 초과 (최종 실패): customerKey={}, message={}", customerKey, e.getMessage(), e);
+    public TossBillingKeyResponse recover(ResourceAccessException e,String idempotencyKey, String authKey, String customerKey) {
+        log.error("토스페이먼츠 빌링키 발급 API 최대 재시도 횟수 초과 (최종 실패): customerKey={}, idempotencyKey={}, message={}",
+                customerKey, idempotencyKey, e.getMessage(), e);
         // 프로젝트 컨벤션 방식: 실패 로그 및 알림 배치용 예외 상신
         throw new BusinessException(ErrorCode.NETWORK_ERROR_FINAL_FAILED);
     }
@@ -109,8 +111,9 @@ public class TossPaymentsClient {
      * 비즈니스 예외 발생 시 원래 에러를 밖으로 그대로 던져주는 복구 핸들러
      */
     @Recover
-    public TossBillingKeyResponse recover(BusinessException e, String authKey, String customerKey) {
-        log.warn("토스페이먼츠 빌링키 발급 API BusinessException 복구 처리: customerKey={}, message={}", customerKey, e.getMessage());
+    public TossBillingKeyResponse recover(BusinessException e, String idempotencyKey, String authKey, String customerKey) {
+        log.warn("토스페이먼츠 빌링키 발급 API BusinessException 복구 처리: customerKey={}, idempotencyKey={}, message={}",
+                customerKey, idempotencyKey, e.getMessage());
         throw e;
     }
 
