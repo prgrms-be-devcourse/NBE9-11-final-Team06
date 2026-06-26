@@ -49,8 +49,16 @@ public class IdempotencyManager {
             }
 
             if (existingKey.getStatus() == IdempotencyStatus.TIMEOUT) {
-                existingKey.startProcessingAgain(rawBody); // 상태를 다시 PROCESSING으로 돌리고 통과
-                return existingKey;
+                int updatedRows = idempotencyKeyRepository.updateStatusFromTimeoutToProcessing(existingKey.getId());
+
+                if (updatedRows > 0) {
+                    // 성공적으로 상태를 PROCESSING으로 바꾼 스레드만 진행
+                    existingKey.startProcessingAgain(rawBody);
+                    return existingKey;
+                } else {
+                    // 이미 다른 스레드가 찰나의 순간에 먼저 성공했으므로 중복 예외
+                    throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
+                }
             }
         }
 

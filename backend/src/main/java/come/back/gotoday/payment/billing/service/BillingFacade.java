@@ -67,7 +67,13 @@ public class BillingFacade {
             BillingIssueResponse response = billingService.saveBillingInfo(memberId, tossResponse);
 
             // 최종 성공 시 SUCCESS 업데이트
-            String responseJson = objectMapper.writeValueAsString(response);
+            String responseJson;
+            try {
+                responseJson = objectMapper.writeValueAsString(response);
+            } catch (Exception e) {
+                log.error("멱등성 응답 직렬화 실패", e);
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+            }
             idempotencyManager.updateToSuccess(idempotencyKeyEntity, 200, responseJson);
 
             return response;
