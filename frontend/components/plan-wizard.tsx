@@ -268,6 +268,7 @@ export function PlanWizard() {
 
     async function submit() {
         if (!date || !selectedLocation) return
+        
 
         setIsSubmitting(true)
         setSubmitError(null)
