@@ -226,7 +226,16 @@ class EventBatchServiceTest {
 
         // updateInfo() 메서드를 활용하거나 엔티티 상태를 강제로 바꿉니다.
         // (만약 엔티티 메서드로 안 된다면 JPQL 벌크성 쿼리로 바꾸셔도 됩니다)
-        eventToExpire.updateInfo(eventToExpire.getTitle(), eventToExpire.getStartDate(), today.minusDays(1), eventToExpire.getHomepageUrl(), eventToExpire.getImageUrl(),eventToExpire.getLatitude(),eventToExpire.getLongitude());
+        eventToExpire.updateInfo(
+                eventToExpire.getEventCategory(),
+                eventToExpire.getTitle(),
+                eventToExpire.getStartDate(),
+                today.minusDays(1),
+                eventToExpire.getHomepageUrl(),
+                eventToExpire.getImageUrl(),
+                eventToExpire.getLatitude(),
+                eventToExpire.getLongitude()
+        );
 
         em.flush();
         em.clear();

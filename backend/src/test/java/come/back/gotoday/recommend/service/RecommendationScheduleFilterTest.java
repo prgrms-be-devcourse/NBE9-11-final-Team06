@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -310,6 +309,7 @@ class RecommendationScheduleFilterTest {
         return Event.create(
                 null,                  // Place 연관관계
                 category,              // Category (nullable = false 대응 완료)
+                category.getName(),    // eventCategory
                 title,                 // Title (nullable = false 대응 완료)
                 start.minusDays(3),    // startDate (유저 요일 스캔 범위 내 안착되도록 기간 확장)
                 end.plusDays(3),       // endDate
