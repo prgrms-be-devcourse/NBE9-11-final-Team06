@@ -44,6 +44,7 @@ public enum ErrorCode {
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "요금제를 찾을 수 없습니다."),
 
     // --- 구독 및 결제 관련 에러 코드 ---
+    CANNOT_DELETE_ACTIVE_CARD(HttpStatus.BAD_REQUEST,"CANNOT_DELETE_ACTIVE_CARD","구독에 사용되고 있는 카드는 삭제하실 수 없습니다."),
     INVALID_BILLING_INFO(HttpStatus.BAD_REQUEST, "INVALID_BILLING_INFO", "유효하지 않은 결제 정보입니다."),
     DUPLICATE_ACTIVE_SUBSCRIPTION(HttpStatus.CONFLICT, "DUPLICATE_ACTIVE_SUBSCRIPTION", "이미 활성화된 구독이 존재합니다."),
     SUBSCRIPTION_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIPTION_NOT_FOUND", "구독 정보를 찾을 수 없습니다."),
