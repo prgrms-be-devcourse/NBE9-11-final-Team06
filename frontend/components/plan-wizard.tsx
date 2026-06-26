@@ -563,7 +563,7 @@ export function PlanWizard() {
                             <StepHeader
                                 icon={Sparkles}
                                 title="어떤 음식을 좋아하세요?"
-                                desc="식당 추천을 위해 음식 종류를 선택해주세요."
+                                desc="식당 추천을 위해 음식 종류를 선택해주세요. (선택안함 선택시, 카페 식당 추천 안함)"
                             />
 
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -572,6 +572,7 @@ export function PlanWizard() {
                                     { value: "WESTERN", label: "양식", emoji: "🍝" },
                                     { value: "JAPANESE", label: "일식", emoji: "🍣" },
                                     { value: "CHINESE", label: "중식", emoji: "🥟" },
+                                    { value: "NOTHING", label: "선택안함", emoji : "❌"},
                                 ].map((type) => (
                                     <button
                                         key={type.value}
