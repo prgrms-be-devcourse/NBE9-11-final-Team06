@@ -30,6 +30,10 @@ public class Event {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    // 외부 행사 API에서 제공하는 세부 분류값 (예: 클래식, 콘서트, 무용, 전시/미술)
+    @Column(name = "event_category", length = 50)
+    private String eventCategory;
+
     @Column(nullable = false)
     private String title;
 
@@ -83,11 +87,13 @@ public class Event {
     @Column(name = "embedding_vector", columnDefinition = "LONGBLOB")
     private byte[] embeddingVectorBytes;
 
-    private Event(Place place, Category category, String title, LocalDate startDate, LocalDate endDate,
+    private Event(Place place, Category category, String eventCategory, String title, LocalDate startDate, LocalDate endDate,
                   String eventTime, String fee, String target, String homepageUrl, String imageUrl,
-                  String description, String source, String externalId,float[] embeddingVector,String area,Double latitude, Double longitude) {
+                  String description, String source, String externalId, float[] embeddingVector, String area,
+                  Double latitude, Double longitude) {
         this.place = place;
         this.category = category;
+        this.eventCategory = eventCategory;
         this.title = title;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -102,20 +108,26 @@ public class Event {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         setEmbeddingVector(embeddingVector);
-        this.area =area;
+        this.area = area;
         this.latitude = latitude;   // <- 추가
         this.longitude = longitude; // <- 추가
     }
 
     // [규칙 반영] 정적 팩토리 메서드
-    public static Event create(Place place, Category category, String title, LocalDate startDate, LocalDate endDate,
-                               String eventTime, String fee, String target, String homepageUrl, String imageUrl,
-                               String description, EventSource source, String externalId,float[] embeddingVector,String area,Double latitude, Double longitude) {
-        return new Event(place, category, title, startDate, endDate, eventTime, fee, target, homepageUrl, imageUrl, description, source.getCode(), externalId,embeddingVector,area, latitude, longitude);
+    public static Event create(Place place, Category category, String eventCategory, String title,
+                               LocalDate startDate, LocalDate endDate, String eventTime, String fee,
+                               String target, String homepageUrl, String imageUrl, String description,
+                               EventSource source, String externalId, float[] embeddingVector, String area,
+                               Double latitude, Double longitude) {
+        return new Event(place, category, eventCategory, title, startDate, endDate, eventTime, fee, target,
+                homepageUrl, imageUrl, description, source.getCode(), externalId, embeddingVector, area,
+                latitude, longitude);
     }
 
     // 변경 감지용 메서드
-    public void updateInfo(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl,Double latitude, Double longitude) {
+    public void updateInfo(String eventCategory, String title, LocalDate startDate, LocalDate endDate,
+                           String homepageUrl, String imageUrl, Double latitude, Double longitude) {
+        this.eventCategory = eventCategory;
         this.title = title;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -126,13 +138,24 @@ public class Event {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void updateCategory(Category category) {
+        this.category = category;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isCategoryChanged(Category category) {
+        return !java.util.Objects.equals(this.category.getId(), category.getId());
+    }
+
     // 데이터 일치 확인용 메서드
-    public boolean isChanged(String title, LocalDate startDate, LocalDate endDate, String homepageUrl, String imageUrl,Double latitude, Double longitude) {
-        return !this.title.equals(title) ||
+    public boolean isChanged(String eventCategory, String title, LocalDate startDate, LocalDate endDate,
+                             String homepageUrl, String imageUrl, Double latitude, Double longitude) {
+        return !java.util.Objects.equals(this.eventCategory, eventCategory) ||
+                !this.title.equals(title) ||
                 !this.startDate.equals(startDate) ||
                 !this.endDate.equals(endDate) ||
                 !java.util.Objects.equals(this.homepageUrl, homepageUrl) ||
-                !java.util.Objects.equals(this.imageUrl, imageUrl)||
+                !java.util.Objects.equals(this.imageUrl, imageUrl) ||
                 !java.util.Objects.equals(this.latitude, latitude) ||
                 !java.util.Objects.equals(this.longitude, longitude);
     }

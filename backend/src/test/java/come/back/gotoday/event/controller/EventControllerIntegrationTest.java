@@ -84,6 +84,7 @@ class EventControllerIntegrationTest {
             Event event = Event.create(
                     place,
                     category,
+                    "클래식",
                     "[영등포문화재단] 마티네콘서트 With 금난새 #3.베버",
                     LocalDate.of(2026, 6, 11),
                     LocalDate.of(2026, 10, 15),
@@ -154,14 +155,14 @@ class EventControllerIntegrationTest {
             LocalDate today = LocalDate.now();
             // given - 2. 영등포구 클래식 이벤트 저장
             Event event1 = Event.create(
-                    null, classic, "금난새의 클래식 대행진",
+                    null, classic, "클래식", "금난새의 클래식 대행진",
                     today.minusDays(1), today.plusDays(30),
                     "19:00", "무료", "전체", "url", "image1", "설명",
                     EventSource.SEOUL_API, "EXT_1", new float[]{0.1f}, "영등포구", 37.5, 126.8
             );
             // given - 3. 마포구 전시 이벤트 저장 (필터에서 제외되어야 할 대상)
             Event event2 = Event.create(
-                    null, exhibition, "마포 현대 미술전",
+                    null, exhibition, "전시/미술", "마포 현대 미술전",
                     today.minusDays(1), today.plusDays(30),
                     "14:00", "10000원", "전체", "url", "image2", "설명",
                     EventSource.SEOUL_API, "EXT_2", new float[]{0.2f}, "마포구", 37.5, 126.9
@@ -198,7 +199,7 @@ class EventControllerIntegrationTest {
             em.persist(classic);
 
             Event event = Event.create(
-                    null, classic, "금난새 콘서트",
+                    null, classic, "클래식", "금난새 콘서트",
                     LocalDate.of(2026, 5, 1), LocalDate.of(2026, 6, 1), // 2026년 6월 1일 마감됨
                     "19:00", "유료", "전체", "url", "image", "설명",
                     EventSource.SEOUL_API, "EXT_3", new float[]{0.1f}, "강남구", 37.5, 126.8
@@ -231,13 +232,13 @@ class EventControllerIntegrationTest {
             String targetKeyword = "★특수키워드★";
 
             Event matchEvent = Event.create(
-                    null, classic, "제1회 " + targetKeyword + " 음악회",
+                    null, classic, "클래식", "제1회 " + targetKeyword + " 음악회",
                     LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                     "19:00", "무료", "전체", "url", "image1", "설명",
                     EventSource.SEOUL_API, "EXT_K1", new float[]{0.1f}, "영등포구", 37.5, 126.8
             );
             Event nonMatchEvent = Event.create(
-                    null, classic, "일반적인 클래식 피아노 리사이틀",
+                    null, classic, "클래식", "일반적인 클래식 피아노 리사이틀",
                     LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                     "19:00", "무료", "전체", "url", "image2", "설명",
                     EventSource.SEOUL_API, "EXT_K2", new float[]{0.2f}, "영등포구", 37.5, 126.8
@@ -274,7 +275,7 @@ class EventControllerIntegrationTest {
             // 우주구에 총 12개의 이벤트를 루프를 돌며 생성 및 저장
             for (int i = 1; i <= totalInsertCount; i++) {
                 Event pagingEvent = Event.create(
-                        null, classic, "우주 정기 공연 " + i,
+                        null, classic, "클래식", "우주 정기 공연 " + i,
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                         "19:00", "무료", "전체", "url", "image", "설명",
                         EventSource.SEOUL_API, "EXT_P" + i, new float[]{0.1f}, targetArea, 37.5, 126.8
@@ -334,14 +335,14 @@ class EventControllerIntegrationTest {
             LocalDate today = LocalDate.now();
             // 1. 오늘 마감되는 이벤트 (ING에 포함되어야 함)
             Event todayEndEvent = Event.create(
-                    null, classic, "오늘 마감 공연",
+                    null, classic, "클래식", "오늘 마감 공연",
                     today.minusDays(15), today, // 오늘 마감
                     "19:00", "무료", "전체", "url", "image", "설명",
                     EventSource.SEOUL_API, "EXT_B1", new float[]{0.1f}, boundaryArea, 37.5, 126.8
             );
             // 2. 어제 마감된 이벤트 (ING에서 제외되어야 함)
             Event yesterdayEndEvent = Event.create(
-                    null, classic, "어제 마감된 공연",
+                    null, classic, "클래식", "어제 마감된 공연",
                     today.minusDays(15), today.minusDays(1), // 어제 마감
                     "19:00", "무료", "전체", "url", "image", "설명",
                     EventSource.SEOUL_API, "EXT_B2", new float[]{0.1f}, boundaryArea, 37.5, 126.8
@@ -372,7 +373,7 @@ class EventControllerIntegrationTest {
 
             String overflowArea = "오버플로우구";
             Event event = Event.create(
-                    null, classic, "공연",
+                    null, classic, "클래식", "공연",
                     LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                     "19:00", "무료", "전체", "url", "image", "설명",
                     EventSource.SEOUL_API, "EXT_O1", new float[]{0.1f}, overflowArea, 37.5, 126.8

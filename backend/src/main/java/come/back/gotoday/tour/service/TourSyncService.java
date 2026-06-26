@@ -124,6 +124,8 @@ public class TourSyncService {
 
     private void updateTourIfChanged(Tour tour, TourApiItem item) {
         Category category = findCategory(item);
+        String detailCategoryName = tourCategoryMapper.mapDetailCategoryName(
+                item.cat1(), item.cat2(), item.cat3());
         String area = extractArea(item.addr1());
         Double latitude = parseDouble(item.mapy());
         Double longitude = parseDouble(item.mapx());
@@ -141,6 +143,7 @@ public class TourSyncService {
                 item.cat1(),
                 item.cat2(),
                 item.cat3(),
+                detailCategoryName,
                 area,
                 latitude,
                 longitude
@@ -163,6 +166,7 @@ public class TourSyncService {
                 item.cat1(),
                 item.cat2(),
                 item.cat3(),
+                detailCategoryName,
                 area,
                 latitude,
                 longitude
@@ -170,6 +174,8 @@ public class TourSyncService {
     }
 
     private void saveNewTour(TourApiItem item) {
+        String detailCategoryName = tourCategoryMapper.mapDetailCategoryName(
+                item.cat1(), item.cat2(), item.cat3());
         Tour tour = Tour.create(
                 findCategory(item),
                 item.contentid(),
@@ -187,6 +193,7 @@ public class TourSyncService {
                 item.cat1(),
                 item.cat2(),
                 item.cat3(),
+                detailCategoryName,
                 extractArea(item.addr1()),
                 parseDouble(item.mapy()),
                 parseDouble(item.mapx()),

@@ -60,7 +60,7 @@ class EventServiceTest {
             ReflectionTestUtils.setField(mockPlace, "id", placeId);
 
             Event mockEvent = Event.create(
-                    mockPlace, mockCategory, "금난새 콘서트",
+                    mockPlace, mockCategory, "클래식", "금난새 콘서트",
                     LocalDate.of(2026, 6, 11), LocalDate.of(2026, 10, 15),
                     "11:00", "전석 15,000원", "초등학생 이상", "https://homepage.com", "https://image.com",
                     "상세설명", EventSource.SEOUL_API, "EV_185", new float[]{0.1f, 0.2f}, "영등포구", 37.525547, 126.8967
@@ -78,6 +78,7 @@ class EventServiceTest {
             assertThat(result.id()).isEqualTo(eventId);
             assertThat(result.title()).isEqualTo("금난새 콘서트");
             assertThat(result.categoryName()).isEqualTo("클래식");
+            assertThat(result.eventCategory()).isEqualTo("클래식");
             assertThat(result.placeName()).isEqualTo("영등포아트홀");
         }
 

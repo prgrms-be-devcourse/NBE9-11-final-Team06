@@ -73,6 +73,10 @@ public class Tour {
     @Column(length = 50)
     private String cat3;
 
+    // 화면 표시 및 추천 설명에 사용하는 관광지 세부 분류명
+    @Column(name = "detail_category_name", length = 50)
+    private String detailCategoryName;
+
     // 추천 조회용 지역명 예: 성동구, 마포구
     @Column(name = "area", length = 50)
     private String area;
@@ -116,6 +120,7 @@ public class Tour {
             String cat1,
             String cat2,
             String cat3,
+            String detailCategoryName,
             String area,
             Double latitude,
             Double longitude,
@@ -138,6 +143,7 @@ public class Tour {
         this.cat1 = cat1;
         this.cat2 = cat2;
         this.cat3 = cat3;
+        this.detailCategoryName = detailCategoryName;
         this.area = area;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -165,6 +171,7 @@ public class Tour {
             String cat1,
             String cat2,
             String cat3,
+            String detailCategoryName,
             String area,
             Double latitude,
             Double longitude,
@@ -188,6 +195,7 @@ public class Tour {
                 cat1,
                 cat2,
                 cat3,
+                detailCategoryName,
                 area,
                 latitude,
                 longitude,
@@ -209,6 +217,7 @@ public class Tour {
             String cat1,
             String cat2,
             String cat3,
+            String detailCategoryName,
             String area,
             Double latitude,
             Double longitude
@@ -225,6 +234,7 @@ public class Tour {
         this.cat1 = cat1;
         this.cat2 = cat2;
         this.cat3 = cat3;
+        this.detailCategoryName = detailCategoryName;
         this.area = area;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -243,6 +253,7 @@ public class Tour {
             String cat1,
             String cat2,
             String cat3,
+            String detailCategoryName,
             String area,
             Double latitude,
             Double longitude
@@ -258,6 +269,7 @@ public class Tour {
                 !Objects.equals(this.cat1, cat1) ||
                 !Objects.equals(this.cat2, cat2) ||
                 !Objects.equals(this.cat3, cat3) ||
+                !Objects.equals(this.detailCategoryName, detailCategoryName) ||
                 !Objects.equals(this.area, area) ||
                 !Objects.equals(this.latitude, latitude) ||
                 !Objects.equals(this.longitude, longitude);

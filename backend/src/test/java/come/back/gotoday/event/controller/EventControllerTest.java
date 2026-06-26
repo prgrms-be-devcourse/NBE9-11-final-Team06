@@ -60,7 +60,7 @@ class EventControllerTest {
             // given
             Long eventId = 185L;
             EventDetailResponse response = new EventDetailResponse(
-                    eventId, 100L, "영등포아트홀", 16L, "클래식",
+                    eventId, 100L, "영등포아트홀", 16L, "공연", "클래식",
                     "[영등포문화재단] 마티네콘서트 With 금난새 #3.베버",
                     LocalDate.of(2026, 6, 11), LocalDate.of(2026, 10, 15),
                     "11:00", "전석 15,000원", "초등학생 이상",
@@ -80,7 +80,8 @@ class EventControllerTest {
                     .andExpect(jsonPath("$.data.id").value(eventId))
                     .andExpect(jsonPath("$.data.title").value("[영등포문화재단] 마티네콘서트 With 금난새 #3.베버"))
                     .andExpect(jsonPath("$.data.placeName").value("영등포아트홀"))
-                    .andExpect(jsonPath("$.data.categoryName").value("클래식"));
+                    .andExpect(jsonPath("$.data.categoryName").value("공연"))
+                    .andExpect(jsonPath("$.data.eventCategory").value("클래식"));
         }
 
         @Test
@@ -113,7 +114,7 @@ class EventControllerTest {
             EventListResponse eventSample = new EventListResponse(
                     185L, "[영등포문화재단] 마티네콘서트",
                     LocalDate.of(2026, 6, 11), LocalDate.of(2026, 10, 15),
-                    "11:00", "영등포구", "https://image.com", "클래식"
+                    "11:00", "영등포구", "https://image.com", "공연", "클래식"
             );
 
             Page<EventListResponse> mockPage = new PageImpl<>(
@@ -143,6 +144,8 @@ class EventControllerTest {
                     .andExpect(jsonPath("$.data.content[0].id").value(185L))
                     .andExpect(jsonPath("$.data.content[0].title").value("[영등포문화재단] 마티네콘서트"))
                     .andExpect(jsonPath("$.data.content[0].area").value("영등포구"))
+                    .andExpect(jsonPath("$.data.content[0].categoryName").value("공연"))
+                    .andExpect(jsonPath("$.data.content[0].eventCategory").value("클래식"))
                     .andExpect(jsonPath("$.data.pageable.pageNumber").value(0))
                     .andExpect(jsonPath("$.data.pageable.pageSize").value(10))
                     .andExpect(jsonPath("$.data.totalElements").value(1));

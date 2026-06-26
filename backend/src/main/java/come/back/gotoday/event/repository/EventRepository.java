@@ -98,20 +98,4 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("now") LocalDate now,
             Pageable pageable
     );
-
-    //
-//    //지워도 됨 이 아래로는 가중치 설정하기 위해 임시로 추가한 것=============
-//    // 과거 30개의 데이터 (Train Set - 학습 및 가중치 탐색용)
-//    @Query(value = "SELECT * FROM event ORDER BY created_at ASC, id ASC LIMIT 30", nativeQuery = true)
-//    List<Event> findTrainSet();
-//
-//    // 최근 11개의 데이터 (Test Set - 검증용)
-//    @Query(value = "SELECT * FROM event ORDER BY created_at ASC, id ASC LIMIT 11 OFFSET 30", nativeQuery = true)
-//    List<Event> findTestSet();
-//    // EventRepository.java
-//    @Query("SELECT e FROM Event e WHERE e.area = :area AND e.category.name IN :categories")
-//    List<Event> findByAreaAndCategories(String area, List<String> categories);
-//
-//    @Query("SELECT e FROM Event e WHERE e.area = :area")
-//    List<Event> findByArea(String area);
 }

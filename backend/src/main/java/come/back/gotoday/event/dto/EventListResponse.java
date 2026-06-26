@@ -11,7 +11,8 @@ public record EventListResponse(
         String eventTime,
         String area,
         String imageUrl,
-        String categoryName
+        String categoryName,
+        String eventCategory
 ) {
     public static EventListResponse from(Event event) {
         return new EventListResponse(
@@ -22,7 +23,8 @@ public record EventListResponse(
                 event.getEventTime(),
                 event.getArea(),
                 event.getImageUrl(),
-                event.getCategory().getName()
+                event.getCategory().getName(),
+                event.getEventCategory()
         );
     }
 }
