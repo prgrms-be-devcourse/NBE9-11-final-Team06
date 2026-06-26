@@ -23,7 +23,6 @@ import come.back.gotoday.member.repository.MemberRepository;
 import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.place.service.PlaceService;
-import come.back.gotoday.recommend.dto.RecommendationCourseCreateRequest;
 import come.back.gotoday.recommend.service.RecommendationService;
 import come.back.gotoday.tour.entity.Tour;
 import come.back.gotoday.tour.repository.TourRepository;
@@ -177,73 +176,46 @@ public class CourseService {
     }
 
 
-
     @Transactional
-    public CoursePreviewResponse previewCourse(Long memberId, CoursePreviewRequest request) {
-        getMemberOrThrow(memberId);
+    public CoursePreviewResponse previewCourse(Long memberId,
+                                               CoursePreviewRequest request) {
 
+        getMemberOrThrow(memberId);
         log.info(
                 "추천 코스 미리보기 분기 진입: memberId={}, categories={}",
                 memberId,
                 request.categories()
         );
 
-        RecommendationService.RecommendedCourseDraft draft =
-                recommendationService.recommendCourse(
-                        memberId,
-                        toRecommendationCourseCreateRequest(request)
-                );
 
-        List<Long> recommendedEventIds = draft.events()
-                .stream()
-                .map(RecommendationService.RecommendedEvent::eventId)
-                .toList();
+        List<Long> recommendedEventIds = request.eventIds();
 
         List<Event> events = eventRepository.findAllById(recommendedEventIds);
 
-        Event centerEvent = events.stream()
-                .filter(event -> event.getLatitude() != null && event.getLongitude() != null)
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("추천 가능한 행사가 없습니다."));
+        List<EventNearbyPlaceResponse> nearbyPlaceResponses =
+                events.stream()
+                        .filter(event -> event.getLatitude() != null
+                                && event.getLongitude() != null)
+                        .map(event -> createNearbyPlaceResponse(event, request))
+                        .toList();
 
-        return createCoursePreviewResponse(
+        return new CoursePreviewResponse(
                 recommendedEventIds,
-                centerEvent.getId(),
-                centerEvent.getTitle(),
-                centerEvent.getLatitude(),
-                centerEvent.getLongitude(),
-                request
-        );
-    }
-
-    private RecommendationCourseCreateRequest toRecommendationCourseCreateRequest(
-            CoursePreviewRequest request
-    ) {
-        return new RecommendationCourseCreateRequest(
-                null,
-                request.startDate(),
-                request.endDate(),
-                DEFAULT_PREVIEW_EVENT_COUNT,
-                request.baseArea(),
-                request.categories(),
-                request.companionType(),
-                null,
+                nearbyPlaceResponses,
                 request.startLatitude(),
                 request.startLongitude()
         );
     }
 
-
-    private CoursePreviewResponse createCoursePreviewResponse(
-            List<Long> recommendedEventIds,
-            Long eventId,
-            String eventTitle,
-            double centerLat,
-            double centerLng,
+    private EventNearbyPlaceResponse createNearbyPlaceResponse(
+            Event event,
             CoursePreviewRequest request
     ) {
+        double latitude = event.getLatitude();
+        double longitude = event.getLongitude();
+
         KakaoPlaceResponse cafeResponse =
-                kakaoLocalService.searchCafe(centerLat, centerLng);
+                kakaoLocalService.searchCafe(latitude, longitude);
 
         RestaurantType restaurantType =
                 request.restaurantType() != null
@@ -251,49 +223,46 @@ public class CourseService {
                         : RestaurantType.KOREAN;
 
         KakaoPlaceResponse restaurantResponse =
-                kakaoLocalService.searchRestaurant(centerLat, centerLng, restaurantType);
+                kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
 
         Category restaurantCategory = getCategoryByName("맛집");
         Category cafeCategory = getCategoryByName("카페");
 
-        List<PlacePreviewResponse> restaurants = getDocumentsOrEmpty(restaurantResponse)
-                .stream()
-                .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(
-                        centerLat,
-                        centerLng,
-                        Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())
-                ) <= NEARBY_PLACE_RADIUS_METER)
-                .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
-                .map(this::toPlacePreviewResponse)
-                .toList();
+        List<PlacePreviewResponse> restaurants =
+                getDocumentsOrEmpty(restaurantResponse)
+                        .stream()
+                        .filter(doc -> doc.y() != null && doc.x() != null)
+                        .filter(doc -> distance(
+                                latitude,
+                                longitude,
+                                Double.parseDouble(doc.y()),
+                                Double.parseDouble(doc.x())
+                        ) <= NEARBY_PLACE_RADIUS_METER)
+                        .limit(5)
+                        .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
+                        .map(this::toPlacePreviewResponse)
+                        .toList();
 
-        List<PlacePreviewResponse> cafes = getDocumentsOrEmpty(cafeResponse)
-                .stream()
-                .filter(doc -> doc.y() != null && doc.x() != null)
-                .filter(doc -> distance(
-                        centerLat,
-                        centerLng,
-                        Double.parseDouble(doc.y()),
-                        Double.parseDouble(doc.x())
-                ) <= NEARBY_PLACE_RADIUS_METER)
-                .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
-                .map(this::toPlacePreviewResponse)
-                .toList();
+        List<PlacePreviewResponse> cafes =
+                getDocumentsOrEmpty(cafeResponse)
+                        .stream()
+                        .filter(doc -> doc.y() != null && doc.x() != null)
+                        .filter(doc -> distance(
+                                latitude,
+                                longitude,
+                                Double.parseDouble(doc.y()),
+                                Double.parseDouble(doc.x())
+                        ) <= NEARBY_PLACE_RADIUS_METER)
+                        .limit(5)
+                        .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
+                        .map(this::toPlacePreviewResponse)
+                        .toList();
 
-        EventNearbyPlaceResponse nearbyPlaceResponse = new EventNearbyPlaceResponse(
-                eventId,
-                eventTitle,
+        return new EventNearbyPlaceResponse(
+                event.getId(),
+                event.getTitle(),
                 restaurants,
                 cafes
-        );
-
-        return new CoursePreviewResponse(
-                recommendedEventIds,
-                List.of(nearbyPlaceResponse),
-                request.startLatitude(),
-                request.startLongitude()
         );
     }
 
