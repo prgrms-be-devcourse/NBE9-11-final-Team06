@@ -34,8 +34,16 @@ public class CategoryInitData {
             categoryRepository.save(Category.create("축제", CategoryType.EVENT));
             categoryRepository.save(Category.create("전시", CategoryType.EVENT));
 
-            categoryRepository.save(Category.create("조용한", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create("활동적인", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("조용한 힐링", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("문화생활", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("자연•산책", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("감성•사진", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("활동적인 하루", CategoryType.PREFERENCE));
+            categoryRepository.save(Category.create("새로운 경험", CategoryType.PREFERENCE));
+
+            categoryRepository.save(Category.create("공연", CategoryType.EVENT));
+            categoryRepository.save(Category.create("교육/체험", CategoryType.EVENT));
+            categoryRepository.save(Category.create("기타행사", CategoryType.EVENT));
 
             log.info("카테고리 초기 데이터 생성 완료. createdCount={}", categoryRepository.count());
         };
