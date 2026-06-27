@@ -502,7 +502,6 @@ function RecommendContent() {
                 }
 
                 sessionStorage.removeItem(SELECTED_RECOMMENDATION_ITEMS_KEY)
-                sessionStorage.removeItem("recommendationCandidates")
                 router.push(`/course/${courseId}`)
             } catch (error) {
                 setSelectionMessage(

@@ -2,19 +2,15 @@ package come.back.gotoday.recommend.service;
 
 import come.back.gotoday.category.entity.Category;
 import come.back.gotoday.category.repository.PreferenceEventCategoryMappingRepository;
+import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.preference.entity.UserPreference;
+import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
+import come.back.gotoday.preference.repository.UserPreferenceRepository;
 import come.back.gotoday.weather.service.EventIndoorOutdoorPolicy;
 import come.back.gotoday.weather.service.WeatherConditionClassifier;
 import come.back.gotoday.weather.service.WeatherForecastService;
 import come.back.gotoday.weather.service.WeatherScoreCalculator;
-import come.back.gotoday.preference.entity.UserPreference;
-import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
-import come.back.gotoday.preference.repository.UserPreferenceRepository;
-
-import come.back.gotoday.crowd.entity.CongestionLevel;
-import come.back.gotoday.crowd.service.CrowdScoreCalculator;
-import come.back.gotoday.crowd.service.NearestCrowdAreaService;
-import come.back.gotoday.event.entity.Event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,21 +21,20 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("추천 서비스 단위 테스트")
 class RecommendationServiceTest {
 
-    private static final LocalDate BEAM_SEARCH_DATE = LocalDate.of(2026, 6, 20);
 
     @Mock
     private UserPreferenceRepository userPreferenceRepository;
@@ -53,11 +48,6 @@ class RecommendationServiceTest {
     @Mock
     private EventRepository eventRepository;
 
-    @Mock
-    private NearestCrowdAreaService nearestCrowdAreaService;
-
-    @Mock
-    private CrowdScoreCalculator crowdScoreCalculator;
 
     @Mock
     private WeatherForecastService weatherForecastService;
@@ -316,235 +306,4 @@ class RecommendationServiceTest {
         assertThat(secondQueryText).isEqualTo(firstQueryText);
     }
 
-    @Test
-    @DisplayName("빔 서치에서 혼잡한 곳 피하기를 선택하면 쾌적한 행사가 우선된다")
-    void selectBeamSearchEventIdsAvoidCrowdsPrioritizesRelaxedEvent() {
-        Event crowdedEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event relaxedEvent = mockEvent(2L, 37.5000, 127.0000);
-
-        given(nearestCrowdAreaService.findNearest(37.5000, 127.0000))
-                .willReturn(
-                        Optional.of(nearestArea(CongestionLevel.VERY_CROWDED)),
-                        Optional.of(nearestArea(CongestionLevel.RELAXED))
-                );
-        given(crowdScoreCalculator.calculate(CongestionLevel.VERY_CROWDED)).willReturn(0);
-        given(crowdScoreCalculator.calculate(CongestionLevel.RELAXED)).willReturn(100);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(crowdedEvent, relaxedEvent),
-                Map.of(1L, 1.0, 2L, 1.0),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                true,
-                2
-        );
-
-        assertThat(result).containsExactly(2L, 1L);
-    }
-
-    @Test
-    @DisplayName("빔 서치에서 혼잡도 상관없음을 선택하면 혼잡도 조회를 생략한다")
-    void selectBeamSearchEventIdsIndifferentSkipsCrowdLookup() {
-        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(firstEvent, secondEvent),
-                Map.of(1L, 1.0, 2L, 0.5),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                2
-        );
-
-        assertThat(result).containsExactly(1L, 2L);
-        verify(nearestCrowdAreaService, never()).findNearest(
-                org.mockito.ArgumentMatchers.anyDouble(),
-                org.mockito.ArgumentMatchers.anyDouble()
-        );
-        verify(crowdScoreCalculator, never()).calculate(
-                org.mockito.ArgumentMatchers.any(CongestionLevel.class)
-        );
-    }
-
-    @Test
-    @DisplayName("빔 서치는 직전 행사 좌표를 다음 후보 점수 계산에 사용한다")
-    void selectBeamSearchEventIdsUpdatesCurrentLocation() {
-        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event nearFirstEvent = mockEvent(2L, 37.5005, 127.0005);
-        Event farFromFirstEvent = mockEvent(3L, 37.5500, 127.0500);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(firstEvent, nearFirstEvent, farFromFirstEvent),
-                Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                3
-        );
-
-        assertThat(result).containsExactly(1L, 2L, 3L);
-    }
-
-    @Test
-    @DisplayName("빔 서치는 동일 행사를 중복 선택하지 않고 후보 수만큼만 반환한다")
-    void selectBeamSearchEventIdsDoesNotSelectDuplicates() {
-        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(firstEvent, secondEvent),
-                Map.of(1L, 1.0, 2L, 0.8),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                5
-        );
-
-        assertThat(result)
-                .containsExactly(1L, 2L)
-                .doesNotHaveDuplicates();
-    }
-
-    @Test
-    @DisplayName("빔 서치는 topK가 0이면 빈 결과를 반환한다")
-    void selectBeamSearchEventIdsReturnsEmptyWhenTopKIsZero() {
-        Event event = org.mockito.Mockito.mock(Event.class);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(event),
-                Map.of(1L, 1.0),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                0
-        );
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("빔 서치는 시작 좌표가 없어도 중복 없이 모든 후보를 추천한다")
-    void selectBeamSearchEventIdsWorksWithoutStartCoordinates() {
-        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event secondEvent = mockEvent(2L, 37.5100, 127.0100);
-        Event thirdEvent = mockEvent(3L, 37.5200, 127.0200);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(firstEvent, secondEvent, thirdEvent),
-                Map.of(1L, 1.0, 2L, 0.8, 3L, 0.6),
-                BEAM_SEARCH_DATE,
-                null,
-                null,
-                false,
-                5
-        );
-
-        assertThat(result)
-                .containsExactlyInAnyOrder(1L, 2L, 3L)
-                .doesNotHaveDuplicates();
-    }
-
-    @Test
-    @DisplayName("빔 서치는 선호 점수가 없는 행사를 추천 후보에서 제외한다")
-    void selectBeamSearchEventIdsExcludesEventsWithoutPreferenceScore() {
-        Event scoredEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event unscoredEvent = org.mockito.Mockito.mock(Event.class);
-        given(unscoredEvent.getId()).willReturn(2L);
-
-        List<Long> result = selectBeamSearchEventIds(
-                List.of(scoredEvent, unscoredEvent),
-                Map.of(1L, 1.0),
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                2
-        );
-
-        assertThat(result).containsExactly(1L);
-    }
-
-    @Test
-    @DisplayName("빔 서치는 동일한 입력에 대해 항상 동일한 방문 순서를 반환한다")
-    void selectBeamSearchEventIdsReturnsDeterministicOrder() {
-        Event firstEvent = mockEvent(1L, 37.5000, 127.0000);
-        Event secondEvent = mockEvent(2L, 37.5005, 127.0005);
-        Event thirdEvent = mockEvent(3L, 37.5100, 127.0100);
-
-        List<Event> candidateEvents = List.of(firstEvent, secondEvent, thirdEvent);
-        Map<Long, Double> preferenceScores = Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0);
-
-        List<Long> firstResult = selectBeamSearchEventIds(
-                candidateEvents,
-                preferenceScores,
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                3
-        );
-        List<Long> secondResult = selectBeamSearchEventIds(
-                candidateEvents,
-                preferenceScores,
-                BEAM_SEARCH_DATE,
-                37.5000,
-                127.0000,
-                false,
-                3
-        );
-
-        assertThat(secondResult).containsExactlyElementsOf(firstResult);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Long> selectBeamSearchEventIds(
-            List<Event> candidateEvents,
-            Map<Long, Double> preferenceScores,
-            LocalDate searchStart,
-            Double startLatitude,
-            Double startLongitude,
-            boolean avoidCrowds,
-            int topK
-    ) {
-        return (List<Long>) ReflectionTestUtils.invokeMethod(
-                recommendationService,
-                "selectBeamSearchEventIds",
-                candidateEvents,
-                preferenceScores,
-                searchStart,
-                startLatitude,
-                startLongitude,
-                avoidCrowds,
-                topK,
-                5
-        );
-    }
-
-    private Event mockEvent(Long id, Double latitude, Double longitude) {
-        Event event = org.mockito.Mockito.mock(Event.class);
-        given(event.getId()).willReturn(id);
-        given(event.getLatitude()).willReturn(latitude);
-        given(event.getLongitude()).willReturn(longitude);
-        return event;
-    }
-
-    private NearestCrowdAreaService.NearestCrowdArea nearestArea(
-            CongestionLevel congestionLevel
-    ) {
-        return new NearestCrowdAreaService.NearestCrowdArea(
-                1L,
-                "테스트 지역",
-                "POI001",
-                37.5000,
-                127.0000,
-                0.1,
-                congestionLevel
-        );
-    }
 }

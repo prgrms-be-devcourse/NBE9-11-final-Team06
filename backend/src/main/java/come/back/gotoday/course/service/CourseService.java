@@ -41,6 +41,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 
 @Slf4j
 @Service
@@ -51,6 +53,7 @@ public class CourseService {
     private static final int SAVED_COURSE_PAGE_SIZE = 10;
     private static final int DEFAULT_PREVIEW_EVENT_COUNT = 3;
     private static final double NEARBY_PLACE_RADIUS_METER = 500.0;
+    private static final int DEFAULT_ROUTE_BEAM_WIDTH = 5;
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -98,83 +101,330 @@ public class CourseService {
                 "사용자 선택 코스"
         );
 
+        List<CourseRouteCandidate> selectedPlaces = createRouteCandidates(
+                events,
+                tours,
+                restaurant,
+                cafe
+        );
+
+        List<CourseRouteCandidate> orderedPlaces = findOptimalRoute(
+                selectedPlaces,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+
         int order = 1;
-
-        for (Event event : events) {
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            event.getPlace(),
-                            event,
-                            order++,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
-                    )
-            );
-        }
-
-        for (Tour tour : tours) {
-            course.addCoursePlace(
-                    CoursePlace.createWithTour(
-                            course,
-                            tour,
-                            order++,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            "선택한 관광지입니다."
-                    )
-            );
-        }
-
-        if (restaurant != null) {
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            restaurant,
-                            null,
-                            order++,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            "사용자가 선택한 식당입니다."
-                    )
-            );
-        }
-
-        if (cafe != null) {
-            course.addCoursePlace(
-                    CoursePlace.create(
-                            course,
-                            cafe,
-                            null,
-                            order++,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            "사용자가 선택한 카페입니다."
-                    )
-            );
+        for (CourseRouteCandidate candidate : orderedPlaces) {
+            addCoursePlace(course, candidate, order++);
         }
 
         courseRepository.save(course);
 
         return course.getId();
     }
+    private List<CourseRouteCandidate> createRouteCandidates(
+            List<Event> events,
+            List<Tour> tours,
+            Place restaurant,
+            Place cafe
+    ) {
+        List<CourseRouteCandidate> candidates = new ArrayList<>();
+        int sequence = 0;
+
+        for (Event event : events) {
+            Place eventPlace = event.getPlace();
+            Double latitude = eventPlace != null && eventPlace.getLatitude() != null
+                    ? eventPlace.getLatitude().doubleValue()
+                    : event.getLatitude();
+            Double longitude = eventPlace != null && eventPlace.getLongitude() != null
+                    ? eventPlace.getLongitude().doubleValue()
+                    : event.getLongitude();
+
+            candidates.add(CourseRouteCandidate.event(
+                    sequence++,
+                    event,
+                    latitude,
+                    longitude,
+                    "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+            ));
+        }
+
+        for (Tour tour : tours) {
+            candidates.add(CourseRouteCandidate.tour(
+                    sequence++,
+                    tour,
+                    tour.getLatitude(),
+                    tour.getLongitude(),
+                    "선택한 관광지입니다."
+            ));
+        }
+
+        if (restaurant != null) {
+            candidates.add(CourseRouteCandidate.place(
+                    sequence++,
+                    restaurant,
+                    restaurant.getLatitude() != null
+                            ? restaurant.getLatitude().doubleValue()
+                            : null,
+                    restaurant.getLongitude() != null
+                            ? restaurant.getLongitude().doubleValue()
+                            : null,
+                    "사용자가 선택한 식당입니다."
+            ));
+        }
+
+        if (cafe != null) {
+            candidates.add(CourseRouteCandidate.place(
+                    sequence,
+                    cafe,
+                    cafe.getLatitude() != null
+                            ? cafe.getLatitude().doubleValue()
+                            : null,
+                    cafe.getLongitude() != null
+                            ? cafe.getLongitude().doubleValue()
+                            : null,
+                    "사용자가 선택한 카페입니다."
+            ));
+        }
+
+        return candidates;
+    }
+
+    private List<CourseRouteCandidate> findOptimalRoute(
+            List<CourseRouteCandidate> candidates,
+            Double startLatitude,
+            Double startLongitude
+    ) {
+        List<CourseRouteCandidate> routeableCandidates = candidates.stream()
+                .filter(CourseRouteCandidate::hasCoordinates)
+                .toList();
+
+        List<CourseRouteCandidate> candidatesWithoutCoordinates = candidates.stream()
+                .filter(candidate -> !candidate.hasCoordinates())
+                .toList();
+
+        if (routeableCandidates.size() < 2) {
+            return candidates;
+        }
+
+        List<BeamState> beamStates = List.of(
+                BeamState.start(startLatitude, startLongitude)
+        );
+
+        for (int depth = 0; depth < routeableCandidates.size(); depth++) {
+            List<BeamState> expandedStates = new ArrayList<>();
+
+            for (BeamState beamState : beamStates) {
+                for (CourseRouteCandidate candidate : routeableCandidates) {
+                    if (beamState.visitedSequences().contains(candidate.sequence())) {
+                        continue;
+                    }
+
+                    double moveDistance = beamState.currentLatitude() == null
+                            || beamState.currentLongitude() == null
+                            ? 0.0
+                            : distance(
+                                    beamState.currentLatitude(),
+                                    beamState.currentLongitude(),
+                                    candidate.latitude(),
+                                    candidate.longitude()
+                            );
+
+                    expandedStates.add(beamState.extend(candidate, moveDistance));
+                }
+            }
+
+            beamStates = expandedStates.stream()
+                    .sorted(Comparator.comparingDouble(BeamState::totalDistance))
+                    .limit(DEFAULT_ROUTE_BEAM_WIDTH)
+                    .toList();
+        }
+
+        if (beamStates.isEmpty()) {
+            return candidates;
+        }
+
+        List<CourseRouteCandidate> orderedCandidates = new ArrayList<>(
+                beamStates.get(0).route()
+        );
+        orderedCandidates.addAll(candidatesWithoutCoordinates);
+
+        log.info(
+                "선택 장소 빔 서치 경로 생성 완료: candidateCount={}, totalDistance={}m",
+                candidates.size(),
+                beamStates.get(0).totalDistance()
+        );
+
+        return orderedCandidates;
+    }
+
+    private void addCoursePlace(
+            Course course,
+            CourseRouteCandidate candidate,
+            int visitOrder
+    ) {
+        if (candidate.itemType() == CourseItemType.EVENT) {
+            course.addCoursePlace(
+                    CoursePlace.create(
+                            course,
+                            candidate.event().getPlace(),
+                            candidate.event(),
+                            visitOrder,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            candidate.recommendationReason()
+                    )
+            );
+            return;
+        }
+
+        if (candidate.itemType() == CourseItemType.TOUR) {
+            course.addCoursePlace(
+                    CoursePlace.createWithTour(
+                            course,
+                            candidate.tour(),
+                            visitOrder,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            candidate.recommendationReason()
+                    )
+            );
+            return;
+        }
+
+        course.addCoursePlace(
+                CoursePlace.create(
+                        course,
+                        candidate.place(),
+                        null,
+                        visitOrder,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        candidate.recommendationReason()
+                )
+        );
+    }
+
+    private record CourseRouteCandidate(
+            int sequence,
+            CourseItemType itemType,
+            Event event,
+            Tour tour,
+            Place place,
+            Double latitude,
+            Double longitude,
+            String recommendationReason
+    ) {
+        private static CourseRouteCandidate event(
+                int sequence,
+                Event event,
+                Double latitude,
+                Double longitude,
+                String recommendationReason
+        ) {
+            return new CourseRouteCandidate(
+                    sequence,
+                    CourseItemType.EVENT,
+                    event,
+                    null,
+                    null,
+                    latitude,
+                    longitude,
+                    recommendationReason
+            );
+        }
+
+        private static CourseRouteCandidate tour(
+                int sequence,
+                Tour tour,
+                Double latitude,
+                Double longitude,
+                String recommendationReason
+        ) {
+            return new CourseRouteCandidate(
+                    sequence,
+                    CourseItemType.TOUR,
+                    null,
+                    tour,
+                    null,
+                    latitude,
+                    longitude,
+                    recommendationReason
+            );
+        }
+
+        private static CourseRouteCandidate place(
+                int sequence,
+                Place place,
+                Double latitude,
+                Double longitude,
+                String recommendationReason
+        ) {
+            return new CourseRouteCandidate(
+                    sequence,
+                    CourseItemType.PLACE,
+                    null,
+                    null,
+                    place,
+                    latitude,
+                    longitude,
+                    recommendationReason
+            );
+        }
+
+        private boolean hasCoordinates() {
+            return latitude != null && longitude != null;
+        }
+    }
+
+    private record BeamState(
+            List<CourseRouteCandidate> route,
+            Set<Integer> visitedSequences,
+            Double currentLatitude,
+            Double currentLongitude,
+            double totalDistance
+    ) {
+        private static BeamState start(Double startLatitude, Double startLongitude) {
+            return new BeamState(
+                    List.of(),
+                    Set.of(),
+                    startLatitude,
+                    startLongitude,
+                    0.0
+            );
+        }
+
+        private BeamState extend(CourseRouteCandidate candidate, double moveDistance) {
+            List<CourseRouteCandidate> nextRoute = new ArrayList<>(route);
+            nextRoute.add(candidate);
+
+            Set<Integer> nextVisitedSequences = new HashSet<>(visitedSequences);
+            nextVisitedSequences.add(candidate.sequence());
+
+            return new BeamState(
+                    List.copyOf(nextRoute),
+                    Set.copyOf(nextVisitedSequences),
+                    candidate.latitude(),
+                    candidate.longitude(),
+                    totalDistance + moveDistance
+            );
+        }
+    }
+
+
 
 
     @Transactional
