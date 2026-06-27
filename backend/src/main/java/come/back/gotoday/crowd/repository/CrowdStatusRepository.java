@@ -1,6 +1,7 @@
 package come.back.gotoday.crowd.repository;
 
 import come.back.gotoday.crowd.entity.CrowdStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -47,6 +48,38 @@ public interface CrowdStatusRepository extends JpaRepository<CrowdStatus, Long> 
               )
             """)
     List<CrowdStatus> findLatestByArea();
+
+    /**
+     * 각 혼잡도 핫스팟의 최신 저장 데이터만 조회한 뒤,
+     * 혼잡도 단계가 높은 순서로 정렬해 반환합니다.
+     *
+     * VERY_CROWDED → CROWDED → NORMAL → RELAXED 순으로 정렬하며,
+     * 같은 혼잡도 단계에서는 예상 인구 상한과 최근 저장 시각이 높은 데이터를 우선합니다.
+     *
+     * 홈 화면에서 현재 가장 붐비는 서울 지역 TOP N을 조회할 때 사용합니다.
+     *
+     * @return 혼잡도 단계 내림차순으로 정렬된 지역별 최신 혼잡도 데이터 목록
+     */
+    @Query("""
+            select cs
+            from CrowdStatus cs
+            where cs.createdAt = (
+                select max(latest.createdAt)
+                from CrowdStatus latest
+                where latest.areaName = cs.areaName
+            )
+            order by
+                case cs.congestionLevel
+                    when 'VERY_CROWDED' then 4
+                    when 'CROWDED' then 3
+                    when 'NORMAL' then 2
+                    when 'RELAXED' then 1
+                    else 0
+                end desc,
+                cs.populationMax desc,
+                cs.createdAt desc
+            """)
+    List<CrowdStatus> findLatestByAreaOrderByCongestionDesc(Pageable pageable);
 
     /**
      * 특정 지역의 지정된 기간 내 혼잡도 이력을 측정 시각 오름차순으로 조회합니다.

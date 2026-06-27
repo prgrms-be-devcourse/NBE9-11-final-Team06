@@ -41,14 +41,22 @@ public class CrowdService {
     /** 혼잡도 조회 결과를 저장하고 캐시 조회에 사용하는 Repository입니다. */
     private final CrowdStatusRepository crowdStatusRepository;
 
+    /** 장소 좌표와 가장 가까운 저장된 혼잡도 핫스팟을 찾는 서비스입니다. */
+    private final NearestCrowdAreaService nearestCrowdAreaService;
+
     /**
      * SeoulCrowdClient를 생성자 주입 방식으로 주입받습니다.
      *
      * 생성자 주입을 사용하면 필수 의존성이 명확해지고 테스트 코드 작성이 쉬워집니다.
      */
-    public CrowdService(SeoulCrowdClient seoulCrowdClient, CrowdStatusRepository crowdStatusRepository) {
+    public CrowdService(
+            SeoulCrowdClient seoulCrowdClient,
+            CrowdStatusRepository crowdStatusRepository,
+            NearestCrowdAreaService nearestCrowdAreaService
+    ) {
         this.seoulCrowdClient = seoulCrowdClient;
         this.crowdStatusRepository = crowdStatusRepository;
+        this.nearestCrowdAreaService = nearestCrowdAreaService;
     }
 
     /**
@@ -85,6 +93,61 @@ public class CrowdService {
             log.error("혼잡도 조회 실패: 사용 가능한 캐시가 없습니다. areaName={}", areaName, exception);
             throw exception;
         }
+    }
+
+    /**
+     * 지역별 최신 혼잡도 데이터 중 현재 가장 붐비는 지역을 상위 개수만큼 반환합니다.
+     *
+     * Repository에서 지역별 최신 데이터만 조회한 뒤 혼잡도 단계와 예상 인구 수를 기준으로
+     * 정렬하므로, 홈 화면에서는 외부 서울시 API를 지역별로 반복 호출하지 않고 DB 데이터만 사용합니다.
+     *
+     * @param limit 조회할 최대 지역 수
+     * @return 현재 혼잡도가 높은 순서로 정렬된 혼잡도 응답 목록
+     */
+    public List<CrowdResponse> getTopCrowdStatuses(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+
+        List<CrowdResponse> responses = crowdStatusRepository
+                .findLatestByAreaOrderByCongestionDesc(
+                        org.springframework.data.domain.PageRequest.of(0, limit)
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+        log.info("현재 혼잡도 상위 지역 조회 완료: requestedLimit={}, resultCount={}", limit, responses.size());
+        return responses;
+    }
+
+    /**
+     * 일반 장소의 위도·경도를 기준으로 저장된 최신 혼잡도 핫스팟 중
+     * 가장 가까운 지역의 혼잡도 정보를 반환합니다.
+     *
+     * 일반 관광지명은 서울시 도시데이터 API의 공식 핫스팟명과 일치하지 않을 수 있으므로,
+     * 이 조회는 외부 API를 다시 호출하지 않고 DB에 수집된 최신 혼잡도 데이터를 사용합니다.
+     *
+     * @param latitude 조회할 장소의 위도
+     * @param longitude 조회할 장소의 경도
+     * @return 최근접 혼잡도 핫스팟의 응답 DTO
+     */
+    public CrowdResponse getNearestCrowdStatus(double latitude, double longitude) {
+        NearestCrowdAreaService.NearestCrowdArea nearestArea = nearestCrowdAreaService
+                .findNearest(latitude, longitude)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CROWD_AREA_NOT_FOUND));
+
+        CrowdStatus crowdStatus = nearestArea.crowdStatus();
+
+        log.info(
+                "좌표 기준 최근접 혼잡도 지역 조회 완료: latitude={}, longitude={}, matchedAreaName={}, distanceKm={}",
+                latitude,
+                longitude,
+                nearestArea.areaName(),
+                nearestArea.distanceKm()
+        );
+
+        return toResponse(crowdStatus);
     }
 
     /**

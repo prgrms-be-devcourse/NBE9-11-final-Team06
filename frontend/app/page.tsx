@@ -55,92 +55,66 @@ const FEATURES = [
   },
 ]
 
-type SeoulAreaWithCrowd = (typeof SEOUL_AREAS)[number] & {
-  populationMin: number | null
-  populationMax: number | null
-}
 
 type CrowdApiResponse = {
   areaName: string
   congestionText: string
+  congestionLevel?: string
   populationMin: number | null
   populationMax: number | null
 }
 
-const CROWD_API_AREA_NAMES: Record<string, string> = {
-  성수: "성수카페거리",
-  연남동: "연남동",
-  익선동: "익선동",
-  삼청동: "삼청동",
-  여의도: "여의도한강공원",
-  잠실: "잠실 관광특구",
-  홍대: "홍대 관광특구",
-  이태원: "이태원 관광특구",
+type CrowdLevel = (typeof SEOUL_AREAS)[number]["crowd"]
+
+const CROWD_LEVEL_LABELS: Record<string, CrowdLevel> = {
+  RELAXED: "여유",
+  NORMAL: "보통",
+  CROWDED: "혼잡",
+  VERY_CROWDED: "매우혼잡",
+  여유: "여유",
+  보통: "보통",
+  혼잡: "혼잡",
+  매우혼잡: "매우혼잡",
 }
 
-const CROWD_LEVELS = new Set(["여유", "보통", "혼잡", "매우혼잡"])
-
-const DEFAULT_SEOUL_AREAS: SeoulAreaWithCrowd[] = SEOUL_AREAS.map((area) => ({
-  ...area,
-  populationMin: null,
-  populationMax: null,
-}))
 
 export default function HomePage() {
-  const [seoulAreas, setSeoulAreas] = useState<SeoulAreaWithCrowd[]>(DEFAULT_SEOUL_AREAS)
+  const [topCrowdAreas, setTopCrowdAreas] = useState<CrowdApiResponse[]>([])
+  const [isTopCrowdLoading, setIsTopCrowdLoading] = useState(true)
 
   useEffect(() => {
     const controller = new AbortController()
 
-    const loadRealtimeCrowds = async () => {
-      const updatedAreas = await Promise.all(
-        DEFAULT_SEOUL_AREAS.map(async (area) => {
-          const areaName = CROWD_API_AREA_NAMES[area.name]
+    const loadTopCrowdAreas = async () => {
+      try {
+        const response = await fetch("/api/crowds/top?limit=10", {
+          signal: controller.signal,
+        })
 
-          if (!areaName) {
-            return area
-          }
+        if (!response.ok) {
+          throw new Error("혼잡도 상위 지역을 불러오지 못했습니다.")
+        }
 
-          try {
-            const response = await fetch(
-              `/api/crowds?areaName=${encodeURIComponent(areaName)}`,
-              { signal: controller.signal },
-            )
+        const crowdData = (await response.json()) as CrowdApiResponse[]
 
-            if (!response.ok) {
-              return area
-            }
-
-            const crowdData = (await response.json()) as CrowdApiResponse
-
-            return {
-              ...area,
-              crowd: CROWD_LEVELS.has(crowdData.congestionText)
-                ? crowdData.congestionText as SeoulAreaWithCrowd["crowd"]
-                : area.crowd,
-              populationMin: crowdData.populationMin,
-              populationMax: crowdData.populationMax,
-            }
-          } catch (error) {
-            if ((error as DOMException).name !== "AbortError") {
-              console.warn(`혼잡도 조회 실패: ${area.name}`, error)
-            }
-            return area
-          }
-        }),
-      )
-
-      if (!controller.signal.aborted) {
-        setSeoulAreas(updatedAreas)
+        if (!controller.signal.aborted) {
+          setTopCrowdAreas(crowdData)
+        }
+      } catch (error) {
+        if ((error as DOMException).name !== "AbortError") {
+          console.warn("혼잡도 상위 지역 조회 실패", error)
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsTopCrowdLoading(false)
+        }
       }
     }
 
-    void loadRealtimeCrowds()
+    void loadTopCrowdAreas()
 
     return () => controller.abort()
   }, [])
-
-  const seongsuArea = seoulAreas.find((area) => area.name === "성수")
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -186,7 +160,7 @@ export default function HomePage() {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="size-4 text-primary" />
-                  서울 8개 인기 지역
+                  서울 실시간 혼잡도 TOP 10
                 </span>
 
                 <span className="flex items-center gap-1.5">
@@ -212,26 +186,56 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Areas quick chips */}
+        {/* Current crowd top 10 */}
         <section className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex flex-wrap gap-2">
-            {seoulAreas.map((area) => (
-              <Link
-                key={area.name}
-                href="/plan"
-                className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium transition-colors hover:border-primary hover:text-primary"
-              >
-                <MapPin className="size-3.5 text-primary" />
-                {area.name}
-                <CrowdBadge
-                  level={area.crowd}
-                  populationMin={area.populationMin}
-                  populationMax={area.populationMax}
-                  showRange
-                  className="px-1.5 py-0.5 text-[10px]"
-                />
-              </Link>
-            ))}
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-primary">실시간 서울 혼잡도</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight">
+                지금 서울에서 혼잡한 지역 TOP 10
+              </h2>
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+              <Activity className="size-4 text-primary" />
+              최신 수집 데이터 기준
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {isTopCrowdLoading
+              ? Array.from({ length: 10 }, (_, index) => (
+                  <div
+                    key={index}
+                    className="flex min-h-24 animate-pulse flex-col justify-between rounded-2xl border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="h-4 w-24 rounded bg-muted" />
+                      <span className="size-6 rounded-full bg-muted" />
+                    </div>
+                    <span className="mt-3 h-4 w-20 rounded bg-muted" />
+                  </div>
+                ))
+              : topCrowdAreas.map((area, index) => (
+                  <Link
+                    key={area.areaName}
+                    href="/plan"
+                    className="flex min-h-24 flex-col justify-between rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-semibold leading-snug">{area.areaName}</span>
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                        {index + 1}
+                      </span>
+                    </div>
+                    <CrowdBadge
+                      level={CROWD_LEVEL_LABELS[area.congestionLevel ?? area.congestionText] ?? "보통"}
+                      populationMin={area.populationMin}
+                      populationMax={area.populationMax}
+                      showRange
+                      className="mt-3 w-fit px-1.5 py-0.5 text-[10px]"
+                    />
+                  </Link>
+                ))}
           </div>
         </section>
 
