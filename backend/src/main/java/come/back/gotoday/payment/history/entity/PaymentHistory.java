@@ -1,6 +1,7 @@
-package come.back.gotoday.payment.subscription.entity;
+package come.back.gotoday.payment.history.entity;
 
-import come.back.gotoday.payment.subscription.enums.PaymentStatus;
+import come.back.gotoday.payment.subscription.entity.Subscription;
+import come.back.gotoday.payment.history.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

@@ -60,8 +60,8 @@ function SuccessContent() {
 
   // 최초 컴포넌트 로드 시 실행
   useEffect(() => {
-    if (requestSent.current) return
-    requestSent.current = true
+    // if (requestSent.current) return
+    // requestSent.current = true
 
     void requestIssue()
   }, [requestIssue])

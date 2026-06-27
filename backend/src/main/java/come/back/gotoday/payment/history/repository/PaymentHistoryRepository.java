@@ -1,6 +1,6 @@
-package come.back.gotoday.payment.subscription.repository;
+package come.back.gotoday.payment.history.repository;
 
-import come.back.gotoday.payment.subscription.entity.PaymentHistory;
+import come.back.gotoday.payment.history.entity.PaymentHistory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

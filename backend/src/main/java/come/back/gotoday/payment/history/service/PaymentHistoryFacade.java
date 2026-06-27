@@ -1,4 +1,4 @@
-package come.back.gotoday.payment.subscription.service;
+package come.back.gotoday.payment.history.service;
 
 import come.back.gotoday.external.toss.TossPaymentsClient;
 import come.back.gotoday.external.toss.dto.TossCancelRequest;

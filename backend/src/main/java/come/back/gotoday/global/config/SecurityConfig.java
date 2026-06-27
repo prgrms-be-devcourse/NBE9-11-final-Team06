@@ -54,7 +54,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/test/batch/**").permitAll()
+//                        .requestMatchers("/api/test/batch/**").permitAll()
                         .requestMatchers("/api/v1/payments/webhook").permitAll()
                         .requestMatchers("/api/members").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
