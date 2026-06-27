@@ -132,6 +132,8 @@ function readSelectedRecommendationItems(): SelectedRecommendationItems | null {
   }
 }
 
+
+
 export default function CoursePreviewPage() {
   const [course, setCourse] = useState<CoursePreviewResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -262,7 +264,11 @@ export default function CoursePreviewPage() {
         }
       } catch (error) {
         console.error(error)
-        setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "코스 상세 정보를 불러오지 못했습니다.",
+        )
       } finally {
         if (isMounted) {
           setIsLoading(false)
