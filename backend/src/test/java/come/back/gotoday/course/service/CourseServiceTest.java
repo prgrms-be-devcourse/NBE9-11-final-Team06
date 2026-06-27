@@ -24,6 +24,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -147,7 +148,9 @@ class CourseServiceTest {
                 events,
                 tours,
                 restaurant,
-                cafe
+                cafe,
+                Map.of(),
+                Map.of()
         );
     }
 

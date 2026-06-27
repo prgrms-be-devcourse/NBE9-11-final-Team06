@@ -128,6 +128,7 @@ type RecommendationCandidateDraft = {
     endDate?: string
     baseArea?: string
     companionType?: string
+    recommendationReason?: string | null
     candidates?: RecommendationCandidate[]
 }
 
@@ -171,7 +172,9 @@ function createCandidateCourse(draft: RecommendationCandidateDraft): CourseDetai
         endDate: draft.endDate,
         baseArea: draft.baseArea,
         companionType: draft.companionType,
-        recommendationReason: "선택한 취향, 동행 유형, 출발 위치를 함께 고려해 행사와 관광지를 추천했어요.",
+        recommendationReason:
+            draft.recommendationReason ??
+            "선택한 취향, 동행 유형, 출발 위치를 함께 고려해 행사와 관광지를 추천했어요.",
         places,
     }
 }
@@ -434,12 +437,30 @@ function RecommendContent() {
         }
 
         const skipFoodPreview = shouldSkipFoodPreview(searchParams)
+        const selectedRecommendationItems = getCoursePlaces(course)
+            .filter((place) =>
+                (place.itemType === "EVENT" &&
+                    place.eventId != null &&
+                    selectedEventIds.includes(place.eventId)) ||
+                (place.itemType === "TOUR" &&
+                    place.tourId != null &&
+                    selectedTourIds.includes(place.tourId)),
+            )
+            .map((place) => ({
+                itemType: place.itemType,
+                eventId: place.eventId ?? null,
+                tourId: place.tourId ?? null,
+                title: getPlaceTitle(place),
+                recommendationReason: getPlaceReason(place),
+            }))
 
         sessionStorage.setItem(
             SELECTED_RECOMMENDATION_ITEMS_KEY,
             JSON.stringify({
                 eventIds: selectedEventIds,
                 tourIds: selectedTourIds,
+                selectedRecommendationItems,
+                recommendationReason: course?.recommendationReason ?? null,
                 startDate: course?.startDate ?? dateParam ?? null,
                 endDate: course?.endDate ?? dateParam ?? null,
                 baseArea: course?.baseArea ?? areaParam ?? null,
@@ -465,6 +486,7 @@ function RecommendContent() {
                     body: JSON.stringify({
                         title: "추천 코스",
                         description: "선택한 행사와 관광지를 함께 즐기는 코스",
+                        recommendationReason: course?.recommendationReason ?? null,
                         courseType: metadata.courseType ?? "RECOMMENDED",
                         startDate: course?.startDate ?? dateParam ?? metadata.startDate ?? null,
                         endDate: course?.endDate ?? dateParam ?? metadata.endDate ?? null,
@@ -476,6 +498,7 @@ function RecommendContent() {
                             null,
                         eventIds: selectedEventIds,
                         tourIds: selectedTourIds,
+                        selectedRecommendationItems,
                         restaurantId: null,
                         cafeId: null,
                         startLatitude:

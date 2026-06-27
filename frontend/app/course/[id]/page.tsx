@@ -167,7 +167,7 @@ function getSavedRecommendedCourse(courseId?: string) {
     const parsed = JSON.parse(saved) as CourseDetail
     const savedCourseId = parsed.id ?? parsed.courseId
 
-    if (!courseId || String(savedCourseId) === courseId) {
+    if (!courseId || savedCourseId == null || String(savedCourseId) === courseId) {
       return parsed
     }
 
@@ -278,7 +278,53 @@ export default function CourseDetailPage() {
         }
 
         const fetchedCourse = extractCourse(result)
-        setCourse(fetchedCourse)
+
+        if (!fetchedCourse) {
+          return
+        }
+
+        const savedPlaces = getCoursePlaces(savedCourse)
+        const fetchedPlaces = getCoursePlaces(fetchedCourse)
+        const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
+          const savedPlace = savedPlaces.find((savedPlace) => {
+            if (place.itemType !== savedPlace.itemType) {
+              return false
+            }
+
+            if (place.itemType === "EVENT") {
+              return place.eventId != null && place.eventId === savedPlace.eventId
+            }
+
+            if (place.itemType === "TOUR") {
+              return place.tourId != null && place.tourId === savedPlace.tourId
+            }
+
+            if (place.itemType === "PLACE") {
+              return place.placeId != null && place.placeId === savedPlace.placeId
+            }
+
+            return false
+          })
+
+          return {
+            ...place,
+            recommendationReason:
+              place.recommendationReason ??
+              place.reason ??
+              savedPlace?.recommendationReason ??
+              savedPlace?.reason,
+          }
+        })
+        setCourse({
+          ...savedCourse,
+          ...fetchedCourse,
+          places: placesWithRecommendationReasons,
+          recommendationReason:
+            fetchedCourse.recommendationReason ??
+            fetchedCourse.reason ??
+            savedCourse?.recommendationReason ??
+            savedCourse?.reason,
+        })
       } catch {
         if (!savedCourse) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")

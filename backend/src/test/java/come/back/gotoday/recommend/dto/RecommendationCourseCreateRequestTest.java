@@ -207,7 +207,8 @@ class RecommendationCourseCreateRequestTest {
                 "커플",
                 "서울특별시 강남구",
                 latitude,
-                longitude
+                longitude,
+                List.of()
         );
     }
 }

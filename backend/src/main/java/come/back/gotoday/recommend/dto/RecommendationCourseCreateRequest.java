@@ -8,9 +8,11 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 public record RecommendationCourseCreateRequest(
         @Size(max = 50, message = "코스 제목은 50자 이하여야 합니다.")
@@ -46,7 +48,11 @@ public record RecommendationCourseCreateRequest(
 
         @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
         @DecimalMax(value = "180.0", message = "경도는 180 이하여야 합니다.")
-        Double longitude
+        Double longitude,
+
+        @Valid
+        @Size(max = 10, message = "선택한 추천 장소는 최대 10개까지 전달할 수 있습니다.")
+        List<SelectedRecommendationItem> selectedRecommendationItems
 ) {
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")
     public boolean isValidPeriod() {
@@ -68,5 +74,37 @@ public record RecommendationCourseCreateRequest(
     public boolean isValidCoordinates() {
         return (latitude == null && longitude == null)
                 || (latitude != null && longitude != null);
+    }
+
+    public List<SelectedRecommendationItem> getSelectedRecommendationItemsOrEmpty() {
+        return selectedRecommendationItems == null
+                ? List.of()
+                : selectedRecommendationItems.stream()
+                        .filter(Objects::nonNull)
+                        .toList();
+    }
+
+    public record SelectedRecommendationItem(
+            String itemType,
+            Long eventId,
+            Long tourId,
+            @Size(max = 200, message = "추천 이유는 200자 이하여야 합니다.")
+            String recommendationReason
+    ) {
+        @AssertTrue(message = "추천 장소 유형은 EVENT 또는 TOUR여야 합니다.")
+        public boolean isValidItemType() {
+            return "EVENT".equals(itemType) || "TOUR".equals(itemType);
+        }
+
+        @AssertTrue(message = "EVENT는 eventId만, TOUR는 tourId만 전달해야 합니다.")
+        public boolean isValidTargetId() {
+            if ("EVENT".equals(itemType)) {
+                return eventId != null && tourId == null;
+            }
+            if ("TOUR".equals(itemType)) {
+                return tourId != null && eventId == null;
+            }
+            return false;
+        }
     }
 }
