@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 public class Category {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, length = 50)
@@ -40,5 +39,11 @@ public class Category {
 
     public static Category create(String name, CategoryType type) {
         return new Category(name, type);
+    }
+
+    public static Category create(Long id, String name, CategoryType type) {
+        Category category = new Category(name, type);
+        category.id = id;
+        return category;
     }
 }
