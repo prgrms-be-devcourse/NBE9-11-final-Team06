@@ -20,6 +20,50 @@ import {SiteFooter} from "@/components/site-footer"
 import {SiteHeader} from "@/components/site-header"
 
 
+const FOOD_PREFERENCE_STORAGE_KEY = "coursePreviewRequest"
+const SELECTED_RECOMMENDATION_ITEMS_KEY = "selectedRecommendationItems"
+const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080"
+function normalizeAccessToken(value: string | null | undefined) {
+    if (!value) return null
+
+    const token = value.trim().replace(/^Bearer\s+/i, "")
+
+    if (!token || token === "undefined" || token === "null") {
+        return null
+    }
+
+    return token
+}
+
+function getAccessToken() {
+    if (typeof window === "undefined") return null
+
+    const tokenKeys = ["accessToken", "access_token", "token", "jwt"]
+
+    for (const storage of [localStorage, sessionStorage]) {
+        for (const tokenKey of tokenKeys) {
+            const token = normalizeAccessToken(storage.getItem(tokenKey))
+            if (token) return token
+        }
+    }
+
+    return null
+}
+
+function getCourseCreateMetadata() {
+    if (typeof window === "undefined") return {}
+
+    const savedRequest = localStorage.getItem(FOOD_PREFERENCE_STORAGE_KEY)
+    if (!savedRequest) return {}
+
+    try {
+        return JSON.parse(savedRequest) as Record<string, unknown>
+    } catch {
+        return {}
+    }
+}
+
 type CourseItemType = "PLACE" | "EVENT" | "TOUR"
 
 type CoursePlace = {
@@ -255,6 +299,70 @@ function RecommendEmptyState() {
     )
 }
 
+function shouldSkipFoodPreview(searchParams: URLSearchParams) {
+    const noFoodValues = new Set([
+        "NONE",
+        "NO_FOOD",
+        "NO_PREFERENCE",
+        "선택안함",
+        "선택 안 함",
+        "식당 카페 선택 안 함",
+    ])
+
+    const hasNoFoodValue = (value: unknown): boolean => {
+        if (typeof value === "string") {
+            return noFoodValues.has(value.trim())
+        }
+
+        if (Array.isArray(value)) {
+            return value.some(hasNoFoodValue)
+        }
+
+        if (value && typeof value === "object") {
+            return Object.values(value as Record<string, unknown>).some(hasNoFoodValue)
+        }
+
+        return false
+    }
+
+    for (const key of [
+        "restaurantType",
+        "foodType",
+        "foodPreference",
+        "mealType",
+        "restaurantPreference",
+        "selectedRestaurantType",
+    ]) {
+        if (hasNoFoodValue(searchParams.get(key))) {
+            return true
+        }
+    }
+
+    if (typeof window === "undefined") return false
+
+    for (const storage of [localStorage, sessionStorage]) {
+        for (let index = 0; index < storage.length; index += 1) {
+            const storageKey = storage.key(index)
+            if (!storageKey) continue
+
+            const savedValue = storage.getItem(storageKey)
+            if (!savedValue) continue
+
+            try {
+                if (hasNoFoodValue(JSON.parse(savedValue))) {
+                    return true
+                }
+            } catch {
+                if (hasNoFoodValue(savedValue)) {
+                    return true
+                }
+            }
+        }
+    }
+
+    return false
+}
+
 function RecommendContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -317,7 +425,7 @@ function RecommendContent() {
         return false
     }
 
-    function saveSelectedCandidates() {
+    async function saveSelectedCandidates() {
         const selectedCount = selectedEventIds.length + selectedTourIds.length
 
         if (selectedCount === 0) {
@@ -325,8 +433,10 @@ function RecommendContent() {
             return
         }
 
+        const skipFoodPreview = shouldSkipFoodPreview(searchParams)
+
         sessionStorage.setItem(
-            "selectedRecommendationItems",
+            SELECTED_RECOMMENDATION_ITEMS_KEY,
             JSON.stringify({
                 eventIds: selectedEventIds,
                 tourIds: selectedTourIds,
@@ -336,13 +446,78 @@ function RecommendContent() {
                 companionType: course?.companionType ?? companionParam ?? null,
                 startLatitude: parseNullableNumber(latitude),
                 startLongitude: parseNullableNumber(longitude),
+                skipFoodPreview,
             }),
         )
+
+        if (skipFoodPreview) {
+            const metadata = getCourseCreateMetadata()
+            const accessToken = getAccessToken()
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/courses`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(accessToken ? {Authorization: `Bearer ${accessToken}`} : {}),
+                    },
+                    body: JSON.stringify({
+                        title: "추천 코스",
+                        description: "선택한 행사와 관광지를 함께 즐기는 코스",
+                        courseType: metadata.courseType ?? "RECOMMENDED",
+                        startDate: course?.startDate ?? dateParam ?? metadata.startDate ?? null,
+                        endDate: course?.endDate ?? dateParam ?? metadata.endDate ?? null,
+                        baseArea: course?.baseArea ?? areaParam ?? metadata.baseArea ?? null,
+                        companionType:
+                            course?.companionType ??
+                            companionParam ??
+                            metadata.companionType ??
+                            null,
+                        eventIds: selectedEventIds,
+                        tourIds: selectedTourIds,
+                        restaurantId: null,
+                        cafeId: null,
+                        startLatitude:
+                            parseNullableNumber(latitude) ?? metadata.startLatitude ?? null,
+                        startLongitude:
+                            parseNullableNumber(longitude) ?? metadata.startLongitude ?? null,
+                    }),
+                })
+
+                const result = await response.json().catch(() => null)
+
+                if (!response.ok) {
+                    throw new Error(
+                        result?.message ??
+                            result?.error ??
+                            "식당·카페 없이 코스를 생성하지 못했습니다.",
+                    )
+                }
+
+                const courseId = result?.data
+
+                if (!courseId) {
+                    throw new Error("생성된 코스 정보를 찾을 수 없습니다.")
+                }
+
+                sessionStorage.removeItem(SELECTED_RECOMMENDATION_ITEMS_KEY)
+                sessionStorage.removeItem("recommendationCandidates")
+                router.push(`/course/${courseId}`)
+            } catch (error) {
+                setSelectionMessage(
+                    error instanceof Error
+                        ? error.message
+                        : "식당·카페 없이 코스를 생성하지 못했습니다.",
+                )
+            }
+
+            return
+        }
 
         setSelectionMessage(
             `행사 ${selectedEventIds.length}개, 관광지 ${selectedTourIds.length}개를 선택했어요.`,
         )
-
         router.push("/course/preview")
     }
 

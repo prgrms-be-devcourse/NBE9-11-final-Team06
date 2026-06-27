@@ -573,7 +573,7 @@ export function PlanWizard() {
                                     { value: "WESTERN", label: "양식", emoji: "🍝" },
                                     { value: "JAPANESE", label: "일식", emoji: "🍣" },
                                     { value: "CHINESE", label: "중식", emoji: "🥟" },
-                                    { value: "NOTHING", label: "선택안함", emoji : "❌"},
+                                    { value: "NONE", label: "선택안함", emoji: "❌" },
                                 ].map((type) => (
                                     <button
                                         key={type.value}
