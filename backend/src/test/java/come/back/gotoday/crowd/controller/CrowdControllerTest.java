@@ -1,13 +1,7 @@
-
 package come.back.gotoday.crowd.controller;
 
 import come.back.gotoday.crowd.dto.CrowdResponse;
 import come.back.gotoday.crowd.service.CrowdService;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,10 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.lang.reflect.Method;
-import java.util.Set;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -36,20 +27,11 @@ class CrowdControllerTest {
 
     private MockMvc mockMvc;
     private CrowdController crowdController;
-    private ValidatorFactory validatorFactory;
-    private Validator validator;
 
     @BeforeEach
     void setUp() {
         crowdController = new CrowdController(crowdService);
         mockMvc = MockMvcBuilders.standaloneSetup(crowdController).build();
-        validatorFactory = Validation.buildDefaultValidatorFactory();
-        validator = validatorFactory.getValidator();
-    }
-
-    @AfterEach
-    void tearDown() {
-        validatorFactory.close();
     }
 
     @Test
@@ -67,42 +49,34 @@ class CrowdControllerTest {
     }
 
     @Test
-    @DisplayName("지역명 파라미터가 없으면 400 응답을 반환한다")
-    void getCrowdStatusReturnsBadRequestWhenAreaNameIsMissing() throws Exception {
-        mockMvc.perform(get("/api/crowds"))
-                .andExpect(status().isBadRequest());
+    @DisplayName("지역명과 좌표가 모두 없으면 예외가 발생한다")
+    void getCrowdStatusThrowsExceptionWhenNoLookupConditionIsProvided() {
+        assertThatThrownBy(() -> crowdController.getCrowdStatus(null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("지역명 또는 위도·경도는 필수입니다.");
     }
 
     @Test
-    @DisplayName("지역명이 빈 문자열이면 검증에 실패한다")
-    void emptyAreaNameFailsValidation() throws Exception {
-        Set<ConstraintViolation<CrowdController>> violations = validateAreaName("");
+    @DisplayName("위도와 경도가 함께 전달되면 최근접 혼잡도 조회에 성공한다")
+    void getCrowdStatusSucceedsWithCoordinates() throws Exception {
+        double latitude = 37.5446;
+        double longitude = 127.0558;
+        CrowdResponse response = mock(CrowdResponse.class);
+        given(crowdService.getNearestCrowdStatus(latitude, longitude)).willReturn(response);
 
-        assertThat(violations).isNotEmpty();
-        assertThat(violations)
-                .extracting(ConstraintViolation::getMessage)
-                .contains("지역명은 필수입니다.");
+        mockMvc.perform(get("/api/crowds")
+                        .param("latitude", String.valueOf(latitude))
+                        .param("longitude", String.valueOf(longitude)))
+                .andExpect(status().isOk());
+
+        verify(crowdService).getNearestCrowdStatus(latitude, longitude);
     }
 
     @Test
-    @DisplayName("지역명이 공백이면 검증에 실패한다")
-    void blankAreaNameFailsValidation() throws Exception {
-        Set<ConstraintViolation<CrowdController>> violations = validateAreaName("   ");
-
-        assertThat(violations).isNotEmpty();
-        assertThat(violations)
-                .extracting(ConstraintViolation::getMessage)
-                .contains("지역명은 필수입니다.");
-    }
-
-    private Set<ConstraintViolation<CrowdController>> validateAreaName(String areaName)
-            throws Exception {
-        Method method = CrowdController.class.getMethod("getCrowdStatus", String.class);
-
-        return validator.forExecutables().validateParameters(
-                crowdController,
-                method,
-                new Object[]{areaName}
-        );
+    @DisplayName("위도 또는 경도 중 하나만 전달되면 예외가 발생한다")
+    void getCrowdStatusThrowsExceptionWhenOnlyOneCoordinateIsProvided() {
+        assertThatThrownBy(() -> crowdController.getCrowdStatus(null, 37.5446, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("혼잡도 좌표 조회에는 위도와 경도를 함께 전달해야 합니다.");
     }
 }
