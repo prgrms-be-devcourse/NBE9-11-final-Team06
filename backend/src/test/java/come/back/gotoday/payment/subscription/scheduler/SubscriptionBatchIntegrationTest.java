@@ -41,7 +41,8 @@ import static org.mockito.ArgumentMatchers.eq;
 @SpringBootTest(properties = {
         "KMA_WEATHER_API_KEY=mock_api_key",
         "weather.kma.service-key=mock_api_key",
-        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역"
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역",
+        "TOUR_API_KEY=mock_tour_api_key"
 })
 @Slf4j
 @org.junit.jupiter.api.Disabled("로컬에서만 테스트 운영환경에 영향을 주기 않기 위함")

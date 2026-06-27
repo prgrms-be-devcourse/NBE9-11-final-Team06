@@ -458,13 +458,16 @@ export default function MyPage() {
       setIsRegistering(true)
 
       const tossPayments = window.TossPayments(CLIENT_KEY)
+      
+      const idempotencyKey = crypto.randomUUID()
+
       const customerKey =
         "USER_" + member.id + "_" + Math.random().toString(36).substring(2, 7)
       const payment = tossPayments.payment({ customerKey })
 
       await payment.requestBillingAuth({
         method: "CARD",
-        successUrl: `${window.location.origin}/success?customerKey=${customerKey}&from=mypage`,
+        successUrl: `${window.location.origin}/success?customerKey=${customerKey}&idempotencyKey=${idempotencyKey}&from=mypage`,
         failUrl: `${window.location.origin}/fail?from=mypage`,
         customerEmail: member.email || "customer@example.com",
         customerName: member.nickname || "고객",
