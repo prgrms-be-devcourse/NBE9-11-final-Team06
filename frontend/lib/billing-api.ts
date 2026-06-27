@@ -42,4 +42,19 @@ export const billingApi = {
     })
     return response.json()
   },
+
+  issueBillingKey: async (idempotencyKey: string, authKey: string, customerKey: string): Promise<ApiResponse<BillingCardResponse>> => {
+    const response = await fetch("/api/v1/billing/issue", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey, 
+      },
+      body: JSON.stringify({
+        authKey,
+        customerKey,
+      }),
+    })
+    return response.json()
+  },
 }

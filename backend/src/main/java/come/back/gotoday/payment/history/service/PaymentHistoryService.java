@@ -1,12 +1,12 @@
-package come.back.gotoday.payment.subscription.service;
+package come.back.gotoday.payment.history.service;
 
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
-import come.back.gotoday.payment.subscription.dto.PaymentHistoryResponse;
-import come.back.gotoday.payment.subscription.entity.PaymentHistory;
+import come.back.gotoday.payment.history.dto.PaymentHistoryResponse;
+import come.back.gotoday.payment.history.entity.PaymentHistory;
 import come.back.gotoday.payment.subscription.entity.Subscription;
-import come.back.gotoday.payment.subscription.enums.PaymentStatus;
-import come.back.gotoday.payment.subscription.repository.PaymentHistoryRepository;
+import come.back.gotoday.payment.history.enums.PaymentStatus;
+import come.back.gotoday.payment.history.repository.PaymentHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

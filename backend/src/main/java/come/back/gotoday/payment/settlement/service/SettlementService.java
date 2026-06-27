@@ -4,9 +4,9 @@ import come.back.gotoday.external.toss.dto.SettlementDto;
 import come.back.gotoday.payment.settlement.entity.SettlementDetail;
 import come.back.gotoday.payment.settlement.enums.SettlementStatus;
 import come.back.gotoday.payment.settlement.repository.SettlementDetailRepository;
-import come.back.gotoday.payment.subscription.entity.PaymentHistory;
-import come.back.gotoday.payment.subscription.enums.PaymentStatus;
-import come.back.gotoday.payment.subscription.repository.PaymentHistoryRepository; // 가정된 레포지토리
+import come.back.gotoday.payment.history.entity.PaymentHistory;
+import come.back.gotoday.payment.history.enums.PaymentStatus;
+import come.back.gotoday.payment.history.repository.PaymentHistoryRepository; // 가정된 레포지토리
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

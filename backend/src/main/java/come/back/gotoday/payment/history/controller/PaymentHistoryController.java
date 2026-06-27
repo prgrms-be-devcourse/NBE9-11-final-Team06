@@ -1,12 +1,12 @@
-package come.back.gotoday.payment.subscription.controller;
+package come.back.gotoday.payment.history.controller;
 
 
 import come.back.gotoday.global.response.ApiResponse;
 import come.back.gotoday.global.security.CustomUserDetails;
-import come.back.gotoday.payment.subscription.dto.PaymentHistoryResponse;
+import come.back.gotoday.payment.history.dto.PaymentHistoryResponse;
 import come.back.gotoday.payment.subscription.dto.SubscriptionPaymentCancelRequest;
-import come.back.gotoday.payment.subscription.service.PaymentHistoryFacade;
-import come.back.gotoday.payment.subscription.service.PaymentHistoryService;
+import come.back.gotoday.payment.history.service.PaymentHistoryFacade;
+import come.back.gotoday.payment.history.service.PaymentHistoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

@@ -1,4 +1,4 @@
-package come.back.gotoday.payment.subscription.enums;
+package come.back.gotoday.payment.history.enums;
 
 public enum PaymentStatus {
     SUCCESS,  // 결제 완료

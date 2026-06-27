@@ -6,14 +6,13 @@ import come.back.gotoday.member.entity.Member;
 import come.back.gotoday.member.entity.OAuthProvider;
 import come.back.gotoday.payment.billing.entity.BillingInfo;
 import come.back.gotoday.payment.plan.entity.Plan;
-import come.back.gotoday.payment.subscription.entity.PaymentHistory;
+import come.back.gotoday.payment.history.entity.PaymentHistory;
 import come.back.gotoday.payment.subscription.entity.Subscription;
-import come.back.gotoday.payment.subscription.enums.PaymentStatus;
+import come.back.gotoday.payment.history.enums.PaymentStatus;
 import come.back.gotoday.payment.subscription.enums.SubscriptionStatus;
-import come.back.gotoday.payment.subscription.repository.PaymentHistoryRepository;
+import come.back.gotoday.payment.history.repository.PaymentHistoryRepository;
 import come.back.gotoday.payment.subscription.repository.SubscriptionRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,9 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionCallback;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
@@ -41,7 +38,8 @@ import static org.mockito.ArgumentMatchers.eq;
 @SpringBootTest(properties = {
         "KMA_WEATHER_API_KEY=mock_api_key",
         "weather.kma.service-key=mock_api_key",
-        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역"
+        "SEOUL_CROWD_AREA_NAMES=강남역,홍대입구역",
+        "TOUR_API_KEY=mock_tour_api_key"
 })
 @Slf4j
 @org.junit.jupiter.api.Disabled("로컬에서만 테스트 운영환경에 영향을 주기 않기 위함")

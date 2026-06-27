@@ -1,7 +1,7 @@
-package come.back.gotoday.payment.subscription.dto;
+package come.back.gotoday.payment.history.dto;
 
-import come.back.gotoday.payment.subscription.entity.PaymentHistory;
-import come.back.gotoday.payment.subscription.enums.PaymentStatus;
+import come.back.gotoday.payment.history.entity.PaymentHistory;
+import come.back.gotoday.payment.history.enums.PaymentStatus;
 import lombok.Builder;
 import java.time.LocalDateTime;
 
