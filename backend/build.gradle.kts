@@ -44,6 +44,7 @@ dependencies {
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
+    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
     // 딥러닝 & 자연어 처리 (ONNX, Tokenizer, Komoran)
     implementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")

@@ -45,9 +45,19 @@ type CoursePreviewResponse = {
   events: NearbyPlaceResponse[]
 }
 
+type SelectedRecommendationPlace = {
+  itemType: "EVENT" | "TOUR"
+  eventId?: number | null
+  tourId?: number | null
+  title?: string | null
+  recommendationReason?: string | null
+}
+
 type SelectedRecommendationItems = {
   eventIds?: number[]
   tourIds?: number[]
+  selectedRecommendationItems?: SelectedRecommendationPlace[]
+  recommendationReason?: string | null
   startDate?: string | null
   endDate?: string | null
   baseArea?: string | null
@@ -120,6 +130,27 @@ function readSelectedRecommendationItems(): SelectedRecommendationItems | null {
             .map((id) => Number(id))
             .filter((id) => Number.isFinite(id) && id > 0)
         : [],
+      selectedRecommendationItems: Array.isArray(parsed.selectedRecommendationItems)
+        ? parsed.selectedRecommendationItems
+            .filter((item): item is SelectedRecommendationPlace =>
+              item != null &&
+              (item.itemType === "EVENT" || item.itemType === "TOUR"),
+            )
+            .map((item) => ({
+              itemType: item.itemType,
+              eventId:
+                item.eventId != null && Number.isFinite(Number(item.eventId))
+                  ? Number(item.eventId)
+                  : null,
+              tourId:
+                item.tourId != null && Number.isFinite(Number(item.tourId))
+                  ? Number(item.tourId)
+                  : null,
+              title: item.title ?? null,
+              recommendationReason: item.recommendationReason ?? null,
+            }))
+        : [],
+      recommendationReason: parsed.recommendationReason ?? null,
       startDate: parsed.startDate ?? null,
       endDate: parsed.endDate ?? null,
       baseArea: parsed.baseArea ?? null,
@@ -549,6 +580,8 @@ export default function CoursePreviewPage() {
                 const payload = {
                   title: "추천 코스",
                   description: "선택한 행사와 관광지, 맛집과 카페를 함께 즐기는 코스",
+                  recommendationReason:
+                    selectedItems?.recommendationReason ?? null,
 
                   courseType: request.courseType ?? "RECOMMENDED",
                   startDate: request.startDate,
@@ -558,6 +591,8 @@ export default function CoursePreviewPage() {
 
                   eventIds,
                   tourIds,
+                  selectedRecommendationItems:
+                    selectedItems?.selectedRecommendationItems ?? [],
 
                   restaurantId: selectedRestaurant.id,
                   cafeId: selectedCafe.id,
@@ -613,6 +648,38 @@ export default function CoursePreviewPage() {
                     return
                   }
 
+                  sessionStorage.setItem(
+                    "recommendedCourse",
+                    JSON.stringify({
+                      title: payload.title,
+                      description: payload.description,
+                      startDate: payload.startDate,
+                      endDate: payload.endDate,
+                      baseArea: payload.baseArea,
+                      companionType: payload.companionType,
+                      recommendationReason:
+                        selectedItems?.recommendationReason ?? null,
+                      places: [
+                        ...(selectedItems?.selectedRecommendationItems ?? []).map((item) => ({
+                          itemType: item.itemType,
+                          eventId: item.eventId ?? null,
+                          tourId: item.tourId ?? null,
+                          title: item.title ?? null,
+                          recommendationReason: item.recommendationReason ?? null,
+                        })),
+                        {
+                          itemType: "RESTAURANT",
+                          title: selectedRestaurant.name,
+                          recommendationReason: "사용자가 선택한 식당입니다.",
+                        },
+                        {
+                          itemType: "CAFE",
+                          title: selectedCafe.name,
+                          recommendationReason: "사용자가 선택한 카페입니다.",
+                        },
+                      ],
+                    }),
+                  )
                   sessionStorage.removeItem("selectedRecommendationItems")
 
                   window.location.href = `/course/${courseId}`

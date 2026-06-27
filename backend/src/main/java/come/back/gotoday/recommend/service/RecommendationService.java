@@ -11,6 +11,7 @@ import come.back.gotoday.crowd.util.GeoDistanceCalculator;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
 import come.back.gotoday.event.service.EventScheduleMatcher;
+import come.back.gotoday.external.ai.service.AiRecommendationReasonService;
 import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.preference.repository.UserPreferenceCategoryRepository;
@@ -63,6 +64,7 @@ public class RecommendationService {
     private final WeatherConditionClassifier weatherConditionClassifier;
     private final WeatherScoreCalculator weatherScoreCalculator;
     private final EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy;
+    private final AiRecommendationReasonService aiRecommendationReasonService;
 
     public RecommendationService(UserPreferenceRepository userPreferenceRepository,
                                  UserPreferenceCategoryRepository userPreferenceCategoryRepository,
@@ -78,7 +80,8 @@ public class RecommendationService {
                                  WeatherForecastService weatherForecastService,
                                  WeatherConditionClassifier weatherConditionClassifier,
                                  WeatherScoreCalculator weatherScoreCalculator,
-                                 EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy) {
+                                 EventIndoorOutdoorPolicy eventIndoorOutdoorPolicy,
+                                 AiRecommendationReasonService aiRecommendationReasonService) {
         this.userPreferenceRepository = userPreferenceRepository;
         this.userPreferenceCategoryRepository = userPreferenceCategoryRepository;
         this.preferenceEventCategoryMappingRepository = preferenceEventCategoryMappingRepository;
@@ -94,6 +97,7 @@ public class RecommendationService {
         this.weatherConditionClassifier = weatherConditionClassifier;
         this.weatherScoreCalculator = weatherScoreCalculator;
         this.eventIndoorOutdoorPolicy = eventIndoorOutdoorPolicy;
+        this.aiRecommendationReasonService = aiRecommendationReasonService;
     }
     @Transactional(readOnly = true)
     public RecommendationCandidateDraft recommendCandidates(
@@ -199,20 +203,66 @@ public class RecommendationService {
             throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
         }
 
+        List<String> placeRecommendationReasons = aiRecommendationReasonService.generatePlaceReasons(
+                topCandidates.stream()
+                        .map(candidate -> new AiRecommendationReasonService.PlaceReasonContext(
+                                request.startDate(),
+                                rawSelectedArea,
+                                selectedCompanionType,
+                                selectedCategories,
+                                candidate.title(),
+                                candidate.type().name(),
+                                candidate.detailCategoryName() != null
+                                        ? candidate.detailCategoryName()
+                                        : candidate.categoryName()
+                        ))
+                        .toList()
+        );
+
+        List<RecommendationCandidate> candidatesWithAiReasons = new ArrayList<>(topCandidates.size());
+        for (int index = 0; index < topCandidates.size(); index++) {
+            RecommendationCandidate candidate = topCandidates.get(index);
+            candidatesWithAiReasons.add(new RecommendationCandidate(
+                    candidate.type(),
+                    candidate.eventId(),
+                    candidate.tourId(),
+                    candidate.title(),
+                    candidate.categoryName(),
+                    candidate.detailCategoryName(),
+                    candidate.address(),
+                    candidate.latitude(),
+                    candidate.longitude(),
+                    candidate.score(),
+                    placeRecommendationReasons.get(index)
+            ));
+        }
+
         log.info(
                 "[통합 추천 후보 완료] memberId={}, eventCount={}, tourCount={}, topCandidateCount={}",
                 memberId,
                 eventCandidates.size(),
                 tourCandidates.size(),
-                topCandidates.size()
+                candidatesWithAiReasons.size()
         );
 
+        String courseRecommendationReason = aiRecommendationReasonService.generateCourseReason(
+                new AiRecommendationReasonService.CourseReasonContext(
+                        request.startDate(),
+                        rawSelectedArea,
+                        selectedCompanionType,
+                        selectedCategories,
+                        candidatesWithAiReasons.stream()
+                                .map(RecommendationCandidate::title)
+                                .toList()
+                )
+        );
         return new RecommendationCandidateDraft(
                 request.startDate(),
                 request.endDate(),
                 selectedArea,
                 selectedCompanionType,
-                topCandidates
+                candidatesWithAiReasons,
+                courseRecommendationReason
         );
     }
 
@@ -810,8 +860,18 @@ public class RecommendationService {
             LocalDate endDate,
             String baseArea,
             String companionType,
-            List<RecommendationCandidate> candidates
+            List<RecommendationCandidate> candidates,
+            String recommendationReason
     ) {
+        public RecommendationCandidateDraft(
+                LocalDate startDate,
+                LocalDate endDate,
+                String baseArea,
+                String companionType,
+                List<RecommendationCandidate> candidates
+        ) {
+            this(startDate, endDate, baseArea, companionType, candidates, null);
+        }
     }
 
     public record RecommendationCandidate(

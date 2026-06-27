@@ -167,7 +167,7 @@ function getSavedRecommendedCourse(courseId?: string) {
     const parsed = JSON.parse(saved) as CourseDetail
     const savedCourseId = parsed.id ?? parsed.courseId
 
-    if (!courseId || String(savedCourseId) === courseId) {
+    if (!courseId || savedCourseId == null || String(savedCourseId) === courseId) {
       return parsed
     }
 
@@ -278,7 +278,35 @@ export default function CourseDetailPage() {
         }
 
         const fetchedCourse = extractCourse(result)
-        setCourse(fetchedCourse)
+
+        if (!fetchedCourse) {
+          return
+        }
+
+        const savedPlaces = getCoursePlaces(savedCourse)
+        const fetchedPlaces = getCoursePlaces(fetchedCourse)
+        const placesWithRecommendationReasons = fetchedPlaces.map((place, index) => {
+          const savedPlace = savedPlaces[index]
+
+          return {
+            ...place,
+            recommendationReason:
+              place.recommendationReason ??
+              place.reason ??
+              savedPlace?.recommendationReason ??
+              savedPlace?.reason,
+          }
+        })
+        setCourse({
+          ...savedCourse,
+          ...fetchedCourse,
+          places: placesWithRecommendationReasons,
+          recommendationReason:
+            fetchedCourse.recommendationReason ??
+            fetchedCourse.reason ??
+            savedCourse?.recommendationReason ??
+            savedCourse?.reason,
+        })
       } catch {
         if (!savedCourse) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")

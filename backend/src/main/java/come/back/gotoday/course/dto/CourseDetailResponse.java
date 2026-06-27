@@ -15,6 +15,7 @@ public record CourseDetailResponse(
         Double startLatitude,
         Double startLongitude,
         List<CoursePlaceResponse> places,
+        String recommendationReason,
         double totalDistance,
         int estimatedTime
 ) {

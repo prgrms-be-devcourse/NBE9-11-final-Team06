@@ -13,6 +13,7 @@ import come.back.gotoday.course.type.CourseItemType;
 import come.back.gotoday.course.type.RestaurantType;
 import come.back.gotoday.event.entity.Event;
 import come.back.gotoday.event.repository.EventRepository;
+import come.back.gotoday.external.ai.service.AiRecommendationReasonService;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceResponse;
 import come.back.gotoday.external.kakao.service.KakaoLocalService;
@@ -67,6 +68,7 @@ public class CourseService {
     private final EventRepository eventRepository;
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
+    private final AiRecommendationReasonService aiRecommendationReasonService;
 
     @Transactional
     public Long createCourse(Long memberId, CourseCreateRequest request) {
@@ -85,6 +87,66 @@ public class CourseService {
             throw new IllegalArgumentException("식당과 카페에 같은 장소를 선택할 수 없습니다.");
         }
 
+        Map<Long, String> eventRecommendationReasons = request.getSelectedRecommendationItemsOrEmpty()
+                .stream()
+                .filter(CourseCreateRequest.SelectedRecommendationItem::isEvent)
+                .filter(item -> item.recommendationReason() != null && !item.recommendationReason().isBlank())
+                .collect(Collectors.toMap(
+                        CourseCreateRequest.SelectedRecommendationItem::eventId,
+                        item -> item.recommendationReason().trim(),
+                        (first, ignored) -> first
+                ));
+
+        Map<Long, String> tourRecommendationReasons = request.getSelectedRecommendationItemsOrEmpty()
+                .stream()
+                .filter(CourseCreateRequest.SelectedRecommendationItem::isTour)
+                .filter(item -> item.recommendationReason() != null && !item.recommendationReason().isBlank())
+                .collect(Collectors.toMap(
+                        CourseCreateRequest.SelectedRecommendationItem::tourId,
+                        item -> item.recommendationReason().trim(),
+                        (first, ignored) -> first
+                ));
+
+        log.info(
+                "코스 생성 AI 추천 이유 수신: selectedItemCount={}, eventReasonCount={}, tourReasonCount={}, eventIds={}, tourIds={}",
+                request.getSelectedRecommendationItemsOrEmpty().size(),
+                eventRecommendationReasons.size(),
+                tourRecommendationReasons.size(),
+                request.eventIds(),
+                request.tourIds()
+        );
+
+        List<CourseRouteCandidate> selectedPlaces = createRouteCandidates(
+                events,
+                tours,
+                restaurant,
+                cafe,
+                eventRecommendationReasons,
+                tourRecommendationReasons
+        );
+
+        List<CourseRouteCandidate> orderedPlaces = findOptimalRoute(
+                selectedPlaces,
+                request.startLatitude(),
+                request.startLongitude()
+        );
+
+        String finalCourseRecommendationReason = aiRecommendationReasonService.generateFinalCourseReason(
+                new AiRecommendationReasonService.FinalCourseReasonContext(
+                        request.startDate(),
+                        request.baseArea(),
+                        request.companionType(),
+                        List.of(),
+                        orderedPlaces.stream()
+                                .map(this::getCandidateName)
+                                .toList()
+                )
+        );
+
+        List<String> finalPlaceRecommendationReasons = aiRecommendationReasonService.generateFinalPlaceReasons(
+                buildFinalPlaceReasonContexts(orderedPlaces)
+        );
+
         Course course = Course.create(
                 member,
                 request.title(),
@@ -98,36 +160,31 @@ public class CourseService {
                 request.startLongitude(),
                 null,
                 null,
-                "사용자 선택 코스"
-        );
-
-        List<CourseRouteCandidate> selectedPlaces = createRouteCandidates(
-                events,
-                tours,
-                restaurant,
-                cafe
-        );
-
-        List<CourseRouteCandidate> orderedPlaces = findOptimalRoute(
-                selectedPlaces,
-                request.startLatitude(),
-                request.startLongitude()
+                finalCourseRecommendationReason
         );
 
         int order = 1;
-        for (CourseRouteCandidate candidate : orderedPlaces) {
-            addCoursePlace(course, candidate, order++);
+        for (int index = 0; index < orderedPlaces.size(); index++) {
+            addCoursePlace(
+                    course,
+                    orderedPlaces.get(index),
+                    order++,
+                    finalPlaceRecommendationReasons.get(index)
+            );
         }
 
         courseRepository.save(course);
 
         return course.getId();
     }
+
     private List<CourseRouteCandidate> createRouteCandidates(
             List<Event> events,
             List<Tour> tours,
             Place restaurant,
-            Place cafe
+            Place cafe,
+            Map<Long, String> eventRecommendationReasons,
+            Map<Long, String> tourRecommendationReasons
     ) {
         List<CourseRouteCandidate> candidates = new ArrayList<>();
         int sequence = 0;
@@ -146,7 +203,11 @@ public class CourseService {
                     event,
                     latitude,
                     longitude,
-                    "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+                    getRecommendationReason(
+                            eventRecommendationReasons,
+                            event.getId(),
+                            "현재 선택한 조건과 행사 유사도를 기반으로 추천되었습니다."
+                    )
             ));
         }
 
@@ -156,7 +217,11 @@ public class CourseService {
                     tour,
                     tour.getLatitude(),
                     tour.getLongitude(),
-                    "선택한 관광지입니다."
+                    getRecommendationReason(
+                            tourRecommendationReasons,
+                            tour.getId(),
+                            "선택한 관광지입니다."
+                    )
             ));
         }
 
@@ -225,11 +290,11 @@ public class CourseService {
                             || beamState.currentLongitude() == null
                             ? 0.0
                             : distance(
-                                    beamState.currentLatitude(),
-                                    beamState.currentLongitude(),
-                                    candidate.latitude(),
-                                    candidate.longitude()
-                            );
+                            beamState.currentLatitude(),
+                            beamState.currentLongitude(),
+                            candidate.latitude(),
+                            candidate.longitude()
+                    );
 
                     expandedStates.add(beamState.extend(candidate, moveDistance));
                 }
@@ -262,7 +327,8 @@ public class CourseService {
     private void addCoursePlace(
             Course course,
             CourseRouteCandidate candidate,
-            int visitOrder
+            int visitOrder,
+            String recommendationReason
     ) {
         if (candidate.itemType() == CourseItemType.EVENT) {
             course.addCoursePlace(
@@ -277,7 +343,7 @@ public class CourseService {
                             null,
                             null,
                             null,
-                            candidate.recommendationReason()
+                            recommendationReason
                     )
             );
             return;
@@ -295,7 +361,7 @@ public class CourseService {
                             null,
                             null,
                             null,
-                            candidate.recommendationReason()
+                            recommendationReason
                     )
             );
             return;
@@ -313,7 +379,7 @@ public class CourseService {
                         null,
                         null,
                         null,
-                        candidate.recommendationReason()
+                        recommendationReason
                 )
         );
     }
@@ -423,8 +489,6 @@ public class CourseService {
             );
         }
     }
-
-
 
 
     @Transactional
@@ -604,7 +668,6 @@ public class CourseService {
     }
 
 
-
     @Transactional(readOnly = true)
     public CourseDetailResponse getCourse(Long courseId) {
         log.info("코스 단건 조회 처리 시작: courseId={}", courseId);
@@ -629,6 +692,7 @@ public class CourseService {
                 course.getStartLatitude(),
                 course.getStartLongitude(),
                 places,
+                course.getRecommendationReason(),
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
                 course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
         );
@@ -908,5 +972,62 @@ public class CourseService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return radius * c * 1000;
+    }
+
+    private String getRecommendationReason(
+            Map<Long, String> recommendationReasons,
+            Long itemId,
+            String defaultReason
+    ) {
+        String recommendationReason = recommendationReasons.get(itemId);
+        return recommendationReason == null || recommendationReason.isBlank()
+                ? defaultReason
+                : recommendationReason;
+    }
+
+    private List<AiRecommendationReasonService.FinalPlaceReasonContext> buildFinalPlaceReasonContexts(
+            List<CourseRouteCandidate> orderedPlaces
+    ) {
+        List<AiRecommendationReasonService.FinalPlaceReasonContext> contexts = new ArrayList<>();
+
+        for (int index = 0; index < orderedPlaces.size(); index++) {
+            CourseRouteCandidate candidate = orderedPlaces.get(index);
+            String previousPlaceName = index == 0
+                    ? null
+                    : getCandidateName(orderedPlaces.get(index - 1));
+            String nextPlaceName = index == orderedPlaces.size() - 1
+                    ? null
+                    : getCandidateName(orderedPlaces.get(index + 1));
+
+            contexts.add(new AiRecommendationReasonService.FinalPlaceReasonContext(
+                    index + 1,
+                    getCandidateName(candidate),
+                    getCandidateTypeName(candidate),
+                    previousPlaceName,
+                    nextPlaceName
+            ));
+        }
+
+        return contexts;
+    }
+
+    private String getCandidateName(CourseRouteCandidate candidate) {
+        if (candidate.itemType() == CourseItemType.EVENT) {
+            return candidate.event().getTitle();
+        }
+        if (candidate.itemType() == CourseItemType.TOUR) {
+            return candidate.tour().getTitle();
+        }
+        return candidate.place().getName();
+    }
+
+    private String getCandidateTypeName(CourseRouteCandidate candidate) {
+        if (candidate.itemType() == CourseItemType.EVENT) {
+            return "행사";
+        }
+        if (candidate.itemType() == CourseItemType.TOUR) {
+            return "관광지";
+        }
+        return "장소";
     }
 }
