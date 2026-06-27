@@ -27,23 +27,22 @@ public class CategoryInitData {
                 return; // 중복 방지
             }
 
-            categoryRepository.save(Category.create(1L, "카페", CategoryType.PLACE));
-            categoryRepository.save(Category.create(2L, "맛집", CategoryType.PLACE));
-            categoryRepository.save(Category.create(3L, "관광지", CategoryType.PLACE));
-
-            categoryRepository.save(Category.create(4L, "축제", CategoryType.EVENT));
-            categoryRepository.save(Category.create(5L, "전시", CategoryType.EVENT));
-
-            categoryRepository.save(Category.create(8L, "조용한 힐링", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create(9L, "문화생활", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create(10L, "자연•산책", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create(11L, "감성•사진", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create(12L, "활동적인 하루", CategoryType.PREFERENCE));
-            categoryRepository.save(Category.create(13L, "새로운 경험", CategoryType.PREFERENCE));
-
-            categoryRepository.save(Category.create(30L, "공연", CategoryType.EVENT));
-            categoryRepository.save(Category.create(31L, "교육/체험", CategoryType.EVENT));
-            categoryRepository.save(Category.create(32L, "기타행사", CategoryType.EVENT));
+            categoryRepository.saveAll(java.util.List.of(
+                    Category.create(1L, "카페", CategoryType.PLACE),
+                    Category.create(2L, "맛집", CategoryType.PLACE),
+                    Category.create(3L, "관광지", CategoryType.PLACE),
+                    Category.create(4L, "축제", CategoryType.EVENT),
+                    Category.create(5L, "전시", CategoryType.EVENT),
+                    Category.create(8L, "조용한 힐링", CategoryType.PREFERENCE),
+                    Category.create(9L, "문화생활", CategoryType.PREFERENCE),
+                    Category.create(10L, "자연•산책", CategoryType.PREFERENCE),
+                    Category.create(11L, "감성•사진", CategoryType.PREFERENCE),
+                    Category.create(12L, "활동적인 하루", CategoryType.PREFERENCE),
+                    Category.create(13L, "새로운 경험", CategoryType.PREFERENCE),
+                    Category.create(30L, "공연", CategoryType.EVENT),
+                    Category.create(31L, "교육/체험", CategoryType.EVENT),
+                    Category.create(32L, "기타행사", CategoryType.EVENT)
+            ));
 
             log.info("카테고리 초기 데이터 생성 완료. createdCount={}", categoryRepository.count());
         };
