@@ -1,6 +1,7 @@
 package come.back.gotoday.crowd.repository;
 
 import come.back.gotoday.crowd.entity.CrowdStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -78,7 +79,7 @@ public interface CrowdStatusRepository extends JpaRepository<CrowdStatus, Long> 
                 cs.populationMax desc,
                 cs.createdAt desc
             """)
-    List<CrowdStatus> findLatestByAreaOrderByCongestionDesc();
+    List<CrowdStatus> findLatestByAreaOrderByCongestionDesc(Pageable pageable);
 
     /**
      * 특정 지역의 지정된 기간 내 혼잡도 이력을 측정 시각 오름차순으로 조회합니다.

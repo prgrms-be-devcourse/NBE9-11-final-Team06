@@ -110,9 +110,10 @@ public class CrowdService {
         }
 
         List<CrowdResponse> responses = crowdStatusRepository
-                .findLatestByAreaOrderByCongestionDesc()
+                .findLatestByAreaOrderByCongestionDesc(
+                        org.springframework.data.domain.PageRequest.of(0, limit)
+                )
                 .stream()
-                .limit(limit)
                 .map(this::toResponse)
                 .toList();
 
@@ -136,8 +137,7 @@ public class CrowdService {
                 .findNearest(latitude, longitude)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CROWD_AREA_NOT_FOUND));
 
-        CrowdStatus crowdStatus = crowdStatusRepository.findById(nearestArea.crowdStatusId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.CROWD_AREA_NOT_FOUND));
+        CrowdStatus crowdStatus = nearestArea.crowdStatus();
 
         log.info(
                 "좌표 기준 최근접 혼잡도 지역 조회 완료: latitude={}, longitude={}, matchedAreaName={}, distanceKm={}",

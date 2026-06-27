@@ -58,7 +58,8 @@ public class NearestCrowdAreaService {
                 crowdStatus.getLatitude(),
                 crowdStatus.getLongitude(),
                 distanceKm,
-                crowdStatus.getCongestionLevel()
+                crowdStatus.getCongestionLevel(),
+                crowdStatus
         );
     }
 
@@ -79,7 +80,8 @@ public class NearestCrowdAreaService {
             double latitude,
             double longitude,
             double distanceKm,
-            CongestionLevel congestionLevel
+            CongestionLevel congestionLevel,
+            CrowdStatus crowdStatus
     ) {
     }
 }

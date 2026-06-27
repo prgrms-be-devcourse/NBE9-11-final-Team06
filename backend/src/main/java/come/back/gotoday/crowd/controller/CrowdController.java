@@ -56,7 +56,10 @@ public class CrowdController {
     ) {
         if (latitude != null || longitude != null) {
             if (latitude == null || longitude == null) {
-                throw new IllegalArgumentException("혼잡도 좌표 조회에는 위도와 경도를 함께 전달해야 합니다.");
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "혼잡도 좌표 조회에는 위도와 경도를 함께 전달해야 합니다."
+                );
             }
 
             log.info("좌표 기준 혼잡도 조회 요청: latitude={}, longitude={}", latitude, longitude);
@@ -72,7 +75,10 @@ public class CrowdController {
         }
 
         if (areaName == null || areaName.isBlank()) {
-            throw new IllegalArgumentException("지역명 또는 위도·경도는 필수입니다.");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "지역명 또는 위도·경도는 필수입니다."
+            );
         }
 
         log.info("지역명 기준 혼잡도 조회 요청: areaName={}", areaName);

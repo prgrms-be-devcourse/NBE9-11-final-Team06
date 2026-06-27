@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -49,11 +48,10 @@ class CrowdControllerTest {
     }
 
     @Test
-    @DisplayName("지역명과 좌표가 모두 없으면 예외가 발생한다")
-    void getCrowdStatusThrowsExceptionWhenNoLookupConditionIsProvided() {
-        assertThatThrownBy(() -> crowdController.getCrowdStatus(null, null, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("지역명 또는 위도·경도는 필수입니다.");
+    @DisplayName("지역명과 좌표가 모두 없으면 400 응답을 반환한다")
+    void getCrowdStatusReturnsBadRequestWhenNoLookupConditionIsProvided() throws Exception {
+        mockMvc.perform(get("/api/crowds"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -73,10 +71,10 @@ class CrowdControllerTest {
     }
 
     @Test
-    @DisplayName("위도 또는 경도 중 하나만 전달되면 예외가 발생한다")
-    void getCrowdStatusThrowsExceptionWhenOnlyOneCoordinateIsProvided() {
-        assertThatThrownBy(() -> crowdController.getCrowdStatus(null, 37.5446, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("혼잡도 좌표 조회에는 위도와 경도를 함께 전달해야 합니다.");
+    @DisplayName("위도 또는 경도 중 하나만 전달되면 400 응답을 반환한다")
+    void getCrowdStatusReturnsBadRequestWhenOnlyOneCoordinateIsProvided() throws Exception {
+        mockMvc.perform(get("/api/crowds")
+                        .param("latitude", "37.5446"))
+                .andExpect(status().isBadRequest());
     }
 }
