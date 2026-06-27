@@ -5,6 +5,7 @@ import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.category.type.CategoryType;
 import come.back.gotoday.external.tour.TourApiClient;
 import come.back.gotoday.external.tour.dto.TourApiItem;
+import come.back.gotoday.recommend.engine.VectorEmbeddingEngine;
 import come.back.gotoday.tour.entity.Tour;
 import come.back.gotoday.tour.enums.TourSource;
 import come.back.gotoday.tour.repository.TourRepository;
@@ -40,6 +41,7 @@ public class TourSyncService {
     private final TourRepository tourRepository;
     private final CategoryRepository categoryRepository;
     private final TourCategoryMapper tourCategoryMapper;
+    private final VectorEmbeddingEngine vectorEmbeddingEngine;
 
     @Async("tourPlaceSyncExecutor")
     @Transactional
@@ -148,34 +150,57 @@ public class TourSyncService {
                 latitude,
                 longitude
         );
+        boolean embeddingMissing = tour.getEmbeddingVector() == null
+                || tour.getEmbeddingVector().length == 0;
 
-        if (!categoryChanged && !tourInfoChanged) {
+        if (!categoryChanged && !tourInfoChanged && !embeddingMissing) {
             return;
         }
 
-        tour.updateInfo(
-                category,
-                item.title(),
-                item.addr1(),
-                item.addr2(),
-                item.tel(),
-                tour.getHomepageUrl(),
-                item.firstimage(),
-                item.firstimage2(),
-                tour.getOverview(),
-                item.cat1(),
-                item.cat2(),
-                item.cat3(),
-                detailCategoryName,
-                area,
-                latitude,
-                longitude
-        );
+        if (categoryChanged || tourInfoChanged) {
+            tour.updateInfo(
+                    category,
+                    item.title(),
+                    item.addr1(),
+                    item.addr2(),
+                    item.tel(),
+                    tour.getHomepageUrl(),
+                    item.firstimage(),
+                    item.firstimage2(),
+                    tour.getOverview(),
+                    item.cat1(),
+                    item.cat2(),
+                    item.cat3(),
+                    detailCategoryName,
+                    area,
+                    latitude,
+                    longitude
+            );
+        }
+
+        tour.setEmbeddingVector(vectorEmbeddingEngine.getEmbedding(
+                createEmbeddingText(
+                        item.title(),
+                        detailCategoryName,
+                        item.addr1(),
+                        tour.getOverview()
+                )
+        ));
     }
 
     private void saveNewTour(TourApiItem item) {
         String detailCategoryName = tourCategoryMapper.mapDetailCategoryName(
                 item.cat1(), item.cat2(), item.cat3());
+        String overview = null;
+        float[] embeddingVector = vectorEmbeddingEngine.getEmbedding(
+                createEmbeddingText(
+                        item.title(),
+                        detailCategoryName,
+                        item.addr1(),
+                        overview
+                )
+        );
+
         Tour tour = Tour.create(
                 findCategory(item),
                 item.contentid(),
@@ -187,7 +212,7 @@ public class TourSyncService {
                 null,
                 item.firstimage(),
                 item.firstimage2(),
-                null,
+                overview,
                 item.areacode(),
                 item.sigungucode(),
                 item.cat1(),
@@ -198,10 +223,28 @@ public class TourSyncService {
                 parseDouble(item.mapy()),
                 parseDouble(item.mapx()),
                 TourSource.TOUR_API,
-                null
+                embeddingVector
         );
 
         tourRepository.save(tour);
+    }
+
+    private String createEmbeddingText(
+            String title,
+            String detailCategoryName,
+            String address,
+            String overview
+    ) {
+        return String.join(" ", List.of(
+                nullToEmpty(title),
+                nullToEmpty(detailCategoryName),
+                nullToEmpty(address),
+                nullToEmpty(overview)
+        )).trim();
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private Category findCategory(TourApiItem item) {

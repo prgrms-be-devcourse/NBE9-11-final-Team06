@@ -614,7 +614,6 @@ export default function CoursePreviewPage() {
                   }
 
                   sessionStorage.removeItem("selectedRecommendationItems")
-                  sessionStorage.removeItem("recommendationCandidates")
 
                   window.location.href = `/course/${courseId}`
                 } catch (error) {

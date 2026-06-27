@@ -45,7 +45,6 @@ public class RecommendationService {
     private static final double INDIFFERENT_WEATHER_WEIGHT = 0.15;
     private static final double DEFAULT_CROWD_SCORE = 0.5;
     private static final double DEFAULT_WEATHER_SCORE = 0.5;
-    private static final int DEFAULT_BEAM_WIDTH = 5;
     private static final List<Double> LOCATION_SEARCH_RADII_KM = List.of(3.0, 5.0, 8.0);
 
     private final UserPreferenceRepository userPreferenceRepository;
@@ -149,7 +148,7 @@ public class RecommendationService {
                 selectedCompanionType
         );
 
-        List<Long> recommendedEventIds = getRecommendedEventIds(
+        List<RankedEventCandidate> rankedEvents = rankRecommendedEvents(
                 selectedArea,
                 preferredEventCategoryIds,
                 requestedEventCategoryNames,
@@ -163,7 +162,7 @@ public class RecommendationService {
         );
 
         List<RecommendationCandidate> eventCandidates = createEventCandidates(
-                recommendedEventIds,
+                rankedEvents,
                 selectedArea,
                 preferredEventCategoryIds,
                 requestedEventCategoryNames
@@ -176,6 +175,7 @@ public class RecommendationService {
 
         List<RecommendationCandidate> tourCandidates = createTourCandidates(
                 tourCat3Codes,
+                queryText,
                 request.latitude(),
                 request.longitude()
         );
@@ -217,53 +217,43 @@ public class RecommendationService {
     }
 
     private List<RecommendationCandidate> createEventCandidates(
-            List<Long> recommendedEventIds,
+            List<RankedEventCandidate> rankedEvents,
             String selectedArea,
             Set<Long> preferredEventCategoryIds,
             Set<String> requestedEventCategoryNames
     ) {
-        if (recommendedEventIds.isEmpty()) {
+        if (rankedEvents.isEmpty()) {
             return Collections.emptyList();
         }
 
-        Map<Long, Event> eventMap = eventRepository.findAllById(recommendedEventIds).stream()
-                .collect(Collectors.toMap(Event::getId, event -> event));
-
-        int totalCount = recommendedEventIds.size();
-        List<RecommendationCandidate> candidates = new ArrayList<>();
-
-        for (int index = 0; index < recommendedEventIds.size(); index++) {
-            Event event = eventMap.get(recommendedEventIds.get(index));
-            if (event == null) {
-                continue;
-            }
-
-            double score = (double) (totalCount - index) / totalCount;
-            candidates.add(new RecommendationCandidate(
-                    CandidateType.EVENT,
-                    event.getId(),
-                    null,
-                    event.getTitle(),
-                    event.getCategory() != null ? event.getCategory().getName() : null,
-                    event.getEventCategory(),
-                    event.getPlace() != null ? event.getPlace().getAddress() : event.getArea(),
-                    event.getLatitude(),
-                    event.getLongitude(),
-                    score,
-                    createRecommendationReason(
-                            event,
-                            selectedArea,
-                            preferredEventCategoryIds,
-                            requestedEventCategoryNames
-                    )
-            ));
-        }
-
-        return candidates;
+        return rankedEvents.stream()
+                .map(rankedEvent -> {
+                    Event event = rankedEvent.event();
+                    return new RecommendationCandidate(
+                            CandidateType.EVENT,
+                            event.getId(),
+                            null,
+                            event.getTitle(),
+                            event.getCategory() != null ? event.getCategory().getName() : null,
+                            event.getEventCategory(),
+                            event.getPlace() != null ? event.getPlace().getAddress() : event.getArea(),
+                            event.getLatitude(),
+                            event.getLongitude(),
+                            rankedEvent.score(),
+                            createRecommendationReason(
+                                    event,
+                                    selectedArea,
+                                    preferredEventCategoryIds,
+                                    requestedEventCategoryNames
+                            )
+                    );
+                })
+                .toList();
     }
 
     private List<RecommendationCandidate> createTourCandidates(
             List<String> tourCat3Codes,
+            String queryText,
             Double startLatitude,
             Double startLongitude
     ) {
@@ -281,39 +271,118 @@ public class RecommendationService {
             );
 
             if (!tours.isEmpty()) {
-                return tours.stream()
-                        .sorted(Comparator.comparingDouble(tour -> GeoDistanceCalculator.calculateKilometers(
-                                startLatitude,
-                                startLongitude,
-                                tour.getLatitude(),
-                                tour.getLongitude()
-                        )))
-                        .map(tour -> {
-                            double distanceKm = GeoDistanceCalculator.calculateKilometers(
-                                    startLatitude,
-                                    startLongitude,
-                                    tour.getLatitude(),
-                                    tour.getLongitude()
-                            );
-                            return new RecommendationCandidate(
-                                    CandidateType.TOUR,
-                                    null,
-                                    tour.getId(),
-                                    tour.getTitle(),
-                                    tour.getCategory() != null ? tour.getCategory().getName() : "관광지",
-                                    tour.getDetailCategoryName(),
-                                    tour.getAddress(),
-                                    tour.getLatitude(),
-                                    tour.getLongitude(),
-                                    1.0 / (1.0 + distanceKm),
-                                    "선택한 취향과 출발 위치 주변의 관광지입니다."
-                            );
-                        })
-                        .toList();
+                return rankTourCandidates(tours, queryText, startLatitude, startLongitude);
             }
         }
 
         return Collections.emptyList();
+    }
+
+    private List<RecommendationCandidate> rankTourCandidates(
+            List<Tour> tours,
+            String queryText,
+            double startLatitude,
+            double startLongitude
+    ) {
+        List<String> queryTokens = searchUtils.tokenize(queryText);
+        float[] queryEmbedding = vectorEngine.getEmbedding(queryText);
+
+        Map<Long, List<String>> docTokensMap = new HashMap<>();
+        Map<Long, float[]> docEmbeddingMap = new HashMap<>();
+
+        for (Tour tour : tours) {
+            String docText = String.format(
+                    "[지역: %s] [카테고리: %s] [세부분류: %s] [관광지명: %s] [주소: %s] [소개: %s]",
+                    tour.getArea(),
+                    tour.getCategory() != null ? tour.getCategory().getName() : "관광지",
+                    tour.getDetailCategoryName(),
+                    tour.getTitle(),
+                    tour.getAddress(),
+                    tour.getOverview()
+            );
+            docTokensMap.put(tour.getId(), searchUtils.tokenize(docText));
+
+            float[] embeddingVector = tour.getEmbeddingVector();
+            if (embeddingVector != null && embeddingVector.length > 0) {
+                docEmbeddingMap.put(tour.getId(), embeddingVector);
+            }
+        }
+
+        Map<Long, Double> bm25Scores = searchUtils.calculateBM25(queryTokens, docTokensMap);
+        Map<Long, Double> denseScores = new HashMap<>();
+        for (Map.Entry<Long, float[]> entry : docEmbeddingMap.entrySet()) {
+            denseScores.put(
+                    entry.getKey(),
+                    searchUtils.cosineSimilarity(queryEmbedding, entry.getValue())
+            );
+        }
+
+        List<Long> bm25Ranked = bm25Scores.entrySet().stream()
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .toList();
+
+        List<Long> denseRanked = denseScores.entrySet().stream()
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<Long, Double> rrfScores = new HashMap<>();
+        int rrfK = 60;
+        double bm25Weight = 0.3;
+        double denseWeight = 0.7;
+
+        for (int rank = 0; rank < bm25Ranked.size(); rank++) {
+            Long tourId = bm25Ranked.get(rank);
+            double score = 1.0 / (rrfK + rank + 1);
+            rrfScores.merge(tourId, score * bm25Weight, Double::sum);
+        }
+
+        for (int rank = 0; rank < denseRanked.size(); rank++) {
+            Long tourId = denseRanked.get(rank);
+            double score = 1.0 / (rrfK + rank + 1);
+            rrfScores.merge(tourId, score * denseWeight, Double::sum);
+        }
+
+        double maxPreferenceScore = rrfScores.values().stream()
+                .mapToDouble(Double::doubleValue)
+                .max()
+                .orElse(0.0);
+
+        return tours.stream()
+                .map(tour -> {
+                    double preferenceScore = normalizePreferenceScore(
+                            rrfScores.getOrDefault(tour.getId(), 0.0),
+                            maxPreferenceScore
+                    );
+                    double distanceKm = GeoDistanceCalculator.calculateKilometers(
+                            startLatitude,
+                            startLongitude,
+                            tour.getLatitude(),
+                            tour.getLongitude()
+                    );
+                    double distanceScore = 1.0 / (1.0 + distanceKm);
+                    double totalScore = (preferenceScore * 0.7) + (distanceScore * 0.3);
+
+                    return new RecommendationCandidate(
+                            CandidateType.TOUR,
+                            null,
+                            tour.getId(),
+                            tour.getTitle(),
+                            tour.getCategory() != null ? tour.getCategory().getName() : "관광지",
+                            tour.getDetailCategoryName(),
+                            tour.getAddress(),
+                            tour.getLatitude(),
+                            tour.getLongitude(),
+                            totalScore,
+                            "선택한 취향과 관광지 정보의 유사도, 출발 위치와의 거리를 함께 고려해 추천되었습니다."
+                    );
+                })
+                .sorted(Comparator
+                        .comparingDouble(RecommendationCandidate::score)
+                        .reversed()
+                        .thenComparing(RecommendationCandidate::tourId))
+                .toList();
     }
 
     private List<Tour> findToursWithinRadius(
@@ -342,119 +411,6 @@ public class RecommendationService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public RecommendedCourseDraft recommendCourse(Long memberId, RecommendationCourseCreateRequest request) {
-        var preferenceOptional = userPreferenceRepository.findByMemberId(memberId);
-
-        List<String> savedCategories = preferenceOptional
-                .map(preference -> userPreferenceCategoryRepository.findCategoryNamesByPreferenceId(preference.getId()))
-                .orElseGet(Collections::emptyList);
-
-        String rawSelectedArea = hasText(request.area())
-                ? request.area()
-                : preferenceOptional.map(preference -> preference.getPreferredArea()).orElse(null);
-        String selectedArea = normalizeRecommendationArea(rawSelectedArea);
-
-        List<String> selectedCategories = request.categories() != null && !request.categories().isEmpty()
-                ? request.categories()
-                : savedCategories;
-
-        Set<Long> preferredEventCategoryIds = selectedCategories.isEmpty()
-                ? Collections.emptySet()
-                : new HashSet<>(preferenceEventCategoryMappingRepository
-                                .findEventCategoryIdsByPreferenceCategoryNames(selectedCategories));
-
-        String selectedCompanionType = hasText(request.companionType())
-                ? request.companionType()
-                : preferenceOptional
-                  .map(preference -> preference.getCompanionType() != null
-                                     ? preference.getCompanionType().toString()
-                                     : null)
-                  .orElse(null);
-
-        Set<String> requestedEventCategoryNames = request.categories() == null
-                ? Collections.emptySet()
-                : request.categories().stream()
-                  .filter(this::hasText)
-                  .map(String::trim)
-                  .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        log.info(
-                "[행사 추천 요청 조건] requestArea={}, selectedArea={}, requestCategories={}, selectedCategories={}, requestedEventCategoryNames={}, mappedEventCategoryIds={}, companionType={}",
-                request.area(),
-                selectedArea,
-                request.categories(),
-                selectedCategories,
-                requestedEventCategoryNames,
-                preferredEventCategoryIds,
-                selectedCompanionType
-        );
-
-        boolean avoidCrowds = preferenceOptional
-                .map(preference -> Boolean.TRUE.equals(preference.getAvoidCrowded()))
-                .orElse(false);
-
-        String queryText = createQueryText(
-                selectedArea,
-                String.join(", ", selectedCategories),
-                selectedCompanionType
-        );
-
-        List<Long> recommendedEventIds = getRecommendedEventIds(
-                selectedArea,
-                preferredEventCategoryIds,
-                requestedEventCategoryNames,
-                queryText,
-                request.startDate(),
-                request.endDate(),
-                request.latitude(),
-                request.longitude(),
-                avoidCrowds,
-                request.getTopKOrDefault()
-        );
-
-        if (recommendedEventIds.isEmpty()) {
-            throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
-        }
-
-        Map<Long, Event> eventMap = eventRepository.findAllById(recommendedEventIds).stream()
-                .collect(Collectors.toMap(Event::getId, event -> event));
-
-        List<RecommendedEvent> recommendedEvents = new ArrayList<>();
-        int visitOrder = 1;
-        for (Long eventId : recommendedEventIds) {
-            Event event = eventMap.get(eventId);
-            if (event == null) {
-                continue;
-            }
-
-            recommendedEvents.add(new RecommendedEvent(
-                    event.getId(),
-                    createRecommendationReason(
-                            event,
-                            selectedArea,
-                            preferredEventCategoryIds,
-                            requestedEventCategoryNames
-                    ),
-                    visitOrder++
-            ));
-        }
-
-        if (recommendedEvents.isEmpty()) {
-            throw new BusinessException(ErrorCode.RECOMMENDATION_EVENT_NOT_FOUND);
-        }
-
-        return new RecommendedCourseDraft(
-                request.getTitleOrDefault(),
-                request.startDate(),
-                request.endDate(),
-                selectedArea,
-                selectedCompanionType,
-                request.latitude(),
-                request.longitude(),
-                List.copyOf(recommendedEvents)
-        );
-    }
 
 
     private String createRecommendationReason(
@@ -547,6 +503,34 @@ public class RecommendationService {
             boolean avoidCrowds,
             int topK
     ) {
+        return rankRecommendedEvents(
+                targetArea,
+                preferredEventCategoryIds,
+                requestedEventCategoryNames,
+                queryText,
+                searchStart,
+                searchEnd,
+                startLatitude,
+                startLongitude,
+                avoidCrowds,
+                topK
+        ).stream()
+                .map(rankedEvent -> rankedEvent.event().getId())
+                .toList();
+    }
+
+    private List<RankedEventCandidate> rankRecommendedEvents(
+            String targetArea,
+            Set<Long> preferredEventCategoryIds,
+            Set<String> requestedEventCategoryNames,
+            String queryText,
+            LocalDate searchStart,
+            LocalDate searchEnd,
+            Double startLatitude,
+            Double startLongitude,
+            boolean avoidCrowds,
+            int topK
+    ) {
         log.info(
                 "[행사 추천 입력] targetArea={}, categoryIds={}, categoryNames={}, date={}~{}, startLatitude={}, startLongitude={}, avoidCrowds={}, topK={}",
                 targetArea,
@@ -566,7 +550,6 @@ public class RecommendationService {
         boolean hasStartCoordinate = startLatitude != null && startLongitude != null;
 
         List<Event> candidateEvents;
-
         if (hasStartCoordinate) {
             candidateEvents = findCoordinateBasedCandidateEvents(
                     targetArea,
@@ -596,8 +579,8 @@ public class RecommendationService {
             log.warn("최종적으로 추천할 데이터가 없습니다.");
             return Collections.emptyList();
         }
-        Set<DayOfWeek> userCourseDays = eventScheduleMatcher.getDaysOfWeekInPeriod(searchStart, searchEnd);
 
+        Set<DayOfWeek> userCourseDays = eventScheduleMatcher.getDaysOfWeekInPeriod(searchStart, searchEnd);
         List<Event> dayOfWeekFilteredEvents = candidateEvents.stream()
                 .filter(event -> eventScheduleMatcher.isEventAvailableOnDays(
                         event.getEventTime(),
@@ -605,7 +588,7 @@ public class RecommendationService {
                         searchEnd,
                         userCourseDays
                 ))
-                .collect(Collectors.toList());
+                .toList();
 
         if (dayOfWeekFilteredEvents.isEmpty()) {
             log.info("요일 하드 필터링 결과 매칭되는 행사가 0건입니다. 선택 B 정책에 따라 요일 필터를 해제하고 차선책을 제공합니다.");
@@ -616,11 +599,10 @@ public class RecommendationService {
 
         List<String> queryTokens = searchUtils.tokenize(queryText);
         float[] queryEmbedding = vectorEngine.getEmbedding(queryText);
-
         Map<Long, List<String>> docTokensMap = new HashMap<>();
         Map<Long, float[]> docEmbeddingMap = new HashMap<>();
 
-        for (var event : candidateEvents) {
+        for (Event event : candidateEvents) {
             String docText = String.format(
                     "[지역: %s] [카테고리: %s] [세부분류: %s] [타겟/대상: %s] [행사명: %s]",
                     event.getArea(),
@@ -638,157 +620,67 @@ public class RecommendationService {
 
         Map<Long, Double> bm25Scores = searchUtils.calculateBM25(queryTokens, docTokensMap);
         Map<Long, Double> denseScores = new HashMap<>();
-        for (var entry : docEmbeddingMap.entrySet()) {
-            double sim = searchUtils.cosineSimilarity(queryEmbedding, entry.getValue());
-            denseScores.put(entry.getKey(), sim);
+        for (Map.Entry<Long, float[]> entry : docEmbeddingMap.entrySet()) {
+            denseScores.put(entry.getKey(), searchUtils.cosineSimilarity(queryEmbedding, entry.getValue()));
         }
 
         List<Long> bm25Ranked = bm25Scores.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                 .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
-
+                .toList();
         List<Long> denseRanked = denseScores.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                 .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+                .toList();
 
         Map<Long, Double> rrfScores = new HashMap<>();
-        int k = 60;
+        int rrfK = 60;
         double denseWeight = 0.7;
         double bm25Weight = 0.3;
         double categoryBoost = 2.0;
 
         for (int rank = 0; rank < bm25Ranked.size(); rank++) {
-            Long docId = bm25Ranked.get(rank);
-            double score = 1.0 / (k + (rank + 1));
-            rrfScores.put(docId, rrfScores.getOrDefault(docId, 0.0) + (score * bm25Weight));
+            Long eventId = bm25Ranked.get(rank);
+            rrfScores.merge(eventId, (1.0 / (rrfK + rank + 1)) * bm25Weight, Double::sum);
         }
-
         for (int rank = 0; rank < denseRanked.size(); rank++) {
-            Long docId = denseRanked.get(rank);
-            double score = 1.0 / (k + (rank + 1));
-            rrfScores.put(docId, rrfScores.getOrDefault(docId, 0.0) + (score * denseWeight));
+            Long eventId = denseRanked.get(rank);
+            rrfScores.merge(eventId, (1.0 / (rrfK + rank + 1)) * denseWeight, Double::sum);
         }
-
-        for (var event : candidateEvents) {
+        for (Event event : candidateEvents) {
             if (rrfScores.containsKey(event.getId())
                     && matchesRequestedCategory(event, preferredEventCategoryIds, requestedEventCategoryNames)) {
-                double currentScore = rrfScores.get(event.getId());
-                rrfScores.put(event.getId(), currentScore * categoryBoost);
+                rrfScores.computeIfPresent(event.getId(), (eventId, score) -> score * categoryBoost);
             }
         }
 
-        return selectBeamSearchEventIds(
-                candidateEvents,
-                rrfScores,
-                searchStart,
-                startLatitude,
-                startLongitude,
-                avoidCrowds,
-                topK,
-                DEFAULT_BEAM_WIDTH
-        );
-    }
-
-    /**
-     * 여러 후보 경로를 동시에 유지하는 빔 서치 기반 행사 선택 로직입니다.
-     * <p>
-     * 각 단계에서 현재 빔의 모든 경로를 다음 행사 후보로 확장하고,
-     * 누적 점수가 높은 상위 beamWidth개의 경로만 다음 단계에 유지합니다.
-     * 이를 통해 각 단계의 단일 최고 점수를 즉시 확정하는 방식보다
-     * 전체 코스의 선호도·혼잡도·이동 거리 조합을 함께 고려합니다.
-     */
-    private List<Long> selectBeamSearchEventIds(
-            List<Event> candidateEvents,
-            Map<Long, Double> preferenceScores,
-            LocalDate searchStart,
-            Double startLatitude,
-            Double startLongitude,
-            boolean avoidCrowds,
-            int topK,
-            int beamWidth
-    ) {
-        if (topK <= 0 || beamWidth <= 0 || candidateEvents.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        double maxPreferenceScore = preferenceScores.values().stream()
+        double maxPreferenceScore = rrfScores.values().stream()
                 .mapToDouble(Double::doubleValue)
                 .max()
                 .orElse(0.0);
 
-        List<EventCandidate> candidates = candidateEvents.stream()
-                .filter(event -> preferenceScores.containsKey(event.getId()))
-                .map(event -> new EventCandidate(
-                        event,
-                        normalizePreferenceScore(
-                                preferenceScores.getOrDefault(event.getId(), 0.0),
-                                maxPreferenceScore
-                        ),
-                        avoidCrowds ? calculateCrowdScore(event) : 0.0,
-                        calculateWeatherScore(event, searchStart)
-                ))
-                .toList();
-
-        if (candidates.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<BeamState> beam = List.of(BeamState.initial(startLatitude, startLongitude));
-        int maxDepth = Math.min(topK, candidates.size());
-
-        for (int depth = 0; depth < maxDepth; depth++) {
-            List<BeamState> expandedStates = new ArrayList<>();
-
-            for (BeamState state : beam) {
-                for (EventCandidate candidate : candidates) {
-                    Long eventId = candidate.event().getId();
-                    if (state.selectedEventIds().contains(eventId)) {
-                        continue;
-                    }
-
-                    double candidateScore = calculateCandidateScore(
-                            candidate,
-                            state.currentLatitude(),
-                            state.currentLongitude(),
-                            avoidCrowds
+        return candidateEvents.stream()
+                .filter(event -> rrfScores.containsKey(event.getId()))
+                .map(event -> {
+                    EventCandidate candidate = new EventCandidate(
+                            event,
+                            normalizePreferenceScore(rrfScores.getOrDefault(event.getId(), 0.0), maxPreferenceScore),
+                            avoidCrowds ? calculateCrowdScore(event) : 0.0,
+                            calculateWeatherScore(event, searchStart)
                     );
-                    expandedStates.add(state.extend(candidate.event(), candidateScore));
-                }
-            }
-
-            if (expandedStates.isEmpty()) {
-                break;
-            }
-
-            beam = expandedStates.stream()
-                    .sorted(Comparator
-                            .comparingDouble(BeamState::totalScore)
-                            .reversed()
-                            .thenComparing(BeamState::eventIds, this::compareEventIdSequences))
-                    .limit(beamWidth)
-                    .toList();
-        }
-
-        return beam.stream()
-                .max(Comparator
-                        .comparingDouble(BeamState::totalScore)
-                        .thenComparing(BeamState::eventIds, this::compareEventIdSequences))
-                .map(BeamState::eventIds)
-                .orElseGet(Collections::emptyList);
+                    return new RankedEventCandidate(
+                            event,
+                            calculateCandidateScore(candidate, startLatitude, startLongitude, avoidCrowds)
+                    );
+                })
+                .sorted(Comparator
+                        .comparingDouble(RankedEventCandidate::score)
+                        .reversed()
+                        .thenComparing(rankedEvent -> rankedEvent.event().getId()))
+                .limit(topK)
+                .toList();
     }
 
-    private int compareEventIdSequences(List<Long> first, List<Long> second) {
-        int size = Math.min(first.size(), second.size());
-        for (int index = 0; index < size; index++) {
-            int comparison = Long.compare(first.get(index), second.get(index));
-            if (comparison != 0) {
-                return comparison;
-            }
-        }
-        return Integer.compare(first.size(), second.size());
-    }
 
     private double calculateCandidateScore(
             EventCandidate candidate,
@@ -901,46 +793,12 @@ public class RecommendationService {
     ) {
     }
 
-    private record BeamState(
-            List<Long> eventIds,
-            Set<Long> selectedEventIds,
-            Double currentLatitude,
-            Double currentLongitude,
-            double totalScore
+    private record RankedEventCandidate(
+            Event event,
+            double score
     ) {
-        private static BeamState initial(Double startLatitude, Double startLongitude) {
-            return new BeamState(
-                    List.of(),
-                    Set.of(),
-                    startLatitude,
-                    startLongitude,
-                    0.0
-            );
-        }
-
-        private BeamState extend(Event event, double candidateScore) {
-            List<Long> nextEventIds = new ArrayList<>(eventIds);
-            nextEventIds.add(event.getId());
-
-            Set<Long> nextSelectedEventIds = new HashSet<>(selectedEventIds);
-            nextSelectedEventIds.add(event.getId());
-
-            Double nextLatitude = currentLatitude;
-            Double nextLongitude = currentLongitude;
-            if (event.getLatitude() != null && event.getLongitude() != null) {
-                nextLatitude = event.getLatitude();
-                nextLongitude = event.getLongitude();
-            }
-
-            return new BeamState(
-                    List.copyOf(nextEventIds),
-                    Set.copyOf(nextSelectedEventIds),
-                    nextLatitude,
-                    nextLongitude,
-                    totalScore + candidateScore
-            );
-        }
     }
+
 
     public enum CandidateType {
         EVENT,
@@ -971,24 +829,6 @@ public class RecommendationService {
     ) {
     }
 
-    public record RecommendedCourseDraft(
-            String title,
-            LocalDate startDate,
-            LocalDate endDate,
-            String baseArea,
-            String companionType,
-            double latitude,
-            double longitude,
-            List<RecommendedEvent> events
-    ) {
-    }
-
-    public record RecommendedEvent(
-            Long eventId,
-            String reason,
-            int visitOrder
-    ) {
-    }
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
