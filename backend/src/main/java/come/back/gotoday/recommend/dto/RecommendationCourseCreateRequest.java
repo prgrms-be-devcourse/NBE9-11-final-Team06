@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,6 +50,7 @@ public record RecommendationCourseCreateRequest(
         @DecimalMax(value = "180.0", message = "경도는 180 이하여야 합니다.")
         Double longitude,
 
+        @Valid
         @Size(max = 10, message = "선택한 추천 장소는 최대 10개까지 전달할 수 있습니다.")
         List<SelectedRecommendationItem> selectedRecommendationItems
 ) {

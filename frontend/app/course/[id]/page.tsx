@@ -285,8 +285,26 @@ export default function CourseDetailPage() {
 
         const savedPlaces = getCoursePlaces(savedCourse)
         const fetchedPlaces = getCoursePlaces(fetchedCourse)
-        const placesWithRecommendationReasons = fetchedPlaces.map((place, index) => {
-          const savedPlace = savedPlaces[index]
+        const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
+          const savedPlace = savedPlaces.find((savedPlace) => {
+            if (place.itemType !== savedPlace.itemType) {
+              return false
+            }
+
+            if (place.itemType === "EVENT") {
+              return place.eventId != null && place.eventId === savedPlace.eventId
+            }
+
+            if (place.itemType === "TOUR") {
+              return place.tourId != null && place.tourId === savedPlace.tourId
+            }
+
+            if (place.itemType === "PLACE") {
+              return place.placeId != null && place.placeId === savedPlace.placeId
+            }
+
+            return false
+          })
 
           return {
             ...place,

@@ -118,7 +118,7 @@ weather:
     service-key: ${KMA_WEATHER_API_KEY:dummy-key}
 
 openai:
-  api-key: ${OPENAI_API_KEY}
+  api-key: ${OPENAI_API_KEY:dummy-key}
   base-url: https://api.openai.com
   model: gpt-4o-mini
   timeout-seconds: 10
