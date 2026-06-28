@@ -30,17 +30,18 @@ public class Review {
 
     // 리뷰 작성자
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id")
+    @JoinColumn(name = "member_id",nullable = false)
     private Member member;
 
     // 어떤 코스 리뷰인지
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id")
+    @JoinColumn(name = "course_id",nullable = false)
     private Course course;
 
     // 별점 (1~5점까지 존재한다)
     @Min(1)
     @Max(5)
+    @Column(nullable = false)
     private Integer rating;
 
     // 리뷰 내용
@@ -64,10 +65,22 @@ public class Review {
 
     // [규칙 반영] 정적 팩토리 메서드
     public static Review create(Member member, Course course, Integer rating, String content) {
+        if (member == null) {
+            throw new IllegalArgumentException("Member cannot be null");
+        }
+        if (course == null) {
+            throw new IllegalArgumentException("Course cannot be null");
+        }
+        if (rating == null || rating < 1 || rating > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
         return new Review(member, course, rating, content);
     }
 
     public void update(Integer rating, String content) {
+        if (rating == null || rating < 1 || rating > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
         this.rating = rating;
         this.content = content;
         this.updatedAt = LocalDateTime.now();
