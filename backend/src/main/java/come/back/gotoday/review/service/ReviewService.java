@@ -1,5 +1,6 @@
 package come.back.gotoday.review.service;
 
+import come.back.gotoday.course.entity.Course;
 import come.back.gotoday.review.dto.ReviewCreateRequest;
 import come.back.gotoday.review.dto.ReviewResponse;
 import come.back.gotoday.review.dto.ReviewUpdateRequest;
@@ -23,6 +24,7 @@ public class ReviewService {
     private final MemberRepository memberRepository;
 
     // 리뷰 생성
+    @Transactional
     public ReviewResponse createReview(Long courseId, Long memberId, ReviewCreateRequest request) {
         if (reviewRepository.existsByMemberIdAndCourseId(memberId, courseId)) {
             throw new IllegalArgumentException("이미 해당 코스에 리뷰를 작성했습니다.");
@@ -40,14 +42,17 @@ public class ReviewService {
                 request.getContent());
 
         reviewRepository.save(review);
+        updateCourseRating(courseId);
 
         return ReviewResponse.from(review);
     }
 
     // 리뷰 수정 (본인만 가능)
-    public ReviewResponse updateReview(Long courseId, Long reviewId, Long memberId, ReviewUpdateRequest request) {
+    @Transactional
+    public ReviewResponse updateReview(Long courseId, Long memberId, ReviewUpdateRequest request) {
 
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewRepository
+                .findByCourseIdAndMemberId(courseId, memberId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰 없음"));
 
         // 1. 해당 코스 리뷰 맞는지 검증
@@ -67,14 +72,17 @@ public class ReviewService {
         if (content == null) content = review.getContent();
 
         review.update(rating, content);
-        
+        updateCourseRating(courseId);
+
         return ReviewResponse.from(review);
     }
 
     // 리뷰 삭제 (본인만 가능)
-    public void deleteReview(Long courseId, Long reviewId, Long memberId) {
+    @Transactional
+    public void deleteReview(Long courseId, Long memberId) {
 
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewRepository
+                .findByCourseIdAndMemberId(courseId, memberId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰 없음"));
 
         if (!review.getCourse().getId().equals(courseId)) {
@@ -84,18 +92,17 @@ public class ReviewService {
         if (!review.getMember().getId().equals(memberId)) {
             throw new IllegalArgumentException("본인 리뷰만 삭제 가능");
         }
-
+        
         reviewRepository.delete(review);
+        updateCourseRating(courseId);
     }
 
     //단건 리뷰 조회
-    public ReviewResponse getReview(Long courseId, Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new IllegalArgumentException("리뷰 없음"));
+    public ReviewResponse getReview(Long courseId, Long memberId) {
 
-        if (!review.getCourse().getId().equals(courseId)) {
-            throw new IllegalArgumentException("해당 코스 리뷰 아님");
-        }
+        Review review = reviewRepository
+                .findByCourse_IdAndMember_Id(courseId, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("리뷰 없음"));
 
         return ReviewResponse.from(review);
     }
@@ -107,5 +114,17 @@ public class ReviewService {
                 .stream()
                 .map(ReviewResponse::from)
                 .toList();
+    }
+
+    private void updateCourseRating(Long courseId) {
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("코스 없음"));
+
+        int count = reviewRepository.countByCourseId(courseId);
+        Double avg = reviewRepository.findAverageRating(courseId);
+
+        course.setReviewCount(count);
+        course.setAverageRating(avg == null ? 0.0 : avg);
     }
 }
