@@ -35,6 +35,10 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8"
+      SEOUL_CROWD_AREA_NAMES: ${SEOUL_CROWD_AREA_NAMES}
       SEOUL_API_KEY: ${SEOUL_API_KEY:-dummy}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       KMA_WEATHER_API_KEY: ${KMA_WEATHER_API_KEY:-dummy}
@@ -57,6 +61,10 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8"
+      SEOUL_CROWD_AREA_NAMES: ${SEOUL_CROWD_AREA_NAMES}
       SEOUL_API_KEY: ${SEOUL_API_KEY:-dummy}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       KMA_WEATHER_API_KEY: ${KMA_WEATHER_API_KEY:-dummy}
