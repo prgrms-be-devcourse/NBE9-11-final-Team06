@@ -65,6 +65,8 @@ type CourseDetail = {
   reason?: string
   places?: CoursePlace[]
   coursePlaces?: CoursePlace[]
+  averageRating?: number
+  reviewCount?: number
 }
 
 type Review = {
@@ -258,6 +260,83 @@ export default function CourseDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+
+  async function fetchCourse() {
+    setIsLoading(true)
+    setErrorMessage(null)
+  
+    const savedCourse = getSavedRecommendedCourse(courseId)
+  
+    try {
+      const accessToken = getAccessToken()
+  
+      const headers: HeadersInit = {}
+  
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`
+      }
+  
+      const response = await fetch(
+        `${API_BASE_URL}/api/courses/${courseId}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers,
+        },
+      )
+  
+      const result = await response.json()
+  
+      if (!response.ok) return
+  
+      const fetchedCourse = extractCourse(result)
+  
+      if (!fetchedCourse) return
+  
+      const savedPlaces = getCoursePlaces(savedCourse)
+      const fetchedPlaces = getCoursePlaces(fetchedCourse)
+  
+      const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
+        const savedPlace = savedPlaces.find((savedPlace) => {
+          if (place.itemType !== savedPlace.itemType) return false
+  
+          if (place.itemType === "EVENT")
+            return place.eventId === savedPlace.eventId
+  
+          if (place.itemType === "TOUR")
+            return place.tourId === savedPlace.tourId
+  
+          if (place.itemType === "PLACE")
+            return place.placeId === savedPlace.placeId
+  
+          return false
+        })
+  
+        return {
+          ...place,
+          recommendationReason:
+            place.recommendationReason ??
+            place.reason ??
+            savedPlace?.recommendationReason ??
+            savedPlace?.reason,
+        }
+      })
+  
+      setCourse({
+        ...savedCourse,
+        ...fetchedCourse,
+        places: placesWithRecommendationReasons,
+        recommendationReason:
+          fetchedCourse.recommendationReason ??
+          fetchedCourse.reason ??
+          savedCourse?.recommendationReason ??
+          savedCourse?.reason,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   async function fetchReviews() {
     const res = await fetch(
       `${API_BASE_URL}/api/courses/${courseId}/reviews`,
@@ -310,8 +389,10 @@ export default function CourseDetailPage() {
   
     if (!res.ok) return
   
+    await fetchCourse()
     await fetchReviews()
     await fetchMyReview()
+    
   }
   async function deleteReview() {
     const res = await fetch(
@@ -328,7 +409,9 @@ export default function CourseDetailPage() {
     setRating(5)
     setContent("")
   
+    await fetchCourse()
     await fetchReviews()
+    await fetchMyReview()
   }
 
   useEffect(() => {
@@ -536,6 +619,8 @@ export default function CourseDetailPage() {
                 </p>
               </div>
 
+              
+
               <div className="shrink-0">
                 {actionCourseId ? (
                   <CourseActions courseId={actionCourseId} title={title} />
@@ -546,7 +631,29 @@ export default function CourseDetailPage() {
                 )}
               </div>
             </div>
+            <div className="mt-6 flex items-center gap-6 rounded-xl border p-4">
+  <div>
+    <div className="text-2xl font-bold text-yellow-500">
+      ⭐ {course?.averageRating?.toFixed(1) ?? "0.0"}
+    </div>
 
+    <div className="text-sm text-muted-foreground">
+      평균 평점
+    </div>
+  </div>
+
+  <div className="h-10 w-px bg-border" />
+
+  <div>
+    <div className="text-2xl font-bold">
+      {course?.reviewCount ?? 0}
+    </div>
+
+    <div className="text-sm text-muted-foreground">
+      리뷰 수
+    </div>
+  </div>
+</div>
             <Card className="mt-6 p-6">
               <p className="mb-2 flex items-center gap-1.5 font-semibold">
                 <Sparkles className="size-4 text-accent" />
