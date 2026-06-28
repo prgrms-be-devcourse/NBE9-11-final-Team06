@@ -369,4 +369,34 @@ public class TossPaymentsClient {
         log.warn("토스페이먼츠 정산 조회 API BusinessException 발생 및 상신 처리: message={}", e.getMessage());
         throw e;
     }
+
+    public TossAutomatedPaymentResponse getPaymentByOrderId(String orderId) {
+        log.info("토스페이먼츠 주문 ID 기준 결제 조회 API 호출 시작: orderId={}", orderId);
+
+        try {
+            String encodedKey = Base64.getEncoder().encodeToString((secretKey + ":").getBytes());
+
+            TossAutomatedPaymentResponse response = restClient.get()
+                    .uri("/payments/orders/{orderId}", orderId)
+                    .header("Authorization", "Basic " + encodedKey)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(TossAutomatedPaymentResponse.class);
+
+            log.info("토스페이먼츠 주문 ID 기준 결제 조회 API 완료: orderId={}, status={}",
+                    orderId, response != null ? response.status() : "NULL");
+            return response;
+
+        } catch (RestClientResponseException e) {
+            // 404 Not Found 같은 에러는 아직 토스에 결제가 접수조차 안 되었다는 뜻이므로
+            // 호출부에서 제어할 수 있도록 그대로 예외를 던집니다.
+            log.warn("토스페이먼츠 결제 조회 HTTP 에러 발생 (결제 미접수 가능성 있음): orderId={}, statusCode={}",
+                    orderId, e.getStatusCode());
+            throw e;
+        } catch (Exception e) {
+            log.error("토스페이먼츠 결제 조회 중 알 수 없는 오류 발생: orderId={}, message={}",
+                    orderId, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
 }

@@ -12,6 +12,9 @@ import come.back.gotoday.payment.subscription.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -63,14 +66,24 @@ public class SubscriptionBatchFacade {
 
             subscriptionBatchService.completeScheduledPayment(subscriptionId, orderId, tossResponse);
 
+        } catch (ResourceAccessException e) {
+            // [경우 A] 타임아웃 / 네트워크 유실 발생
+            // 실패 처리를 하지 않고 PENDING 상태 그대로 둔 채 메서드 나감
+            log.error("[정기 정산 배치] 구독 ID: {} 결제 중 네트워크 타임아웃 발생. PENDING 상태로 유지하며 정합성 배치가 수습합니다.", subscriptionId);
+
+        } catch (RestClientResponseException e) {
+            // [경우 B] 명확한 결제 거절 (잔액부족 등) -> 즉시 유예 상태로 전환
+            log.warn("[정기 정산 배치] 구독 ID: {} 토스 결제 거절 발생. 즉시 유예 상태로 전환합니다.", subscriptionId);
+            subscriptionBatchService.handleBatchPaymentFailure(
+                    subscriptionId, orderId, paymentParams.getSnapshotAmount(), e.getResponseBodyAsString(), today, paymentParams.getOriginalStatus()
+            );
+            //todo 사용자에게 알람
         } catch (Exception e) {
-            // 실패 시 유예 상태로 변환 및 실패 이력 적재
+            // [경우 C] 기타 알 수 없는 예외 -> 안전하게 즉시 실패 처리
+            log.error("[정기 정산 배치] 구독 ID: {} 처리 중 예외 발생", subscriptionId, e);
             subscriptionBatchService.handleBatchPaymentFailure(
                     subscriptionId, orderId, paymentParams.getSnapshotAmount(), e.getMessage(), today, paymentParams.getOriginalStatus()
             );
-            // todo [알림 발송 지점] 유저에게 실패 알림 전송
-
-            throw e;
         }
     }
 
