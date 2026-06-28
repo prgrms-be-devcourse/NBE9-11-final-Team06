@@ -10,7 +10,7 @@ public record ReviewResponse(
         Long reviewId,
         Long courseId,
         Long memberId,
-        String memberNickName,
+        String memberNickname,
         Integer rating,
         String content,
         LocalDateTime createdAt,
@@ -22,7 +22,7 @@ public record ReviewResponse(
                 .reviewId(review.getId())
                 .courseId(review.getCourse().getId())
                 .memberId(review.getMember().getId())
-                .memberNickName(review.getMember().getNickname()) // 또는 nickname
+                .memberNickname(review.getMember().getNickname()) 
                 .rating(review.getRating())
                 .content(review.getContent())
                 .createdAt(review.getCreatedAt())

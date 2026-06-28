@@ -15,7 +15,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
@@ -24,7 +24,9 @@ public class ReviewService {
 
     // 리뷰 생성
     public ReviewResponse createReview(Long courseId, Long memberId, ReviewCreateRequest request) {
-
+        if (reviewRepository.existsByMemberIdAndCourseId(memberId, courseId)) {
+            throw new IllegalArgumentException("이미 해당 코스에 리뷰를 작성했습니다.");
+        }
         var course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("코스 없음"));
 
@@ -58,8 +60,14 @@ public class ReviewService {
             throw new IllegalArgumentException("본인 리뷰만 수정 가능");
         }
 
-        review.update(request.getRating(), request.getContent());
+        Integer rating = request.getRating();
+        String content = request.getContent();
 
+        if (rating == null) rating = review.getRating();
+        if (content == null) content = review.getContent();
+
+        review.update(rating, content);
+        
         return ReviewResponse.from(review);
     }
 

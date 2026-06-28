@@ -6,6 +6,7 @@ import come.back.gotoday.review.dto.ReviewCreateRequest;
 import come.back.gotoday.review.dto.ReviewResponse;
 import come.back.gotoday.review.dto.ReviewUpdateRequest;
 import come.back.gotoday.review.service.ReviewService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class ReviewController {
     @PostMapping("/{courseId}/reviews")
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
             @PathVariable Long courseId,
-            @RequestBody ReviewCreateRequest request,
+            @Valid @RequestBody ReviewCreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         ReviewResponse response = reviewService.createReview(
@@ -70,7 +71,7 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
             @PathVariable Long courseId,
             @PathVariable Long reviewId,
-            @RequestBody ReviewUpdateRequest request,
+            @Valid @RequestBody ReviewUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         ReviewResponse response = reviewService.updateReview(
