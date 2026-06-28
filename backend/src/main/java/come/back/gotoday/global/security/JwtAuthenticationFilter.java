@@ -156,10 +156,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) {
     }
 
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String path = request.getRequestURI();
-        // /actuator로 시작하는 경로는 JWT 검증 필터를 그냥 통과 시킵니다.
-        return path.startsWith("/actuator");
-    }
+//    @Override
+//    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+//        String path = request.getRequestURI();
+//        // /actuator로 시작하는 경로는 JWT 검증 필터를 그냥 통과 시킵니다.
+//        return path.startsWith("/actuator");
+//    }
 }

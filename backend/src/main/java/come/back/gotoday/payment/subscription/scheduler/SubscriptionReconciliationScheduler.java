@@ -66,14 +66,17 @@ public class SubscriptionReconciliationScheduler {
 
             } catch (RestClientResponseException e) {
                 // [Case C] 토스 API에서 404 Not Found를 뱉은 경우 (토스 서버에 요청조차 도달하지 않음) -> 기존 실패 함수 재활용
-                if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                if (e.getStatusCode().equals(HttpStatus.NOT_FOUND)) {
                     log.info("[정합성 보정 완료] 토스 내 주문 이력 없음(404) 확인 -> 구독 ID: {} 실패 및 유예 처리", sub.getId());
 
                     subscriptionBatchService.handleBatchPaymentFailure(
                             sub.getId(), orderId, sub.getAmount(), "네트워크 타임아웃으로 토스에 결제 요청 미도달 확인", today, SubscriptionStatus.ACTIVE
                     );
+                } else if (e.getStatusCode().is5xxServerError()) {
+                    // 5xx 서버 에러는 일시적인 오류일 수 있으므로 PENDING 상태를 유지하여 다음 배치에서 재시도하도록 합니다.
+                    log.warn("[정합성 보정 보류] 토스 서버 에러(5xx) 발생 -> 구독 ID: {} PENDING 상태 유지 (재시도 예정)", sub.getId(), e);
                 } else {
-                    // 404가 아닌 다른 HTTP 에러 코드가 온 경우 -> 데이터 오염 방지를 위해 MANUAL_CHECK 전환
+                    // 404가 아닌 다른 4xx 에러 등은 데이터 오염 방지를 위해 MANUAL_CHECK 전환
                     log.error("[정합성 보정 실패] 토스 API 예외 발생으로 판정 불가 -> 구독 ID: {} 를 MANUAL_CHECK로 전환합니다.", sub.getId(), e);
                     subscriptionBatchService.markAsManualCheck(sub.getId());
                 }
