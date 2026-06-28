@@ -67,6 +67,14 @@ type CourseDetail = {
   coursePlaces?: CoursePlace[]
 }
 
+type Review = {
+  reviewId: number
+  rating: number
+  content: string
+  memberNickname: string
+  createdAt: string
+}
+
 function normalizeAccessToken(value: string | null | undefined) {
   if (!value) return null
 
@@ -240,8 +248,88 @@ export default function CourseDetailPage() {
   const numericCourseId = Number(courseId)
 
   const [course, setCourse] = useState<CourseDetail | null>(null)
+
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [myReview, setMyReview] = useState<Review | null>(null)
+
+  const [rating, setRating] = useState(5)
+  const [content, setContent] = useState("")
+
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  async function fetchReviews() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews`,
+      {
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    const json = await res.json()
+  
+    setReviews(json.data)
+  }
+
+  async function fetchMyReview() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews/me`,
+      {
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    const json = await res.json()
+  
+    setMyReview(json.data)
+    setRating(json.data.rating)
+    setContent(json.data.content)
+  }
+  async function saveReview() {
+    const url = myReview
+      ? `${API_BASE_URL}/api/courses/${courseId}/reviews/me`
+      : `${API_BASE_URL}/api/courses/${courseId}/reviews`
+  
+    const method = myReview ? "PATCH" : "POST"
+  
+    const res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        rating,
+        content,
+      }),
+    })
+  
+    if (!res.ok) return
+  
+    await fetchReviews()
+    await fetchMyReview()
+  }
+  async function deleteReview() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews/me`,
+      {
+        method: "DELETE",
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    setMyReview(null)
+    setRating(5)
+    setContent("")
+  
+    await fetchReviews()
+  }
 
   useEffect(() => {
     const savedCourse = getSavedRecommendedCourse(courseId)
@@ -325,6 +413,9 @@ export default function CourseDetailPage() {
             savedCourse?.recommendationReason ??
             savedCourse?.reason,
         })
+
+        await fetchReviews()
+        await fetchMyReview()
       } catch {
         if (!savedCourse) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
@@ -549,6 +640,58 @@ export default function CourseDetailPage() {
                   아직 표시할 코스 장소가 없습니다.
                 </Card>
               )}
+            </section>
+
+            <section className="mt-10">
+              <h2 className="text-2xl font-bold">리뷰</h2>
+
+              <div className="mt-5 space-y-4">
+                <select
+                  value={rating}
+                  onChange={(e) => setRating(Number(e.target.value))}
+                  className="border rounded px-3 py-2"
+                >
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <option key={i} value={i}>
+                      {i}점
+                    </option>
+                  ))}
+                </select>
+
+                <textarea
+                  className="w-full rounded border p-3"
+                  rows={4}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="리뷰를 작성해주세요."
+                />
+
+                <div className="flex gap-2">
+                  <Button onClick={saveReview}>
+                    {myReview ? "리뷰 수정" : "리뷰 등록"}
+                  </Button>
+
+                  {myReview && (
+                    <Button variant="destructive" onClick={deleteReview}>
+                      삭제
+                    </Button>
+                  )}
+                </div>
+
+                <hr />
+
+                <h3 className="text-lg font-semibold">다른 사람들의 리뷰</h3>
+
+                {reviews.map((review) => (
+                  <Card key={review.reviewId} className="p-4">
+                    <div>⭐ {review.rating}</div>
+                    <div className="mt-2">{review.content}</div>
+                    <div className="mt-2 text-sm text-gray-500">
+                      {review.memberNickname}
+                    </div>
+                  </Card>
+                ))}
+              </div>
             </section>
           </>
         )}
