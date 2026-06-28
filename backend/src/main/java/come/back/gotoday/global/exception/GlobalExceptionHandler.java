@@ -15,7 +15,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
         ErrorCode errorCode = exception.getErrorCode();
-        log.warn("비즈니스 예외 발생: code={}, message={}", errorCode.getCode(), errorCode.getMessage());
+        log.warn("비즈니스 예외 발생: code={}, message={}",
+                errorCode.getCode(),
+                errorCode.getMessage(),
+                exception
+        );
 
         return ResponseEntity
                 .status(errorCode.getStatus())
