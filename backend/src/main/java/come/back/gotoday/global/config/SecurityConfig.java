@@ -55,6 +55,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 //                        .requestMatchers("/api/test/batch/**").permitAll()
+                        .requestMatchers("/api/test/**").permitAll()
                         .requestMatchers("/api/v1/payments/webhook").permitAll()
                         .requestMatchers("/api/members").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()

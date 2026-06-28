@@ -129,6 +129,17 @@ public class SubscriptionBatchService {
         log.info("[배치 서비스] 구독 ID: {} 최종 해지 완료.", subscriptionId);
     }
 
+    @Transactional
+    public void markAsManualCheck(Long subscriptionId) {
+        subscriptionRepository.findByIdForUpdate(subscriptionId).ifPresent(subscription -> {
+            if (subscription.getStatus() == SubscriptionStatus.PENDING) {
+                // 엔티티 내부에 status = SubscriptionStatus.MANUAL_CHECK 로 바꾸는 메서드가 있다고 가정합니다.
+                subscription.changeToManualCheck();
+                log.warn("[정합성 서비스] 구독 ID: {} 정산 불일치 의심으로 MANUAL_CHECK 처리됨. 대면 확인 필요", subscriptionId);
+            }
+        });
+    }
+
     @Getter
     @Builder
     public static class BatchPaymentParameters {
