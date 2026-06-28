@@ -65,6 +65,16 @@ type CourseDetail = {
   reason?: string
   places?: CoursePlace[]
   coursePlaces?: CoursePlace[]
+  averageRating?: number
+  reviewCount?: number
+}
+
+type Review = {
+  reviewId: number
+  rating: number
+  content: string
+  memberNickname: string
+  createdAt: string
 }
 
 function normalizeAccessToken(value: string | null | undefined) {
@@ -240,103 +250,186 @@ export default function CourseDetailPage() {
   const numericCourseId = Number(courseId)
 
   const [course, setCourse] = useState<CourseDetail | null>(null)
+
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [myReview, setMyReview] = useState<Review | null>(null)
+
+  const [rating, setRating] = useState(5)
+  const [content, setContent] = useState("")
+
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  useEffect(() => {
+
+  async function fetchCourse() {
+    setIsLoading(true)
+    setErrorMessage(null)
+  
     const savedCourse = getSavedRecommendedCourse(courseId)
-
-    if (savedCourse) {
-      setCourse(savedCourse)
-    }
-
-    async function fetchCourse() {
-      setIsLoading(true)
-      setErrorMessage(null)
-
-      try {
-        const accessToken = getAccessToken()
-        const headers: HeadersInit = {}
-
-        if (accessToken) {
-          headers.Authorization = `Bearer ${accessToken}`
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
+  
+    try {
+      const accessToken = getAccessToken()
+  
+      const headers: HeadersInit = {}
+  
+      if (accessToken) {
+        headers.Authorization = "Bearer " + accessToken
+      }
+  
+      const response = await fetch(
+        API_BASE_URL + "/api/courses/" + courseId,
+        {
           method: "GET",
           credentials: "include",
           headers,
-        })
-
-        const result = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          if (!savedCourse) {
-            setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
-          }
-          return
-        }
-
-        const fetchedCourse = extractCourse(result)
-
-        if (!fetchedCourse) {
-          return
-        }
-
-        const savedPlaces = getCoursePlaces(savedCourse)
-        const fetchedPlaces = getCoursePlaces(fetchedCourse)
-        const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
-          const savedPlace = savedPlaces.find((savedPlace) => {
-            if (place.itemType !== savedPlace.itemType) {
-              return false
-            }
-
-            if (place.itemType === "EVENT") {
-              return place.eventId != null && place.eventId === savedPlace.eventId
-            }
-
-            if (place.itemType === "TOUR") {
-              return place.tourId != null && place.tourId === savedPlace.tourId
-            }
-
-            if (place.itemType === "PLACE") {
-              return place.placeId != null && place.placeId === savedPlace.placeId
-            }
-
-            return false
-          })
-
-          return {
-            ...place,
-            recommendationReason:
-              place.recommendationReason ??
-              place.reason ??
-              savedPlace?.recommendationReason ??
-              savedPlace?.reason,
-          }
-        })
-        setCourse({
-          ...savedCourse,
-          ...fetchedCourse,
-          places: placesWithRecommendationReasons,
-          recommendationReason:
-            fetchedCourse.recommendationReason ??
-            fetchedCourse.reason ??
-            savedCourse?.recommendationReason ??
-            savedCourse?.reason,
-        })
-      } catch {
+        },
+      )
+  
+      const result = await response.json().catch(() => null)
+  
+      if (!response.ok) {
         if (!savedCourse) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
         }
-      } finally {
-        setIsLoading(false)
+        return
       }
+  
+      const fetchedCourse = extractCourse(result)
+  
+      if (!fetchedCourse) return
+  
+      const savedPlaces = getCoursePlaces(savedCourse)
+      const fetchedPlaces = getCoursePlaces(fetchedCourse)
+  
+      const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
+        const savedPlace = savedPlaces.find((savedPlace) => {
+          if (place.itemType !== savedPlace.itemType) return false
+  
+          if (place.itemType === "EVENT")
+            return place.eventId === savedPlace.eventId
+  
+          if (place.itemType === "TOUR")
+            return place.tourId === savedPlace.tourId
+  
+          if (place.itemType === "PLACE")
+            return place.placeId === savedPlace.placeId
+  
+          return false
+        })
+  
+        return {
+          ...place,
+          recommendationReason:
+            place.recommendationReason ??
+            place.reason ??
+            savedPlace?.recommendationReason ??
+            savedPlace?.reason,
+        }
+      })
+  
+      setCourse({
+        ...savedCourse,
+        ...fetchedCourse,
+        places: placesWithRecommendationReasons,
+        recommendationReason:
+          fetchedCourse.recommendationReason ??
+          fetchedCourse.reason ??
+          savedCourse?.recommendationReason ??
+          savedCourse?.reason,
+      })
+    } catch {
+      if (!savedCourse) {
+        setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+      }
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    if (courseId) {
-      fetchCourse()
-    }
+  async function fetchReviews() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews`,
+      {
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    const json = await res.json()
+  
+    setReviews(json.data)
+  }
+
+  async function fetchMyReview() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews/me`,
+      {
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    const json = await res.json()
+  
+    setMyReview(json.data)
+    setRating(json.data.rating)
+    setContent(json.data.content)
+  }
+  async function saveReview() {
+    const url = myReview
+      ? `${API_BASE_URL}/api/courses/${courseId}/reviews/me`
+      : `${API_BASE_URL}/api/courses/${courseId}/reviews`
+  
+    const method = myReview ? "PATCH" : "POST"
+  
+    const res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        rating,
+        content,
+      }),
+    })
+  
+    if (!res.ok) return
+  
+    await fetchCourse()
+    await fetchReviews()
+    await fetchMyReview()
+    
+  }
+  async function deleteReview() {
+    const res = await fetch(
+      `${API_BASE_URL}/api/courses/${courseId}/reviews/me`,
+      {
+        method: "DELETE",
+        credentials: "include",
+      },
+    )
+  
+    if (!res.ok) return
+  
+    setMyReview(null)
+    setRating(5)
+    setContent("")
+  
+    await fetchCourse()
+    await fetchReviews()
+    await fetchMyReview()
+  }
+
+  useEffect(() => {
+    if (!courseId) return
+  
+    fetchCourse().then(() => {
+      fetchReviews()
+      fetchMyReview()
+    })
   }, [courseId])
 
   const coursePlaces = getCoursePlaces(course)
@@ -445,6 +538,8 @@ export default function CourseDetailPage() {
                 </p>
               </div>
 
+              
+
               <div className="shrink-0">
                 {actionCourseId ? (
                   <CourseActions courseId={actionCourseId} title={title} />
@@ -455,7 +550,29 @@ export default function CourseDetailPage() {
                 )}
               </div>
             </div>
+            <div className="mt-6 flex items-center gap-6 rounded-xl border p-4">
+            <div>
+              <div className="text-2xl font-bold text-yellow-500">
+                ⭐ {course?.averageRating?.toFixed(1) ?? "0.0"}
+              </div>
 
+              <div className="text-sm text-muted-foreground">
+                평균 평점
+              </div>
+            </div>
+
+            <div className="h-10 w-px bg-border" />
+
+            <div>
+              <div className="text-2xl font-bold">
+                {course?.reviewCount ?? 0}
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                리뷰 수
+              </div>
+            </div>
+          </div>
             <Card className="mt-6 p-6">
               <p className="mb-2 flex items-center gap-1.5 font-semibold">
                 <Sparkles className="size-4 text-accent" />
@@ -549,6 +666,64 @@ export default function CourseDetailPage() {
                   아직 표시할 코스 장소가 없습니다.
                 </Card>
               )}
+            </section>
+
+            <section className="mt-10">
+              <h2 className="text-2xl font-bold">리뷰</h2>
+
+              <div className="mt-5 space-y-4">
+                <select
+                  value={rating}
+                  onChange={(e) => setRating(Number(e.target.value))}
+                  className="border rounded px-3 py-2"
+                >
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <option key={i} value={i}>
+                      {i}점
+                    </option>
+                  ))}
+                </select>
+
+                <textarea
+                  className="w-full rounded border p-3"
+                  rows={4}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="리뷰를 작성해주세요."
+                />
+
+                <div className="flex gap-2">
+                  <Button onClick={saveReview}>
+                    {myReview ? "리뷰 수정" : "리뷰 등록"}
+                  </Button>
+
+                  {myReview && (
+                    <Button variant="destructive" onClick={deleteReview}>
+                      삭제
+                    </Button>
+                  )}
+                </div>
+
+                <hr />
+
+                <h3 className="text-lg font-semibold">다른 사람들의 리뷰</h3>
+
+                {reviews.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    아직 작성된 리뷰가 없습니다. 첫 번째 리뷰를 작성해보세요!
+                  </p>
+                ) : (
+                  reviews.map((review) => (
+                    <Card key={review.reviewId} className="p-4">
+                      <div>⭐ {review.rating}</div>
+                      <div className="mt-2">{review.content}</div>
+                      <div className="mt-2 text-sm text-gray-500">
+                        {review.memberNickname}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
             </section>
           </>
         )}
