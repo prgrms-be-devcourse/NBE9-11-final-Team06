@@ -273,11 +273,11 @@ export default function CourseDetailPage() {
       const headers: HeadersInit = {}
   
       if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`
+        headers.Authorization = "Bearer " + accessToken
       }
   
       const response = await fetch(
-        `${API_BASE_URL}/api/courses/${courseId}`,
+        API_BASE_URL + "/api/courses/" + courseId,
         {
           method: "GET",
           credentials: "include",
@@ -285,9 +285,14 @@ export default function CourseDetailPage() {
         },
       )
   
-      const result = await response.json()
+      const result = await response.json().catch(() => null)
   
-      if (!response.ok) return
+      if (!response.ok) {
+        if (!savedCourse) {
+          setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+        }
+        return
+      }
   
       const fetchedCourse = extractCourse(result)
   
@@ -332,6 +337,10 @@ export default function CourseDetailPage() {
           savedCourse?.recommendationReason ??
           savedCourse?.reason,
       })
+    } catch {
+      if (!savedCourse) {
+        setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -415,102 +424,12 @@ export default function CourseDetailPage() {
   }
 
   useEffect(() => {
-    const savedCourse = getSavedRecommendedCourse(courseId)
-
-    if (savedCourse) {
-      setCourse(savedCourse)
-    }
-
-    async function fetchCourse() {
-      setIsLoading(true)
-      setErrorMessage(null)
-
-      try {
-        const accessToken = getAccessToken()
-        const headers: HeadersInit = {}
-
-        if (accessToken) {
-          headers.Authorization = `Bearer ${accessToken}`
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}`, {
-          method: "GET",
-          credentials: "include",
-          headers,
-        })
-
-        const result = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          if (!savedCourse) {
-            setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
-          }
-          return
-        }
-
-        const fetchedCourse = extractCourse(result)
-
-        if (!fetchedCourse) {
-          return
-        }
-
-        const savedPlaces = getCoursePlaces(savedCourse)
-        const fetchedPlaces = getCoursePlaces(fetchedCourse)
-        const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
-          const savedPlace = savedPlaces.find((savedPlace) => {
-            if (place.itemType !== savedPlace.itemType) {
-              return false
-            }
-
-            if (place.itemType === "EVENT") {
-              return place.eventId != null && place.eventId === savedPlace.eventId
-            }
-
-            if (place.itemType === "TOUR") {
-              return place.tourId != null && place.tourId === savedPlace.tourId
-            }
-
-            if (place.itemType === "PLACE") {
-              return place.placeId != null && place.placeId === savedPlace.placeId
-            }
-
-            return false
-          })
-
-          return {
-            ...place,
-            recommendationReason:
-              place.recommendationReason ??
-              place.reason ??
-              savedPlace?.recommendationReason ??
-              savedPlace?.reason,
-          }
-        })
-        setCourse({
-          ...savedCourse,
-          ...fetchedCourse,
-          places: placesWithRecommendationReasons,
-          recommendationReason:
-            fetchedCourse.recommendationReason ??
-            fetchedCourse.reason ??
-            savedCourse?.recommendationReason ??
-            savedCourse?.reason,
-        })
-
-        await fetchReviews()
-        await fetchMyReview()
-      } catch {
-        if (!savedCourse) {
-          setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    if (courseId) {
-      fetchCourse()
-    }
+    if (!courseId) return
+  
+    fetchCourse().then(() => {
+      fetchReviews()
+      fetchMyReview()
+    })
   }, [courseId])
 
   const coursePlaces = getCoursePlaces(course)
@@ -789,15 +708,21 @@ export default function CourseDetailPage() {
 
                 <h3 className="text-lg font-semibold">다른 사람들의 리뷰</h3>
 
-                {reviews.map((review) => (
-                  <Card key={review.reviewId} className="p-4">
-                    <div>⭐ {review.rating}</div>
-                    <div className="mt-2">{review.content}</div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      {review.memberNickname}
-                    </div>
-                  </Card>
-                ))}
+                {reviews.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    아직 작성된 리뷰가 없습니다. 첫 번째 리뷰를 작성해보세요!
+                  </p>
+                ) : (
+                  reviews.map((review) => (
+                    <Card key={review.reviewId} className="p-4">
+                      <div>⭐ {review.rating}</div>
+                      <div className="mt-2">{review.content}</div>
+                      <div className="mt-2 text-sm text-gray-500">
+                        {review.memberNickname}
+                      </div>
+                    </Card>
+                  ))
+                )}
               </div>
             </section>
           </>
