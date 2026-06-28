@@ -23,5 +23,4 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     Optional<Review> findByCourseIdAndMemberId(Long courseId, Long memberId);
 
-    Optional<Review> findByCourse_IdAndMember_Id(Long courseId, Long memberId);
 }

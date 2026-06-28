@@ -42,7 +42,7 @@ public class ReviewService {
                 request.getContent());
 
         reviewRepository.save(review);
-        updateCourseRating(courseId);
+        updateCourseRating(course);
 
         return ReviewResponse.from(review);
     }
@@ -72,7 +72,7 @@ public class ReviewService {
         if (content == null) content = review.getContent();
 
         review.update(rating, content);
-        updateCourseRating(courseId);
+        updateCourseRating(review.getCourse());
 
         return ReviewResponse.from(review);
     }
@@ -92,16 +92,16 @@ public class ReviewService {
         if (!review.getMember().getId().equals(memberId)) {
             throw new IllegalArgumentException("본인 리뷰만 삭제 가능");
         }
-        
+
         reviewRepository.delete(review);
-        updateCourseRating(courseId);
+        updateCourseRating(review.getCourse());
     }
 
     //단건 리뷰 조회
     public ReviewResponse getReview(Long courseId, Long memberId) {
 
         Review review = reviewRepository
-                .findByCourse_IdAndMember_Id(courseId, memberId)
+                .findByCourseIdAndMemberId(courseId, memberId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰 없음"));
 
         return ReviewResponse.from(review);
@@ -116,15 +116,10 @@ public class ReviewService {
                 .toList();
     }
 
-    private void updateCourseRating(Long courseId) {
+    private void updateCourseRating(Course course) {
+        int count = reviewRepository.countByCourseId(course.getId());
+        Double avg = reviewRepository.findAverageRating(course.getId());
 
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("코스 없음"));
-
-        int count = reviewRepository.countByCourseId(courseId);
-        Double avg = reviewRepository.findAverageRating(courseId);
-
-        course.setReviewCount(count);
-        course.setAverageRating(avg == null ? 0.0 : avg);
+        course.updateReviewStats(count, avg == null ? 0.0 : avg);
     }
 }
