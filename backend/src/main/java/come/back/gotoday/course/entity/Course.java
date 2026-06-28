@@ -66,6 +66,12 @@ public class Course {
     @Column(name = "start_longitude")
     private Double startLongitude;
 
+    @Column(nullable = false)
+    private Double averageRating = 0.0;
+
+    @Column(nullable = false)
+    private Integer reviewCount = 0;
+
     private Course(Member member, String title, String description, String courseType, LocalDate startDate,
                    LocalDate endDate, String baseArea, String companionType, Double startLatitude, Double startLongitude,Integer totalDistance,
                    Integer estimatedTime, String recommendationReason) {
@@ -84,6 +90,8 @@ public class Course {
         this.recommendationReason = recommendationReason;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        this.averageRating = 0.0;
+        this.reviewCount = 0;
     }
 
     // [규칙 반영] 정적 팩토리 메서드
