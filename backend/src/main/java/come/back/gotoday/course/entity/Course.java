@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -112,5 +113,10 @@ public class Course {
     public void addCoursePlace(CoursePlace coursePlace) {
         coursePlaces.add(coursePlace);
         coursePlace.setCourse(this);
+    }
+
+    public void updateReviewStats(int reviewCount, double averageRating) {
+        this.reviewCount = reviewCount;
+        this.averageRating = averageRating;
     }
 }

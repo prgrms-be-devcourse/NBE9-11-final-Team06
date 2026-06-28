@@ -41,13 +41,16 @@ public class ReviewController {
         );
     }
 
-    // 리뷰 단건 조회
-    @GetMapping("/{courseId}/reviews/{reviewId}")
+    // 리뷰 단건 조회 (해당 코스에서 본인이 작성한 글 조회)
+    @GetMapping("/{courseId}/reviews/me")
     public ResponseEntity<ApiResponse<ReviewResponse>> getReview(
             @PathVariable Long courseId,
-            @PathVariable Long reviewId) {
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        ReviewResponse response = reviewService.getReview(courseId, reviewId);
+        ReviewResponse response = reviewService.getReview(
+                courseId,
+                userDetails.getMemberId()
+        );
 
         return ResponseEntity.ok(
                 ApiResponse.success(response, "리뷰 조회에 성공했습니다.")
@@ -67,16 +70,14 @@ public class ReviewController {
     }
 
     // 리뷰 수정
-    @PatchMapping("/{courseId}/reviews/{reviewId}")
+    @PatchMapping("/{courseId}/reviews/me")
     public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
             @PathVariable Long courseId,
-            @PathVariable Long reviewId,
             @Valid @RequestBody ReviewUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         ReviewResponse response = reviewService.updateReview(
                 courseId,
-                reviewId,
                 userDetails.getMemberId(),
                 request
         );
@@ -87,15 +88,13 @@ public class ReviewController {
     }
 
     // 리뷰 삭제
-    @DeleteMapping("/{courseId}/reviews/{reviewId}")
+    @DeleteMapping("/{courseId}/reviews/me")
     public ResponseEntity<ApiResponse<Void>> deleteReview(
             @PathVariable Long courseId,
-            @PathVariable Long reviewId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         reviewService.deleteReview(
                 courseId,
-                reviewId,
                 userDetails.getMemberId()
         );
 
