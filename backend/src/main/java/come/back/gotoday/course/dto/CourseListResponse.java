@@ -8,6 +8,6 @@ public record CourseListResponse(
         String courseType,
         String baseArea,
         LocalDate startDate,
-        Double averageRating,
-        Integer reviewCount
+        double averageRating,
+        int reviewCount
 ) {}

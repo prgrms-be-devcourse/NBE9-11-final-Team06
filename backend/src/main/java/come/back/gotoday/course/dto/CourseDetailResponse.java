@@ -18,7 +18,7 @@ public record CourseDetailResponse(
         String recommendationReason,
         double totalDistance,
         int estimatedTime,
-        Double averageRating,
-        Integer reviewCount
+        double averageRating,
+        int reviewCount
 ) {
 }

@@ -67,10 +67,10 @@ public class Course {
     private Double startLongitude;
 
     @Column(nullable = false)
-    private Double averageRating = 0.0;
+    private double averageRating = 0.0;
 
     @Column(nullable = false)
-    private Integer reviewCount = 0;
+    private int reviewCount = 0;
 
     private Course(Member member, String title, String description, String courseType, LocalDate startDate,
                    LocalDate endDate, String baseArea, String companionType, Double startLatitude, Double startLongitude,Integer totalDistance,
