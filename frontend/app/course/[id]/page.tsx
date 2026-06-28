@@ -632,28 +632,28 @@ export default function CourseDetailPage() {
               </div>
             </div>
             <div className="mt-6 flex items-center gap-6 rounded-xl border p-4">
-  <div>
-    <div className="text-2xl font-bold text-yellow-500">
-      ⭐ {course?.averageRating?.toFixed(1) ?? "0.0"}
-    </div>
+            <div>
+              <div className="text-2xl font-bold text-yellow-500">
+                ⭐ {course?.averageRating?.toFixed(1) ?? "0.0"}
+              </div>
 
-    <div className="text-sm text-muted-foreground">
-      평균 평점
-    </div>
-  </div>
+              <div className="text-sm text-muted-foreground">
+                평균 평점
+              </div>
+            </div>
 
-  <div className="h-10 w-px bg-border" />
+            <div className="h-10 w-px bg-border" />
 
-  <div>
-    <div className="text-2xl font-bold">
-      {course?.reviewCount ?? 0}
-    </div>
+            <div>
+              <div className="text-2xl font-bold">
+                {course?.reviewCount ?? 0}
+              </div>
 
-    <div className="text-sm text-muted-foreground">
-      리뷰 수
-    </div>
-  </div>
-</div>
+              <div className="text-sm text-muted-foreground">
+                리뷰 수
+              </div>
+            </div>
+          </div>
             <Card className="mt-6 p-6">
               <p className="mb-2 flex items-center gap-1.5 font-semibold">
                 <Sparkles className="size-4 text-accent" />
