@@ -45,7 +45,7 @@ public class Review {
     private Integer rating;
 
     // 리뷰 내용
-    @Column(length = 1000)
+    @Column(length = 1000, nullable = false)
     private String content;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -83,6 +83,16 @@ public class Review {
         }
         this.rating = rating;
         this.content = content;
+    }
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
 }
