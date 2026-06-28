@@ -17,6 +17,8 @@ public record CourseDetailResponse(
         List<CoursePlaceResponse> places,
         String recommendationReason,
         double totalDistance,
-        int estimatedTime
+        int estimatedTime,
+        double averageRating,
+        int reviewCount
 ) {
 }

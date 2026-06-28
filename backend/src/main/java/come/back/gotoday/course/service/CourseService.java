@@ -694,7 +694,9 @@ public class CourseService {
                 places,
                 course.getRecommendationReason(),
                 course.getTotalDistance() != null ? course.getTotalDistance() : 0.0,
-                course.getEstimatedTime() != null ? course.getEstimatedTime() : 0
+                course.getEstimatedTime() != null ? course.getEstimatedTime() : 0,
+                course.getAverageRating(),
+                course.getReviewCount()
         );
     }
 
@@ -785,7 +787,9 @@ public class CourseService {
                         course.getTitle(),
                         course.getCourseType(),
                         course.getBaseArea(),
-                        course.getStartDate()
+                        course.getStartDate(),
+                        course.getAverageRating(),
+                        course.getReviewCount()
                 ))
                 .toList();
     }
