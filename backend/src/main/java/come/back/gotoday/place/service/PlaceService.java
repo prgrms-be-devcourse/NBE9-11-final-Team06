@@ -15,6 +15,8 @@ import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -29,6 +31,7 @@ public class PlaceService {
     private final CategoryRepository categoryRepository;
     private final NaverLocalSearchClient naverLocalSearchClient;
     private final NaverReverseGeocodingClient naverReverseGeocodingClient;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional
     public Long createPlace(PlaceCreateRequest request) {
@@ -165,23 +168,51 @@ public class PlaceService {
         log.info("장소 삭제 처리 완료: placeId={}", placeId);
     }
 
-    @Transactional
     public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
-
         String externalId = extractExternalId(doc.placeUrl());
 
         if (externalId == null) {
             throw new IllegalArgumentException("externalId is null");
         }
 
-        return placeRepository
-                .findFirstBySourceAndExternalId("KAKAO", externalId)
-                .orElseGet(() -> createPlace(doc, category, externalId));
+        return placeRepository.findBySourceAndExternalId("KAKAO", externalId)
+                .orElseGet(() -> createOrGetPlaceAfterDuplicate(doc, category, externalId));
+    }
+
+    private Place createOrGetPlaceAfterDuplicate(
+            KakaoPlaceDocument doc,
+            Category category,
+            String externalId
+    ) {
+        try {
+            Place savedPlace = transactionTemplate.execute(status -> placeRepository
+                    .findBySourceAndExternalId("KAKAO", externalId)
+                    .orElseGet(() -> createPlace(doc, category, externalId))
+            );
+
+            if (savedPlace == null) {
+                throw new IllegalStateException("장소 생성 트랜잭션 결과가 없습니다.");
+            }
+
+            return savedPlace;
+        } catch (DataIntegrityViolationException e) {
+            log.info(
+                    "동일 카카오 장소가 동시에 생성되어 기존 데이터를 재조회합니다. externalId={}",
+                    externalId
+            );
+
+            return transactionTemplate.execute(status -> placeRepository
+                    .findBySourceAndExternalId("KAKAO", externalId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "중복 생성 이후 기존 장소를 찾을 수 없습니다. externalId=" + externalId
+                    ))
+            );
+        }
     }
 
     private Place createPlace(KakaoPlaceDocument doc, Category category, String externalId) {
 
-        return placeRepository.save(
+        return placeRepository.saveAndFlush(
                 Place.create(
                         category,
                         doc.placeName(),

@@ -9,7 +9,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "place")
+@Table(
+        name = "place",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_place_source_external_id",
+                        columnNames = {"source", "external_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder

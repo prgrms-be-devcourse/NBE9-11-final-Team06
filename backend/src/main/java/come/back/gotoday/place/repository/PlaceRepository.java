@@ -22,8 +22,6 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     Optional<Place> findByIdAndIsActiveTrue(Long id);
 
-    Optional<Place> findFirstBySourceAndExternalId(String source, String externalId);
-
     Optional<Place> findBySourceAndExternalId(String source, String externalId);
 
     boolean existsBySourceAndExternalId(String source, String externalId);
