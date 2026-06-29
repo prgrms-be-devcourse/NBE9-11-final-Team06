@@ -44,15 +44,21 @@ spring:
 server:
   port: 8080
   forward-headers-strategy: framework
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    enable:
+      tomcat: true
 
 springdoc:
   api-docs:
@@ -73,6 +79,9 @@ external:
   tour:
     base-url: https://apis.data.go.kr/B551011/KorService2
     api-key: ${TOUR_API_KEY}
+  kakao:
+    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${KAKAO_REST_API_KEY:dummy-key}
 
 cors:
   allowed-origins:
