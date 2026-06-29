@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import type { MouseEvent } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { Compass, Menu } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -19,12 +20,33 @@ const NAV = [
   { href: "/plan", label: "코스 추천받기" },
   { href: "/events", label: "행사 둘러보기" },
   { href: "/mypage", label: "마이페이지" },
-]
+] as const
 
 export function SiteHeader() {
   const pathname = usePathname()
+  const router = useRouter()
 
   const { isLoggedIn, isAuthLoading, isLogoutLoading, logout } = useAuth()
+
+  function handleProtectedNavigation(
+    event: MouseEvent<HTMLAnchorElement>,
+    destination: "/mypage" | "/plan",
+  ) {
+    if (isAuthLoading || isLoggedIn) {
+      return
+    }
+
+    event.preventDefault()
+
+    const featureName = destination === "/mypage" ? "마이페이지" : "코스 추천"
+    const shouldMoveToLogin = window.confirm(
+      `${featureName}은 로그인 후 이용할 수 있어요.\n로그인 페이지로 이동할까요?`,
+    )
+
+    if (shouldMoveToLogin) {
+      router.push("/login")
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
@@ -47,6 +69,11 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={
+                  item.href === "/mypage" || item.href === "/plan"
+                    ? (event) => handleProtectedNavigation(event, item.href)
+                    : undefined
+                }
                 className={cn(
                   "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   active
@@ -97,6 +124,7 @@ export function SiteHeader() {
 
           <Link
             href="/plan"
+            onClick={(event) => handleProtectedNavigation(event, "/plan")}
             className={cn(
               buttonVariants({ size: "sm" }),
               "hidden sm:inline-flex",
@@ -120,7 +148,16 @@ export function SiteHeader() {
               {NAV.map((item) => (
                 <DropdownMenuItem
                   key={item.href}
-                  render={<Link href={item.href} />}
+                  render={
+                    <Link
+                      href={item.href}
+                      onClick={
+                        item.href === "/mypage" || item.href === "/plan"
+                          ? (event) => handleProtectedNavigation(event, item.href)
+                          : undefined
+                      }
+                    />
+                  }
                 >
                   {item.label}
                 </DropdownMenuItem>

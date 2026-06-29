@@ -646,9 +646,7 @@ function RecommendContent() {
 
                             <span className="flex items-center gap-1.5">
                 <Clock className="size-4 text-primary"/>
-                                {course?.startDate && course?.endDate
-                                    ? `${course.startDate} ~ ${course.endDate}`
-                                    : formattedDate}
+                                {formattedDate}
               </span>
 
                             <span className="flex items-center gap-1.5">

@@ -1,4 +1,3 @@
-"use client"
 
 import { useEffect, useRef, useState } from "react"
 
@@ -7,11 +6,19 @@ export type NaverSelectedLocation = {
   address?: string
   latitude?: number
   longitude?: number
-  source: "naver"
+  source: "naver" | "district"
+}
+
+export type NaverDistrictLocation = {
+  name: string
+  address: string
+  latitude: number
+  longitude: number
 }
 
 type NaverLocationPickerProps = {
   initialKeyword?: string
+  selectedDistrictLocation?: NaverDistrictLocation | null
   onSelect: (location: NaverSelectedLocation) => void
 }
 
@@ -33,25 +40,6 @@ type PlaceSearchApiResponse = {
   data: PlaceSearchResult[]
 }
 
-declare global {
-  interface Window {
-    naver?: {
-      maps: {
-        LatLng: new (latitude: number, longitude: number) => NaverLatLng
-        Map: new (container: HTMLElement, options: NaverMapOptions) => NaverMap
-        Marker: new (options: NaverMarkerOptions) => NaverMarker
-        InfoWindow: new (options: NaverInfoWindowOptions) => NaverInfoWindow
-        Event: {
-          addListener: (
-            target: NaverMarker | NaverMap,
-            eventName: string,
-            listener: (event: NaverMapClickEvent) => void,
-          ) => void
-        }
-      }
-    }
-  }
-}
 
 type NaverLatLng = {
   lat: () => number
@@ -147,7 +135,11 @@ function loadNaverMapsSdk(clientId: string): Promise<void> {
   return naverMapsSdkPromise
 }
 
-export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLocationPickerProps) {
+export function NaverLocationPicker({
+  initialKeyword = "",
+  selectedDistrictLocation = null,
+  onSelect,
+}: NaverLocationPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<NaverMap | null>(null)
   const markerRef = useRef<NaverMarker | null>(null)
@@ -171,6 +163,63 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
       setSelectedLocationName(initialKeyword)
     }
   }, [initialKeyword])
+
+  useEffect(() => {
+    if (!selectedDistrictLocation || !isMapReady || !mapRef.current || !window.naver?.maps) {
+      return
+    }
+
+    selectDistrictLocation(selectedDistrictLocation)
+  }, [
+    isMapReady,
+    selectedDistrictLocation?.address,
+    selectedDistrictLocation?.latitude,
+    selectedDistrictLocation?.longitude,
+    selectedDistrictLocation?.name,
+  ])
+  function selectDistrictLocation(location: NaverDistrictLocation) {
+    const map = mapRef.current
+
+    if (!window.naver?.maps || !map) {
+      return
+    }
+
+    selectionVersionRef.current += 1
+    markerRef.current?.setMap(null)
+    infoWindowRef.current?.close()
+
+    const position = new window.naver.maps.LatLng(location.latitude, location.longitude)
+    const marker = new window.naver.maps.Marker({
+      map,
+      position,
+    })
+    const infoWindow = new window.naver.maps.InfoWindow({
+      content: `<div style="padding:6px 10px;font-size:13px;white-space:nowrap;">${location.name}</div>`,
+    })
+
+    markerRef.current = marker
+    infoWindowRef.current = infoWindow
+
+    map.setCenter(position)
+    infoWindow.open(map, marker)
+    setKeyword(location.name)
+    setSelectedLocationName(location.name)
+    setSelectedLocationAddress(location.address)
+    setResults([])
+    setErrorMessage(null)
+
+    window.naver.maps.Event.addListener(marker, "click", () => {
+      infoWindow.open(map, marker)
+    })
+
+    onSelect({
+      name: location.name,
+      address: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      source: "district",
+    })
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -214,7 +263,7 @@ export function NaverLocationPicker({ initialKeyword = "", onSelect }: NaverLoca
     setIsMapReady(true)
     setErrorMessage(null)
 
-    window.naver.maps.Event.addListener(map, "click", function (event) {
+    window.naver.maps.Event.addListener(map, "click", function (event: NaverMapClickEvent) {
       if (!event?.coord) {
         console.warn("네이버 지도 클릭 좌표를 가져오지 못했습니다.", event)
         return

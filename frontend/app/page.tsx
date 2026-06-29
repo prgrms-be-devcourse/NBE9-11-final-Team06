@@ -2,7 +2,9 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useState, type MouseEvent } from "react"
+import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
 import {
   ArrowRight,
   CalendarDays,
@@ -51,7 +53,7 @@ const FEATURES = [
   {
     icon: MapPin,
     title: "지도 동선 안내",
-    desc: "방문 순서와 이동 거리를 지도 경로로 한눈에 볼 수 있어요.",
+    desc: "추천 코스의 방문 순서를 지도에서 한눈에 확인할 수 있어요.",
   },
 ]
 
@@ -79,6 +81,24 @@ const CROWD_LEVEL_LABELS: Record<string, CrowdLevel> = {
 
 
 export default function HomePage() {
+  const router = useRouter()
+  const { isLoggedIn, isAuthLoading } = useAuth()
+
+  function handleRecommendationStart(event: MouseEvent<HTMLAnchorElement>) {
+    if (isAuthLoading || isLoggedIn) {
+      return
+    }
+
+    event.preventDefault()
+
+    const shouldMoveToLogin = window.confirm(
+      "코스 추천은 로그인 후 이용할 수 있어요.\n로그인 페이지로 이동할까요?"
+    )
+
+    if (shouldMoveToLogin) {
+      router.push("/login")
+    }
+  }
   const [topCrowdAreas, setTopCrowdAreas] = useState<CrowdApiResponse[]>([])
   const [isTopCrowdLoading, setIsTopCrowdLoading] = useState(true)
 
@@ -132,7 +152,7 @@ export default function HomePage() {
 
               <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
                 오늘 서울, 어디로 갈지{" "}
-                <span className="text-primary">3초 만에</span> 정해드려요
+                <span className="text-primary">손쉽게</span> 정해드려요
               </h1>
 
               <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
@@ -143,6 +163,7 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/plan"
+                  onClick={handleRecommendationStart}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                 >
                   코스 추천받기
@@ -157,17 +178,6 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="size-4 text-primary" />
-                  서울 실시간 혼잡도 TOP 10
-                </span>
-
-                <span className="flex items-center gap-1.5">
-                  <Activity className="size-4 text-primary" />
-                  실시간 혼잡도 연동
-                </span>
-              </div>
             </div>
 
             <div className="relative">
@@ -216,10 +226,9 @@ export default function HomePage() {
                   </div>
                 ))
               : topCrowdAreas.map((area, index) => (
-                  <Link
+                  <div
                     key={area.areaName}
-                    href="/plan"
-                    className="flex min-h-24 flex-col justify-between rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary"
+                    className="flex min-h-24 flex-col justify-between rounded-2xl border border-border bg-card p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-semibold leading-snug">{area.areaName}</span>
@@ -234,14 +243,14 @@ export default function HomePage() {
                       showRange
                       className="mt-3 w-fit px-1.5 py-0.5 text-[10px]"
                     />
-                  </Link>
+                  </div>
                 ))}
           </div>
         </section>
 
         {/* How it works */}
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="mb-10 text-center">
+          <div className="mb-10">
             <h2 className="text-balance text-3xl font-bold tracking-tight">
               3단계면 끝나는 코스 추천
             </h2>
@@ -280,7 +289,7 @@ export default function HomePage() {
             선택한 카테고리에 가산점을 부여해 코스를 구성해요.
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {CATEGORIES.map((category) => (
               <div
                 key={category.value}
@@ -328,6 +337,7 @@ export default function HomePage() {
 
             <Link
               href="/plan"
+              onClick={handleRecommendationStart}
               className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-secondary px-8 text-sm font-medium text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             >
               무료로 코스 추천받기

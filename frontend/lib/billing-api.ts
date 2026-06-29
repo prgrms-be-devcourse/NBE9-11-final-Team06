@@ -8,6 +8,10 @@ export interface BillingCardResponse {
   createdAt: string
 }
 
+export interface PaymentHistoryResponse {
+  [key: string]: any
+}
+
 export const billingApi = {
   // 등록된 결제 카드 목록 조회
   getBillingKeys: async (): Promise<ApiResponse<BillingCardResponse[]>> => {

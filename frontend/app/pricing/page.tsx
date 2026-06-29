@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { toast } from "sonner"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -74,7 +73,7 @@ export default function PricingPage() {
     }
 
     setActivePlan(plan)
-    setCurrentSlideIndex(0) 
+    setCurrentSlideIndex(0)
     setIsModalOpen(true)
   }
 
@@ -103,7 +102,7 @@ export default function PricingPage() {
     if (!confirmed) return
 
     setIsSubmitting(activePlan.id)
-    setIsModalOpen(false) 
+    setIsModalOpen(false)
 
     // 결제 직전 고유한 멱등키 UUID 생성
     const clientIdempotencyKey = `SUB_REQ_${crypto.randomUUID().replace(/-/g, "")}`
@@ -112,9 +111,9 @@ export default function PricingPage() {
       const response = await subscriptionApi.startSubscription({
         billingInfoId: targetCard.id,
         planId: activePlan.id,
-      }, 
+      },
       clientIdempotencyKey)
-    
+
 
       if (response.success) {
         toast.success(response.message ?? "정기 구독 멤버십 가입이 성공적으로 완료되었습니다!")
@@ -146,7 +145,7 @@ export default function PricingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader />
-      
+
       {/* 🌟 수정 포인트 1: 전체 패딩 상단 간격을 늘려 상단 바(Header)와 타이틀 텍스트 사이 규격 조정 */}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-24 text-center">
         <div className="mb-16">
@@ -161,8 +160,8 @@ export default function PricingPage() {
 
             return (
               /* 🌟 수정 포인트 3: 복잡한 내부 overflow 속성이 짤림을 만들지 못하도록 isolate와 overflow-visible을 명시적으로 부여 */
-              <Card 
-                key={plan.id} 
+              <Card
+                key={plan.id}
                 className={`relative flex flex-col justify-between border-border/60 text-left transition-all overflow-visible isolate ${
                   isCurrentPlan ? 'border-primary ring-2 ring-primary/20' : ''
                 }`}
@@ -173,7 +172,7 @@ export default function PricingPage() {
                     <Sparkles className="size-3" /> 인기 멤버십
                   </div>
                 )}
-                
+
                 <div>
                   <CardHeader className="pt-8"> {/* 패딩 상단 미세 조정 */}
                     <CardTitle className="text-xl">{plan.displayName}</CardTitle>
@@ -183,7 +182,7 @@ export default function PricingPage() {
                       <span className="text-sm font-normal text-muted-foreground">/ 월</span>
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent className="grid gap-3 text-sm text-muted-foreground pb-6">
                     <div className="flex items-center gap-2">
                       <Check className="size-4 text-primary" /> <span>인공지능 기반 맞춤 스케줄러 무제한</span>
@@ -200,7 +199,10 @@ export default function PricingPage() {
                 <div className="w-full">
                   <CardFooter className="pt-4 border-t border-border/40">
                     {!isLoggedIn ? (
-                      <Button render={<Link href="/login" />} className="w-full">
+                      <Button
+                        onClick={() => router.push("/login")}
+                        className="w-full"
+                      >
                         로그인 후 구독하기
                       </Button>
                     ) : isSubscribed ? (

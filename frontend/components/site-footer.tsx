@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { Compass } from "lucide-react"
 
 export function SiteFooter() {
@@ -15,16 +14,10 @@ export function SiteFooter() {
           날짜, 위치, 동행, 취향만 고르면 실시간 혼잡도까지 반영한 서울 하루 여행
           코스를 추천해 드려요.
         </p>
-        <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-          <Link href="/plan" className="hover:text-foreground">
-            코스 추천
-          </Link>
-          <Link href="/mypage" className="hover:text-foreground">
-            마이페이지
-          </Link>
-          <Link href="/admin" className="hover:text-foreground">
+        <nav className="flex flex-wrap text-sm text-muted-foreground">
+          <a href="/admin" className="hover:text-foreground">
             관리자
-          </Link>
+          </a>
         </nav>
       </div>
       <div className="border-t border-border/60 py-4">

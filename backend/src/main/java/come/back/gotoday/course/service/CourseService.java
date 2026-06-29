@@ -715,6 +715,14 @@ public class CourseService {
                 longitude
         );
 
+        log.info(
+                "주변 카페·식당 조회 완료: itemType={}, itemId={}, restaurantCount={}, cafeCount={}",
+                itemType,
+                itemId,
+                restaurantDocuments.size(),
+                cafeDocuments.size()
+        );
+
         List<PlacePreviewResponse> restaurants = placeService
                 .getOrCreatePlaces(restaurantDocuments, restaurantCategory)
                 .stream()
@@ -795,9 +803,18 @@ public class CourseService {
             Double latitude,
             Double longitude
     ) {
-        return getDocumentsOrEmpty(response)
+        List<KakaoPlaceDocument> sortedDocuments = getDocumentsOrEmpty(response)
                 .stream()
                 .filter(document -> document.y() != null && document.x() != null)
+                .sorted(Comparator.comparingDouble(document -> distance(
+                        latitude,
+                        longitude,
+                        Double.parseDouble(document.y()),
+                        Double.parseDouble(document.x())
+                )))
+                .toList();
+
+        List<KakaoPlaceDocument> nearbyDocuments = sortedDocuments.stream()
                 .filter(document -> distance(
                         latitude,
                         longitude,
@@ -806,6 +823,24 @@ public class CourseService {
                 ) <= NEARBY_PLACE_RADIUS_METER)
                 .limit(5)
                 .toList();
+
+        if (nearbyDocuments.size() == 5) {
+            return nearbyDocuments;
+        }
+
+        List<KakaoPlaceDocument> result = new ArrayList<>(nearbyDocuments);
+
+        sortedDocuments.stream()
+                .filter(document -> distance(
+                        latitude,
+                        longitude,
+                        Double.parseDouble(document.y()),
+                        Double.parseDouble(document.x())
+                ) > NEARBY_PLACE_RADIUS_METER)
+                .limit(5 - result.size())
+                .forEach(result::add);
+
+        return result;
     }
 
     private PlacePreviewResponse toPlacePreviewResponse(Place place) {
