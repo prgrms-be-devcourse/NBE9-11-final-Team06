@@ -704,35 +704,28 @@ public class CourseService {
                 restaurantType
         );
 
-        List<PlacePreviewResponse> restaurants =
-                getDocumentsOrEmpty(restaurantResponse)
-                        .stream()
-                        .filter(doc -> doc.y() != null && doc.x() != null)
-                        .filter(doc -> distance(
-                                latitude,
-                                longitude,
-                                Double.parseDouble(doc.y()),
-                                Double.parseDouble(doc.x())
-                        ) <= NEARBY_PLACE_RADIUS_METER)
-                        .limit(5)
-                        .map(doc -> placeService.getOrCreatePlace(doc, restaurantCategory))
-                        .map(this::toPlacePreviewResponse)
-                        .toList();
+        List<KakaoPlaceDocument> restaurantDocuments = findNearbyDocuments(
+                restaurantResponse,
+                latitude,
+                longitude
+        );
+        List<KakaoPlaceDocument> cafeDocuments = findNearbyDocuments(
+                cafeResponse,
+                latitude,
+                longitude
+        );
 
-        List<PlacePreviewResponse> cafes =
-                getDocumentsOrEmpty(cafeResponse)
-                        .stream()
-                        .filter(doc -> doc.y() != null && doc.x() != null)
-                        .filter(doc -> distance(
-                                latitude,
-                                longitude,
-                                Double.parseDouble(doc.y()),
-                                Double.parseDouble(doc.x())
-                        ) <= NEARBY_PLACE_RADIUS_METER)
-                        .limit(5)
-                        .map(doc -> placeService.getOrCreatePlace(doc, cafeCategory))
-                        .map(this::toPlacePreviewResponse)
-                        .toList();
+        List<PlacePreviewResponse> restaurants = placeService
+                .getOrCreatePlaces(restaurantDocuments, restaurantCategory)
+                .stream()
+                .map(this::toPlacePreviewResponse)
+                .toList();
+
+        List<PlacePreviewResponse> cafes = placeService
+                .getOrCreatePlaces(cafeDocuments, cafeCategory)
+                .stream()
+                .map(this::toPlacePreviewResponse)
+                .toList();
 
         return new EventNearbyPlaceResponse(
                 itemType.name(),
@@ -795,6 +788,24 @@ public class CourseService {
         }
 
         return response.documents();
+    }
+
+    private List<KakaoPlaceDocument> findNearbyDocuments(
+            KakaoPlaceResponse response,
+            Double latitude,
+            Double longitude
+    ) {
+        return getDocumentsOrEmpty(response)
+                .stream()
+                .filter(document -> document.y() != null && document.x() != null)
+                .filter(document -> distance(
+                        latitude,
+                        longitude,
+                        Double.parseDouble(document.y()),
+                        Double.parseDouble(document.x())
+                ) <= NEARBY_PLACE_RADIUS_METER)
+                .limit(5)
+                .toList();
     }
 
     private PlacePreviewResponse toPlacePreviewResponse(Place place) {
