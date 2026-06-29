@@ -480,8 +480,8 @@ export function PlanWizard() {
                         <div className="flex flex-col gap-4">
                             <StepHeader
                                 icon={MapPin}
-                                title="어디로 가볼까요?"
-                                desc="장소명이나 주소를 검색하거나, 기본 지역을 선택해 주세요."
+                                title="어디에서 출발하시나요?"
+                                desc="출발할 장소를 검색하거나 지도에서 직접 선택해 주세요."
                             />
 
                             <NaverLocationPicker
