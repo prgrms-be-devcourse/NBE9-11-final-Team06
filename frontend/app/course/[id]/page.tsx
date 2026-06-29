@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
   CalendarDays,
@@ -246,6 +245,7 @@ function getPlaceKey(place: CoursePlace, index: number) {
 
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
+  const router = useRouter()
   const courseId = params.id
   const numericCourseId = Number(courseId)
 
@@ -264,18 +264,18 @@ export default function CourseDetailPage() {
   async function fetchCourse() {
     setIsLoading(true)
     setErrorMessage(null)
-  
+
     const savedCourse = getSavedRecommendedCourse(courseId)
-  
+
     try {
       const accessToken = getAccessToken()
-  
+
       const headers: HeadersInit = {}
-  
+
       if (accessToken) {
         headers.Authorization = "Bearer " + accessToken
       }
-  
+
       const response = await fetch(
         API_BASE_URL + "/api/courses/" + courseId,
         {
@@ -284,39 +284,39 @@ export default function CourseDetailPage() {
           headers,
         },
       )
-  
+
       const result = await response.json().catch(() => null)
-  
+
       if (!response.ok) {
         if (!savedCourse) {
           setErrorMessage("코스 상세 정보를 불러오지 못했습니다.")
         }
         return
       }
-  
+
       const fetchedCourse = extractCourse(result)
-  
+
       if (!fetchedCourse) return
-  
+
       const savedPlaces = getCoursePlaces(savedCourse)
       const fetchedPlaces = getCoursePlaces(fetchedCourse)
-  
+
       const placesWithRecommendationReasons = fetchedPlaces.map((place) => {
         const savedPlace = savedPlaces.find((savedPlace) => {
           if (place.itemType !== savedPlace.itemType) return false
-  
+
           if (place.itemType === "EVENT")
             return place.eventId === savedPlace.eventId
-  
+
           if (place.itemType === "TOUR")
             return place.tourId === savedPlace.tourId
-  
+
           if (place.itemType === "PLACE")
             return place.placeId === savedPlace.placeId
-  
+
           return false
         })
-  
+
         return {
           ...place,
           recommendationReason:
@@ -326,7 +326,7 @@ export default function CourseDetailPage() {
             savedPlace?.reason,
         }
       })
-  
+
       setCourse({
         ...savedCourse,
         ...fetchedCourse,
@@ -353,11 +353,11 @@ export default function CourseDetailPage() {
         credentials: "include",
       },
     )
-  
+
     if (!res.ok) return
-  
+
     const json = await res.json()
-  
+
     setReviews(json.data)
   }
 
@@ -368,11 +368,11 @@ export default function CourseDetailPage() {
         credentials: "include",
       },
     )
-  
+
     if (!res.ok) return
-  
+
     const json = await res.json()
-  
+
     setMyReview(json.data)
     setRating(json.data.rating)
     setContent(json.data.content)
@@ -381,9 +381,9 @@ export default function CourseDetailPage() {
     const url = myReview
       ? `${API_BASE_URL}/api/courses/${courseId}/reviews/me`
       : `${API_BASE_URL}/api/courses/${courseId}/reviews`
-  
+
     const method = myReview ? "PATCH" : "POST"
-  
+
     const res = await fetch(url, {
       method,
       credentials: "include",
@@ -395,13 +395,13 @@ export default function CourseDetailPage() {
         content,
       }),
     })
-  
+
     if (!res.ok) return
-  
+
     await fetchCourse()
     await fetchReviews()
     await fetchMyReview()
-    
+
   }
   async function deleteReview() {
     const res = await fetch(
@@ -411,13 +411,13 @@ export default function CourseDetailPage() {
         credentials: "include",
       },
     )
-  
+
     if (!res.ok) return
-  
+
     setMyReview(null)
     setRating(5)
     setContent("")
-  
+
     await fetchCourse()
     await fetchReviews()
     await fetchMyReview()
@@ -425,7 +425,7 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     if (!courseId) return
-  
+
     fetchCourse().then(() => {
       fetchReviews()
       fetchMyReview()
@@ -478,11 +478,15 @@ export default function CourseDetailPage() {
       <SiteHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        <Button asChild variant="ghost" size="sm" className="mb-6 gap-2">
-          <Link href="/recommend">
-            <ArrowLeft className="size-4" />
-            추천 결과로 돌아가기
-          </Link>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mb-6 gap-2"
+          onClick={() => router.push("/course/preview")}
+        >
+          <ArrowLeft className="size-4" />
+          식당·카페 다시 선택
         </Button>
 
         {isLoading && !course && (

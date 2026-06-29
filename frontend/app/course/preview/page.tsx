@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   MapPin,
@@ -45,6 +46,13 @@ type CoursePreviewResponse = {
   events: NearbyPlaceResponse[]
 }
 
+type CoursePreviewCache = {
+  request: any
+  course: CoursePreviewResponse
+  selectedRestaurantId: number | null
+  selectedCafeId: number | null
+}
+
 type SelectedRecommendationPlace = {
   itemType: "EVENT" | "TOUR"
   eventId?: number | null
@@ -64,6 +72,20 @@ type SelectedRecommendationItems = {
   companionType?: string | null
   startLatitude?: number | null
   startLongitude?: number | null
+}
+
+type MapPoint = {
+  id: string | number
+  title: string
+  latitude: number
+  longitude: number
+  order: number
+  type: "event" | "tour" | "restaurant" | "cafe"
+}
+
+type RawMapPoint = Omit<MapPoint, "latitude" | "longitude"> & {
+  latitude: number | null
+  longitude: number | null
 }
 
 function normalizeAccessToken(value: string | null | undefined) {
@@ -108,6 +130,26 @@ function extractCourse(result: any): CoursePreviewResponse | null {
 
 function getPlaceUrl(place: PlaceItem) {
   return place.url ?? place.placeUrl ?? null
+}
+
+function readCoursePreviewCache(): CoursePreviewCache | null {
+  if (typeof window === "undefined") return null
+
+  const saved = sessionStorage.getItem("coursePreviewCache")
+  if (!saved) return null
+
+  try {
+    return JSON.parse(saved) as CoursePreviewCache
+  } catch {
+    sessionStorage.removeItem("coursePreviewCache")
+    return null
+  }
+}
+
+function saveCoursePreviewCache(cache: CoursePreviewCache) {
+  if (typeof window === "undefined") return
+
+  sessionStorage.setItem("coursePreviewCache", JSON.stringify(cache))
 }
 
 function readSelectedRecommendationItems(): SelectedRecommendationItems | null {
@@ -166,12 +208,22 @@ function readSelectedRecommendationItems(): SelectedRecommendationItems | null {
 
 
 export default function CoursePreviewPage() {
-  const [course, setCourse] = useState<CoursePreviewResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const [initialPreview] = useState<CoursePreviewCache | null>(() =>
+    readCoursePreviewCache(),
+  )
+  const [course, setCourse] = useState<CoursePreviewResponse | null>(
+    initialPreview?.course ?? null,
+  )
+  const [isLoading, setIsLoading] = useState(!initialPreview)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
-  const [selectedCafeId, setSelectedCafeId] = useState<number | null>(null)
-  const [request, setRequest] = useState<any>(null)
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(
+    initialPreview?.selectedRestaurantId ?? null,
+  )
+  const [selectedCafeId, setSelectedCafeId] = useState<number | null>(
+    initialPreview?.selectedCafeId ?? null,
+  )
+  const [request, setRequest] = useState<any>(initialPreview?.request ?? null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
   const [selectedTourIds, setSelectedTourIds] = useState<number[]>([])
@@ -194,6 +246,27 @@ export default function CoursePreviewPage() {
     setSelectedItems(savedItems)
     setSelectedEventIds(savedItems.eventIds ?? [])
     setSelectedTourIds(savedItems.tourIds ?? [])
+  }, [])
+
+  useEffect(() => {
+    const restoreCachedPreview = () => {
+      const cachedPreview = readCoursePreviewCache()
+      if (!cachedPreview) return
+
+      setRequest(cachedPreview.request)
+      setCourse(cachedPreview.course)
+      setSelectedRestaurantId(cachedPreview.selectedRestaurantId)
+      setSelectedCafeId(cachedPreview.selectedCafeId)
+      setErrorMessage(null)
+      setIsLoading(false)
+    }
+
+    restoreCachedPreview()
+    window.addEventListener("pageshow", restoreCachedPreview)
+
+    return () => {
+      window.removeEventListener("pageshow", restoreCachedPreview)
+    }
   }, [])
 
   useEffect(() => {
@@ -252,6 +325,20 @@ export default function CoursePreviewPage() {
 
         setRequest(requestBody)
 
+        const cachedPreview = readCoursePreviewCache()
+
+        if (
+          cachedPreview &&
+          JSON.stringify(cachedPreview.request) === JSON.stringify(requestBody)
+        ) {
+          if (isMounted) {
+            setCourse(cachedPreview.course)
+            setSelectedRestaurantId(cachedPreview.selectedRestaurantId)
+            setSelectedCafeId(cachedPreview.selectedCafeId)
+          }
+          return
+        }
+
         const accessToken = getAccessToken()
 
         const headers: HeadersInit = {
@@ -290,6 +377,15 @@ export default function CoursePreviewPage() {
         console.log("preview fetched:", fetched)
         console.log("preview nearby places:", fetched?.events)
 
+        if (fetched) {
+          saveCoursePreviewCache({
+            request: requestBody,
+            course: fetched,
+            selectedRestaurantId: null,
+            selectedCafeId: null,
+          })
+        }
+
         if (isMounted) {
           setCourse(fetched)
         }
@@ -313,6 +409,17 @@ export default function CoursePreviewPage() {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!course || !request) return
+
+    saveCoursePreviewCache({
+      request,
+      course,
+      selectedRestaurantId,
+      selectedCafeId,
+    })
+  }, [course, request, selectedRestaurantId, selectedCafeId])
 
   useEffect(() => {
     const scriptId = "naver-map-script"
@@ -355,34 +462,37 @@ export default function CoursePreviewPage() {
     ).values(),
   )
 
-  const points = [
-    ...((course?.events ?? []).map((place, index) => ({
+  const rawPoints: RawMapPoint[] = [
+    ...(course?.events ?? []).map((place, index) => ({
       id: `${place.itemType}-${place.itemId}`,
       title: place.title,
       latitude: place.latitude,
       longitude: place.longitude,
       order: index,
-      type: place.itemType === "TOUR" ? "tour" : "event",
-    })) ?? []),
-
+      type: place.itemType === "TOUR" ? ("tour" as const) : ("event" as const),
+    })),
     ...restaurants.map((restaurant, index) => ({
       id: restaurant.id,
       title: restaurant.name,
       latitude: restaurant.latitude,
       longitude: restaurant.longitude,
       order: index + 1,
-      type: "restaurant",
+      type: "restaurant" as const,
     })),
-
     ...cafes.map((cafe, index) => ({
       id: cafe.id,
       title: cafe.name,
       latitude: cafe.latitude,
       longitude: cafe.longitude,
       order: restaurants.length + index + 1,
-      type: "cafe",
+      type: "cafe" as const,
     })),
-  ].filter((point) => point.latitude !== null && point.longitude !== null)
+  ]
+
+  const points: MapPoint[] = rawPoints.filter(
+    (point): point is MapPoint =>
+      point.latitude !== null && point.longitude !== null,
+  )
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -418,7 +528,7 @@ export default function CoursePreviewPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
                 <Route className="size-3.5" />
-                맛집 {restaurants.length}개 · 카페 {cafes.length}개
+                식당 {restaurants.length}개 · 카페 {cafes.length}개
               </Badge>
 
               <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-sm">
@@ -450,11 +560,11 @@ export default function CoursePreviewPage() {
                   selectedCafeId={selectedCafeId}
                   onSelect={(point) => {
                     if (point.type === "restaurant") {
-                      setSelectedRestaurantId(point.id)
+                      setSelectedRestaurantId(Number(point.id))
                     }
 
                     if (point.type === "cafe") {
-                      setSelectedCafeId(point.id)
+                      setSelectedCafeId(Number(point.id))
                     }
                   }}
                 />
@@ -466,11 +576,11 @@ export default function CoursePreviewPage() {
             </div>
 
             <p className="mt-3 text-muted-foreground">
-              선택한 행사·관광지 주변의 맛집과 카페를 골라 최종 코스를 완성하세요.
+              선택한 행사·관광지 주변의 식당과 카페를 골라 최종 코스를 완성하세요.
             </p>
 
             <section className="mt-10">
-              <h2 className="text-2xl font-bold">🍽️ 추천 맛집</h2>
+              <h2 className="text-2xl font-bold">🍽️ 추천 식당</h2>
 
               <div className="mt-5 space-y-4">
                 {restaurants.map((place) => {
@@ -680,9 +790,8 @@ export default function CoursePreviewPage() {
                       ],
                     }),
                   )
-                  sessionStorage.removeItem("selectedRecommendationItems")
 
-                  window.location.href = `/course/${courseId}`
+                  router.push(`/course/${courseId}`)
                 } catch (error) {
                   console.error(error)
                   alert("코스 생성 중 에러")

@@ -117,6 +117,8 @@ type PlaceForm = {
 
 const PLACE_PAGE_SIZE = 20
 const EVENT_PAGE_SIZE = 20
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"
 
 const CROWD_API_AREA_NAMES: Record<string, string> = {
   성수: "성수카페거리",
@@ -198,25 +200,47 @@ const formatMeasuredAt = (measuredAt: string | null) => {
   })
 }
 
+function getAccessToken() {
+  const storages = [localStorage, sessionStorage]
+  const tokenKeys = ["accessToken", "access_token", "token", "jwt"]
+
+  for (const storage of storages) {
+    for (const tokenKey of tokenKeys) {
+      const value = storage.getItem(tokenKey)?.trim().replace(/^Bearer\s+/i, "")
+
+      if (value && value !== "undefined" && value !== "null") {
+        return value
+      }
+    }
+  }
+
+  return null
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
+  const accessToken = getAccessToken()
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(options.headers ?? {}),
     },
   })
 
   if (!res.ok) {
     let message = `API 요청 실패: ${res.status}`
+    const errorText = await res.text()
 
-    try {
-      const errorBody = await res.json()
-      message = errorBody.message ?? errorBody.error ?? message
-    } catch {
-      const errorText = await res.text()
-      if (errorText) {
+    if (errorText) {
+      try {
+        const errorBody = JSON.parse(errorText) as {
+          message?: string
+          error?: string
+        }
+        message = errorBody.message ?? errorBody.error ?? errorText
+      } catch {
         message = errorText
       }
     }
@@ -226,6 +250,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (res.status === 204) {
     return null as T
+  }
+
+  const contentType = res.headers.get("content-type")
+
+  if (!contentType?.includes("application/json")) {
+    throw new Error("백엔드 API가 JSON이 아닌 응답을 반환했습니다.")
   }
 
   return res.json()
@@ -276,6 +306,11 @@ export default function AdminPage() {
   }, [])
 
   async function checkAdminAuth() {
+    if (!getAccessToken()) {
+      router.replace("/login")
+      return
+    }
+
     try {
       const response = await apiFetch<ApiResponse<MemberInfo>>("/api/members/me")
       const member = response.data
@@ -289,7 +324,7 @@ export default function AdminPage() {
       setCheckingAuth(false)
       await Promise.all([loadPlaces(0), loadMembers(), loadEvents(0), loadAreaCrowds()])
     } catch (error) {
-      console.error(error)
+      console.warn("관리자 권한 확인에 실패했습니다.", error)
       router.replace("/login")
     }
   }

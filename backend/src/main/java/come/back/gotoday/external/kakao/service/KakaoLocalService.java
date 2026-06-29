@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -89,26 +90,42 @@ public class KakaoLocalService {
             double longitude,
             RestaurantType restaurantType
     ) {
+        String keyword = restaurantType.getKeyword();
+        String requestUri = UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/v2/local/search/keyword.json")
+                .queryParam("query", keyword)
+                .queryParam("x", longitude)
+                .queryParam("y", latitude)
+                .queryParam("radius", 2000)
+                .queryParam("sort", "distance")
+                .build()
+                .toUriString();
         try {
             return restClient.get()
-                    .uri(UriComponentsBuilder.fromUriString(baseUrl)
-                            .path("/v2/local/search/keyword.json")
-                            .queryParam("query", restaurantType.getKeyword())
-                            .queryParam("x", longitude)
-                            .queryParam("y", latitude)
-                            .queryParam("radius", 2000)
-                            .queryParam("sort", "distance")
-                            .build()
-                            .toUri())
+                    .uri(requestUri)
                     .header("Authorization", "KakaoAK " + apiKey)
                     .retrieve()
                     .body(KakaoPlaceResponse.class);
-        } catch (RestClientException exception) {
+        } catch (RestClientResponseException exception) {
             log.warn(
-                    "Kakao Local 식당 검색 호출 실패 또는 timeout 발생: restaurantType={}, latitude={}, longitude={}, exceptionType={}, message={}",
-                    restaurantType,
+                    "Kakao Local 식당 검색 HTTP 오류: status={}, responseBody={}, keyword={}, latitude={}, longitude={}, requestUri={}",
+                    exception.getStatusCode().value(),
+                    exception.getResponseBodyAsString(),
+                    keyword,
                     latitude,
                     longitude,
+                    requestUri,
+                    exception
+            );
+            throw exception;
+        } catch (RestClientException exception) {
+            log.warn(
+                    "Kakao Local 식당 검색 호출 실패 또는 timeout 발생: restaurantType={}, keyword={}, latitude={}, longitude={}, requestUri={}, exceptionType={}, message={}",
+                    restaurantType,
+                    keyword,
+                    latitude,
+                    longitude,
+                    requestUri,
                     exception.getClass().getSimpleName(),
                     exception.getMessage(),
                     exception

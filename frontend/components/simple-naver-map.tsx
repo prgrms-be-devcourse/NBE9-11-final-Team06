@@ -1,13 +1,12 @@
-"use client"
-
 import { useEffect, useRef } from "react"
 
 type Point = {
-  id: number
+  id: string | number
   title: string
   latitude: number
   longitude: number
-  type: "event" | "restaurant" | "cafe"
+  order: number
+  type: "event" | "tour" | "restaurant" | "cafe"
 }
 
 declare global {
@@ -26,7 +25,7 @@ export function SimpleNaverMap({
   selectedRestaurantId?: number | null
   selectedCafeId?: number | null
   onSelect?: (p: Point) => void
-}) 
+})
 
 {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -70,19 +69,16 @@ export function SimpleNaverMap({
       const isSelected =
       (p.type === "restaurant" && p.id === selectedRestaurantId) ||
       (p.type === "cafe" && p.id === selectedCafeId)
-    
+
 
       let icon = "📍"
 
       if (p.type === "restaurant") icon = "🍽️"
       if (p.type === "cafe") icon = "☕"
 
-      const size = isSelected ? 40 : 34 
+      const size = isSelected ? 40 : 34
       const fontSize = isSelected ? 24 : 20
-      
-      
-      
-      let color = "#2563eb"
+
 
       let bgColor = "white"
       let borderColor = "#000"
@@ -93,7 +89,7 @@ export function SimpleNaverMap({
       // 기본 타입 색
       if (p.type === "restaurant") borderColor = "#dc2626" // 빨강
       if (p.type === "cafe") borderColor = "#16a34a"       // 초록
-      
+
       // 🔥 선택된 경우 override
       if (isSelected) {
         if (p.type === "restaurant") {
@@ -102,7 +98,7 @@ export function SimpleNaverMap({
           textColor = "white"
           shadow = "0 0 0 4px rgba(220, 38, 38, 0.35)"
         }
-      
+
         if (p.type === "cafe") {
           bgColor = "#16a34a" // 초록 배경
           borderColor = "white"
@@ -111,26 +107,29 @@ export function SimpleNaverMap({
         }
       }
 
+      const markerStyle = [
+        `width:${size}px`,
+        `height:${size}px`,
+        "display:flex",
+        "align-items:center",
+        "justify-content:center",
+        `font-size:${fontSize}px`,
+        `background:${bgColor}`,
+        `color:${textColor}`,
+        "border-radius:50%",
+        "border:2px solid",
+        `border-color:${borderColor}`,
+        `box-shadow:${shadow}`,
+        "transition:all 0.2s ease",
+      ].join(";")
+
       const marker = new naver.maps.Marker({
       position,
       map,
       title: p.title,
       icon: {
         content: `
-        <div style="
-          width:${size}px;
-          height:${size}px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          font-size:${fontSize}px;
-          background:${bgColor};
-          color:${textColor};
-          border-radius:50%;
-          border:2px solid ${borderColor};
-          box-shadow:${shadow};
-          transition: all 0.2s ease;
-        ">
+        <div style="${markerStyle}">
           ${icon}
         </div>
       `,
@@ -152,5 +151,5 @@ export function SimpleNaverMap({
     map.fitBounds(bounds)
   }, [points, selectedRestaurantId, selectedCafeId])
 
-  return <div ref={mapRef} className="w-full h-[400px] rounded-lg" />
+  return <div ref={mapRef} className="h-100 w-full rounded-lg" />
 }

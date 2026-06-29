@@ -22,17 +22,56 @@ import {
     type Companion,
 } from "@/lib/data"
 import { SiteHeader } from "@/components/site-header"
-import { NaverLocationPicker } from "@/components/naver-location-picker"
+import {
+    NaverLocationPicker,
+    type NaverDistrictLocation,
+} from "@/components/naver-location-picker"
 
 const STEPS = ["날짜", "위치", "동행", "음식", "취향"]
+
 const MAX_CATEGORIES = 5
+
+type SeoulDistrict = {
+    name: string
+    address: string
+    latitude: number
+    longitude: number
+}
+
+const SEOUL_DISTRICTS: SeoulDistrict[] = [
+    { name: "강남구", address: "서울특별시 강남구", latitude: 37.5172, longitude: 127.0473 },
+    { name: "강동구", address: "서울특별시 강동구", latitude: 37.5301, longitude: 127.1238 },
+    { name: "강북구", address: "서울특별시 강북구", latitude: 37.6396, longitude: 127.0257 },
+    { name: "강서구", address: "서울특별시 강서구", latitude: 37.5509, longitude: 126.8495 },
+    { name: "관악구", address: "서울특별시 관악구", latitude: 37.4784, longitude: 126.9516 },
+    { name: "광진구", address: "서울특별시 광진구", latitude: 37.5385, longitude: 127.0823 },
+    { name: "구로구", address: "서울특별시 구로구", latitude: 37.4954, longitude: 126.8874 },
+    { name: "금천구", address: "서울특별시 금천구", latitude: 37.4519, longitude: 126.9020 },
+    { name: "노원구", address: "서울특별시 노원구", latitude: 37.6542, longitude: 127.0568 },
+    { name: "도봉구", address: "서울특별시 도봉구", latitude: 37.6688, longitude: 127.0471 },
+    { name: "동대문구", address: "서울특별시 동대문구", latitude: 37.5744, longitude: 127.0396 },
+    { name: "동작구", address: "서울특별시 동작구", latitude: 37.5124, longitude: 126.9393 },
+    { name: "마포구", address: "서울특별시 마포구", latitude: 37.5663, longitude: 126.9019 },
+    { name: "서대문구", address: "서울특별시 서대문구", latitude: 37.5791, longitude: 126.9368 },
+    { name: "서초구", address: "서울특별시 서초구", latitude: 37.4837, longitude: 127.0324 },
+    { name: "성동구", address: "서울특별시 성동구", latitude: 37.5635, longitude: 127.0369 },
+    { name: "성북구", address: "서울특별시 성북구", latitude: 37.5894, longitude: 127.0167 },
+    { name: "송파구", address: "서울특별시 송파구", latitude: 37.5145, longitude: 127.1066 },
+    { name: "양천구", address: "서울특별시 양천구", latitude: 37.5170, longitude: 126.8664 },
+    { name: "영등포구", address: "서울특별시 영등포구", latitude: 37.5264, longitude: 126.8962 },
+    { name: "용산구", address: "서울특별시 용산구", latitude: 37.5326, longitude: 126.9906 },
+    { name: "은평구", address: "서울특별시 은평구", latitude: 37.6027, longitude: 126.9291 },
+    { name: "종로구", address: "서울특별시 종로구", latitude: 37.5730, longitude: 126.9794 },
+    { name: "중구", address: "서울특별시 중구", latitude: 37.5640, longitude: 126.9979 },
+    { name: "중랑구", address: "서울특별시 중랑구", latitude: 37.6063, longitude: 127.0927 },
+]
 
 type SelectedLocation = {
     name: string
     address?: string
     latitude?: number
     longitude?: number
-    source: "preset" | "naver"
+    source: "preset" | "naver" | "district"
 }
 
 type CategoryOption = (typeof CATEGORIES)[number]
@@ -44,6 +83,8 @@ export function PlanWizard() {
     const [area, setArea] = useState<string | null>(null)
     const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null)
     const [locationKeyword, setLocationKeyword] = useState("")
+    const [selectedDistrictName, setSelectedDistrictName] = useState("")
+    const [selectedDistrictLocation, setSelectedDistrictLocation] = useState<NaverDistrictLocation | null>(null)
     const [companion, setCompanion] = useState<Companion | null>(null)
     const [categories, setCategories] = useState<CategoryOption[]>([])
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -268,7 +309,7 @@ export function PlanWizard() {
 
     async function submit() {
         if (!date || !selectedLocation) return
-        
+
 
         setIsSubmitting(true)
         setSubmitError(null)
@@ -481,13 +522,65 @@ export function PlanWizard() {
                             <StepHeader
                                 icon={MapPin}
                                 title="어디에서 출발하시나요?"
-                                desc="출발할 장소를 검색하거나 지도에서 직접 선택해 주세요."
+                                desc="서울시 자치구를 선택하거나, 출발할 장소를 검색하거나 지도에서 직접 선택해 주세요."
                             />
+
+                            <div className="rounded-2xl border bg-secondary/20 p-4">
+                                <label
+                                    htmlFor="seoul-district"
+                                    className="text-sm font-semibold text-foreground"
+                                >
+                                    서울시 자치구에서 빠르게 선택
+                                </label>
+                                <select
+                                    id="seoul-district"
+                                    value={selectedDistrictName}
+                                    onChange={(event) => {
+                                        const district = SEOUL_DISTRICTS.find(
+                                            (item) => item.name === event.target.value
+                                        )
+
+                                        setSelectedDistrictName(event.target.value)
+
+                                        if (!district) {
+                                            setSelectedDistrictLocation(null)
+                                            return
+                                        }
+
+                                        setSelectedDistrictLocation(district)
+                                        setArea(district.name)
+                                        setLocationKeyword(district.name)
+                                        setSelectedLocation({
+                                            name: district.name,
+                                            address: district.address,
+                                            latitude: district.latitude,
+                                            longitude: district.longitude,
+                                            source: "district",
+                                        })
+                                    }}
+                                    className="mt-2 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <option value="">자치구를 선택해주세요</option>
+                                    {SEOUL_DISTRICTS.map((district) => (
+                                        <option key={district.name} value={district.name}>
+                                            {district.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
                             <NaverLocationPicker
                                 initialKeyword={locationKeyword}
+                                selectedDistrictLocation={selectedDistrictLocation}
                                 onSelect={(location) => {
-                                    setArea(null)
+                                    if (location.source === "district") {
+                                        setArea(location.name)
+                                    } else {
+                                        setArea(null)
+                                        setSelectedDistrictName("")
+                                        setSelectedDistrictLocation(null)
+                                    }
+
                                     setLocationKeyword(location.name)
                                     setSelectedLocation(location)
                                 }}
@@ -506,9 +599,11 @@ export function PlanWizard() {
                                             <p className="font-semibold">{selectedLocation.name}</p>
 
                                             <p className="text-sm text-muted-foreground">
-                                                {selectedLocation.source === "preset"
-                                                    ? "기본 지역 선택"
-                                                    : "네이버 지도 선택"}
+                                                {selectedLocation.source === "district"
+                                                    ? "서울시 자치구 선택"
+                                                    : selectedLocation.source === "preset"
+                                                        ? "기본 지역 선택"
+                                                        : "네이버 지도 선택"}
                                             </p>
 
                                             {selectedLocation.address && (
@@ -601,7 +696,9 @@ export function PlanWizard() {
                                 title="어떤 하루를 보내고 싶으세요?"
                                 desc={`원하는 분위기를 골라주세요. (최대 ${MAX_CATEGORIES}개)`}
                             />
-
+                            <p className="rounded-xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
+                                선택하지 않으면 저장된 선호 카테고리를 반영해요. 저장된 선호 카테고리도 없으면 취향 조건 없이 코스를 추천해요.
+                            </p>
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 {CATEGORIES.map((category) => {
                                     const active = categories.some(
