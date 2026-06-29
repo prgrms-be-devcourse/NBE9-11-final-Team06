@@ -46,11 +46,18 @@ public class WeatherForecastService {
             LocalTime.of(23, 0)
     );
     private static final int FORECAST_PUBLISH_DELAY_MINUTES = 10;
+    private static final String KMA_API_FAILURE_CACHE_KEY = "kma-api-unavailable";
+    private static final Duration KMA_API_FAILURE_CACHE_DURATION = Duration.ofSeconds(30);
 
     private final KmaWeatherClient kmaWeatherClient;
     private final Cache<ForecastCacheKey, Optional<WeatherForecast>> forecastCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofHours(4))
             .maximumSize(10_000)
+            .build();
+
+    private final Cache<String, Boolean> kmaApiFailureCache = Caffeine.newBuilder()
+            .expireAfterWrite(KMA_API_FAILURE_CACHE_DURATION)
+            .maximumSize(1)
             .build();
 
     /**
@@ -66,6 +73,16 @@ public class WeatherForecastService {
     ) {
         if (!isWithinShortForecastRange(targetDate)) {
             log.info("단기예보 제공 범위를 벗어난 날짜입니다. targetDate={}", targetDate);
+            return Optional.empty();
+        }
+
+        if (kmaApiFailureCache.getIfPresent(KMA_API_FAILURE_CACHE_KEY) != null) {
+            log.warn(
+                    "기상청 단기예보 API 장애 fallback 캐시 사용: targetDate={}, latitude={}, longitude={}",
+                    targetDate,
+                    latitude,
+                    longitude
+            );
             return Optional.empty();
         }
 
@@ -90,9 +107,18 @@ public class WeatherForecastService {
             return cachedForecast;
         }
 
-        Optional<WeatherForecast> requestedForecast =
+        WeatherForecastRequestResult requestResult =
                 requestRepresentativeForecast(targetDate, gridCoordinate, baseDateTime);
 
+        if (requestResult.apiUnavailable()) {
+            kmaApiFailureCache.put(KMA_API_FAILURE_CACHE_KEY, Boolean.TRUE);
+            log.warn(
+                    "기상청 단기예보 API 장애를 감지하여 {}초 동안 추가 외부 호출을 생략합니다.",
+                    KMA_API_FAILURE_CACHE_DURATION.toSeconds()
+            );
+        }
+
+        Optional<WeatherForecast> requestedForecast = requestResult.forecast();
         Optional<WeatherForecast> existingForecast =
                 forecastCache.asMap().putIfAbsent(cacheKey, requestedForecast);
 
@@ -111,7 +137,7 @@ public class WeatherForecastService {
         return forecast;
     }
 
-    private Optional<WeatherForecast> requestRepresentativeForecast(
+    private WeatherForecastRequestResult requestRepresentativeForecast(
             LocalDate targetDate,
             KmaGridConverter.GridCoordinate gridCoordinate,
             LocalDateTime baseDateTime
@@ -123,11 +149,18 @@ public class WeatherForecastService {
                 gridCoordinate.ny()
         );
 
-        if (!isSuccessfulResponse(response)) {
-            return Optional.empty();
+        if (response == null) {
+            return new WeatherForecastRequestResult(Optional.empty(), true);
         }
 
-        return extractRepresentativeForecast(response, targetDate);
+        if (!isSuccessfulResponse(response)) {
+            return new WeatherForecastRequestResult(Optional.empty(), false);
+        }
+
+        return new WeatherForecastRequestResult(
+                extractRepresentativeForecast(response, targetDate),
+                false
+        );
     }
 
     private boolean isWithinShortForecastRange(LocalDate targetDate) {
@@ -266,6 +299,12 @@ public class WeatherForecastService {
         } catch (NumberFormatException exception) {
             return 0.0;
         }
+    }
+
+    private record WeatherForecastRequestResult(
+            Optional<WeatherForecast> forecast,
+            boolean apiUnavailable
+    ) {
     }
 
     private record ForecastCacheKey(

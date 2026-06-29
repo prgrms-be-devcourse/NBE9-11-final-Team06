@@ -133,6 +133,8 @@ toss:
 weather:
   kma:
     service-key: ${KMA_WEATHER_API_KEY:dummy-key}
+    connect-timeout-seconds: ${KMA_WEATHER_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${KMA_WEATHER_READ_TIMEOUT_SECONDS:3}
 
 thread:
   batch:
