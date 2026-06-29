@@ -7,6 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record NaverGeocodingProperties(
         String clientId,
         String clientSecret,
-        String baseUrl
+        String baseUrl,
+        int connectTimeoutSeconds,
+        int readTimeoutSeconds
 ) {
 }

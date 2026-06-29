@@ -1,4 +1,3 @@
-
 package come.back.gotoday.external.weather;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -7,9 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+
+import java.time.Duration;
 
 /**
  * 기상청 단기예보 조회서비스 API를 호출하는 외부 연동 클라이언트입니다.
@@ -30,12 +32,25 @@ public class KmaWeatherClient {
 
     public KmaWeatherClient(
             @Value("${weather.kma.service-key}") String serviceKey,
-            @Value("${weather.kma.base-url:" + DEFAULT_BASE_URL + "}") String baseUrl
+            @Value("${weather.kma.base-url:" + DEFAULT_BASE_URL + "}") String baseUrl,
+            @Value("${weather.kma.connect-timeout-seconds:2}") int connectTimeoutSeconds,
+            @Value("${weather.kma.read-timeout-seconds:3}") int readTimeoutSeconds
     ) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(connectTimeoutSeconds));
+        requestFactory.setReadTimeout(Duration.ofSeconds(readTimeoutSeconds));
+
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
                 .build();
         this.serviceKey = serviceKey;
+
+        log.info(
+                "기상청 단기예보 API timeout 설정 완료: connectTimeoutSeconds={}, readTimeoutSeconds={}",
+                connectTimeoutSeconds,
+                readTimeoutSeconds
+        );
     }
 
     /**

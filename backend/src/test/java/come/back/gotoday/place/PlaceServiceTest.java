@@ -1,4 +1,3 @@
-
 package come.back.gotoday.place;
 
 import come.back.gotoday.category.entity.Category;
@@ -6,7 +5,10 @@ import come.back.gotoday.category.repository.CategoryRepository;
 import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
 import come.back.gotoday.external.naver.NaverReverseGeocodingClient;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.place.entity.Place;
+import come.back.gotoday.place.dto.ReverseGeocodingResponse;
 import come.back.gotoday.place.repository.PlaceRepository;
 import come.back.gotoday.place.service.PlaceService;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,5 +85,41 @@ class PlaceServiceTest {
                 .findBySourceAndExternalId("KAKAO", "mock-cafe-1");
         verify(placeRepository).saveAndFlush(any(Place.class));
         verify(transactionTemplate, times(2)).execute(any(TransactionCallback.class));
+    }
+
+    @Test
+    void 네이버_지역_검색_API_timeout_발생시_빈_목록을_반환한다() {
+        // given
+        String query = "성수 카페";
+        when(naverLocalSearchClient.search(query, 5, 1))
+                .thenThrow(new BusinessException(ErrorCode.EXTERNAL_API_ERROR));
+
+        // when
+        List<?> result = placeService.searchPlaces(query);
+
+        // then
+        assertThat(result).isEmpty();
+        verify(naverLocalSearchClient).search(query, 5, 1);
+        verifyNoInteractions(placeRepository, categoryRepository, naverReverseGeocodingClient, transactionTemplate);
+    }
+
+    @Test
+    void 네이버_역지오코딩_API_timeout_발생시_빈_지역_정보를_반환한다() {
+        // given
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        when(naverReverseGeocodingClient.reverseGeocode(latitude, longitude))
+                .thenThrow(new BusinessException(ErrorCode.EXTERNAL_API_ERROR));
+
+        // when
+        ReverseGeocodingResponse result = placeService.reverseGeocode(latitude, longitude);
+
+        // then
+        assertThat(result.areaName()).isNull();
+        assertThat(result.district()).isNull();
+        assertThat(result.neighborhood()).isNull();
+        verify(naverReverseGeocodingClient).reverseGeocode(latitude, longitude);
+        verifyNoInteractions(placeRepository, categoryRepository, naverLocalSearchClient, transactionTemplate);
     }
 }

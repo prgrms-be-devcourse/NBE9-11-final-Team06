@@ -100,6 +100,27 @@ class WeatherForecastServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("기상청 API 장애 시 다른 격자 요청은 fallback 캐시를 사용해 외부 API를 재호출하지 않는다")
+    void getRepresentativeForecastUsesFailureCacheWhenKmaApiIsUnavailable() {
+        // given
+        LocalDate targetDate = LocalDate.now(KOREA_ZONE_ID);
+        when(kmaWeatherClient.getVillageForecast(anyString(), anyString(), anyInt(), anyInt()))
+                .thenReturn(null);
+
+        // when
+        Optional<WeatherForecastService.WeatherForecast> first = weatherForecastService
+                .getRepresentativeForecast(targetDate, 37.5665, 126.9780);
+        Optional<WeatherForecastService.WeatherForecast> second = weatherForecastService
+                .getRepresentativeForecast(targetDate, 37.4769, 126.9816);
+
+        // then
+        assertThat(first).isEmpty();
+        assertThat(second).isEmpty();
+        verify(kmaWeatherClient, times(1))
+                .getVillageForecast(anyString(), anyString(), anyInt(), anyInt());
+    }
+
     private String successResponse(LocalDate targetDate) {
         String date = targetDate.toString().replace("-", "");
 

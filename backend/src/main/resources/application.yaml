@@ -76,12 +76,16 @@ external:
   seoul:
     base-url: http://openapi.seoul.go.kr:8088
     api-key: ${SEOUL_API_KEY:dummy-key}
+    connect-timeout-seconds: ${SEOUL_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${SEOUL_READ_TIMEOUT_SECONDS:3}
   tour:
     base-url: https://apis.data.go.kr/B551011/KorService2
     api-key: ${TOUR_API_KEY}
   kakao:
     base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
     rest-api-key: ${KAKAO_REST_API_KEY:dummy-key}
+    connect-timeout-seconds: ${KAKAO_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${KAKAO_READ_TIMEOUT_SECONDS:3}
 
 cors:
   allowed-origins:
@@ -104,10 +108,14 @@ naver:
     client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
+    connect-timeout-seconds: ${NAVER_SEARCH_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${NAVER_SEARCH_READ_TIMEOUT_SECONDS:3}
   geocoding:
     client-id: ${NAVER_GEOCODING_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_GEOCODING_CLIENT_SECRET:dummy-client-secret}
     base-url: https://maps.apigw.ntruss.com
+    connect-timeout-seconds: ${NAVER_GEOCODING_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${NAVER_GEOCODING_READ_TIMEOUT_SECONDS:3}
 
 app:
   oauth2:
@@ -125,6 +133,8 @@ toss:
 weather:
   kma:
     service-key: ${KMA_WEATHER_API_KEY:dummy-key}
+    connect-timeout-seconds: ${KMA_WEATHER_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${KMA_WEATHER_READ_TIMEOUT_SECONDS:3}
 
 thread:
   batch:

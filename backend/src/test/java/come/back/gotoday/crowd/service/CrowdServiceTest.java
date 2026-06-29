@@ -166,6 +166,44 @@ class CrowdServiceTest {
         verify(seoulCrowdClient, never()).getCrowdStatus(any());
         verify(crowdStatusRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("외부 혼잡도 API timeout 발생 시 만료된 기존 혼잡도 데이터를 fallback으로 반환한다")
+    void getCrowdStatusReturnsExpiredCacheWhenExternalApiTimesOut() {
+        String areaName = "강남역";
+        LocalDateTime measuredAt = LocalDateTime.now().minusMinutes(10);
+        CrowdStatus cachedStatus = mock(CrowdStatus.class);
+
+        given(cachedStatus.getCreatedAt()).willReturn(LocalDateTime.now().minusMinutes(6));
+        given(cachedStatus.getAreaName()).willReturn(areaName);
+        given(cachedStatus.getAreaCode()).willReturn("POI001");
+        given(cachedStatus.getCongestionLevel()).willReturn(CongestionLevel.RELAXED);
+        given(cachedStatus.getMessage()).willReturn("기존 혼잡도 데이터입니다.");
+        given(cachedStatus.getPopulationMin()).willReturn(1000);
+        given(cachedStatus.getPopulationMax()).willReturn(2000);
+        given(cachedStatus.getMeasuredAt()).willReturn(measuredAt);
+        given(crowdStatusRepository.findTopByAreaNameOrderByCreatedAtDesc(areaName))
+                .willReturn(Optional.of(cachedStatus));
+        given(seoulCrowdClient.getCrowdStatus(areaName))
+                .willThrow(new BusinessException(ErrorCode.EXTERNAL_API_ERROR));
+
+        CrowdResponse result = crowdService.getCrowdStatus(areaName);
+
+        assertThat(result).isNotNull();
+        assertThat(result.areaName()).isEqualTo(areaName);
+        assertThat(result.areaCode()).isEqualTo("POI001");
+        assertThat(result.congestionLevel()).isEqualTo(CongestionLevel.RELAXED);
+        assertThat(result.message()).isEqualTo("기존 혼잡도 데이터입니다.");
+        assertThat(result.populationMin()).isEqualTo(1000);
+        assertThat(result.populationMax()).isEqualTo(2000);
+        assertThat(result.measuredAt()).isEqualTo(measuredAt);
+
+        verify(crowdStatusRepository)
+                .findTopByAreaNameOrderByCreatedAtDesc(areaName);
+        verify(seoulCrowdClient).getCrowdStatus(areaName);
+        verify(crowdStatusRepository, never()).save(any());
+    }
+
     @Test
     @DisplayName("미래 혼잡도는 최근 이력 중 동일 요일과 동일 시간대 데이터의 평균으로 계산한다")
     void getPredictedCrowdStatusCalculatesAverageFromSameDayAndHourHistories() {

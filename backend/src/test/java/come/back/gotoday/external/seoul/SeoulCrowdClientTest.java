@@ -20,6 +20,7 @@ import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +48,7 @@ class SeoulCrowdClientTest {
 
         given(restClientBuilderProvider.getIfAvailable(any(Supplier.class)))
                 .willReturn(restClientBuilder);
+        lenient().when(restClientBuilder.requestFactory(any())).thenReturn(restClientBuilder);
         given(restClientBuilder.build()).willReturn(restClient);
         given(seoulApiProperties.baseUrl())
                 .willReturn("http://openapi.seoul.go.kr:8088");
@@ -55,7 +57,9 @@ class SeoulCrowdClientTest {
         seoulCrowdClient = new SeoulCrowdClient(
                 seoulApiProperties,
                 seoulCrowdArea,
-                restClientBuilderProvider
+                restClientBuilderProvider,
+                2,
+                3
         );
     }
 
@@ -95,13 +99,13 @@ class SeoulCrowdClientTest {
     }
 
     @Test
-    @DisplayName("서울시 API 호출에 실패하면 EXTERNAL_API_ERROR 예외가 발생한다")
-    void getCrowdStatusThrowsWhenRestClientFails() {
+    @DisplayName("서울시 API read timeout 발생 시 EXTERNAL_API_ERROR 예외가 발생한다")
+    void getCrowdStatusThrowsWhenReadTimeoutOccurs() {
         given(restClient.get()
                 .uri(any(String.class))
                 .retrieve()
                 .body(SeoulCrowdResponse.class))
-                .willThrow(new RestClientException("서울시 API 호출 실패"));
+                .willThrow(new RestClientException("Read timed out"));
 
         assertThatThrownBy(() -> seoulCrowdClient.getCrowdStatus("강남역"))
                 .isInstanceOf(BusinessException.class)

@@ -2,13 +2,18 @@
 package come.back.gotoday.external.naver;
 
 import tools.jackson.databind.JsonNode;
+import come.back.gotoday.global.exception.BusinessException;
+import come.back.gotoday.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
+import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -22,12 +27,24 @@ public class NaverReverseGeocodingClient {
 
     public NaverReverseGeocodingClient(NaverGeocodingProperties properties) {
         this.properties = properties;
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        requestFactory.setReadTimeout(Duration.ofSeconds(properties.readTimeoutSeconds()));
+
         this.restClient = RestClient.builder()
                 .baseUrl(properties.baseUrl())
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader("X-NCP-APIGW-API-KEY-ID", properties.clientId())
                 .defaultHeader("X-NCP-APIGW-API-KEY", properties.clientSecret())
+                .requestFactory(requestFactory)
                 .build();
+
+        log.info(
+                "Naver Reverse Geocoding API timeout 설정 완료: connectTimeoutSeconds={}, readTimeoutSeconds={}",
+                properties.connectTimeoutSeconds(),
+                properties.readTimeoutSeconds()
+        );
     }
 
     /**
@@ -37,16 +54,29 @@ public class NaverReverseGeocodingClient {
     public ReverseGeocodingResult reverseGeocode(double latitude, double longitude) {
         log.info("네이버 역지오코딩 요청: latitude={}, longitude={}", latitude, longitude);
 
-        NaverReverseGeocodingApiResponse response = restClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(REVERSE_GEOCODE_PATH)
-                        .queryParam("coords", longitude + "," + latitude)
-                        .queryParam("sourcecrs", "epsg:4326")
-                        .queryParam("orders", "admcode,addr,roadaddr")
-                        .queryParam("output", "json")
-                        .build())
-                .retrieve()
-                .body(NaverReverseGeocodingApiResponse.class);
+        NaverReverseGeocodingApiResponse response;
+        try {
+            response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(REVERSE_GEOCODE_PATH)
+                            .queryParam("coords", longitude + "," + latitude)
+                            .queryParam("sourcecrs", "epsg:4326")
+                            .queryParam("orders", "admcode,addr,roadaddr")
+                            .queryParam("output", "json")
+                            .build())
+                    .retrieve()
+                    .body(NaverReverseGeocodingApiResponse.class);
+        } catch (RestClientException exception) {
+            log.warn(
+                    "네이버 역지오코딩 API 호출 실패 또는 timeout 발생: latitude={}, longitude={}, exceptionType={}, message={}",
+                    latitude,
+                    longitude,
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage(),
+                    exception
+            );
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
 
         if (response == null || response.results() == null || response.results().isEmpty()) {
             throw new IllegalStateException("네이버 역지오코딩 결과가 없습니다.");
