@@ -108,10 +108,14 @@ naver:
     client-id: ${NAVER_SEARCH_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:dummy-client-secret}
     base-url: https://openapi.naver.com
+    connect-timeout-seconds: ${NAVER_SEARCH_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${NAVER_SEARCH_READ_TIMEOUT_SECONDS:3}
   geocoding:
     client-id: ${NAVER_GEOCODING_CLIENT_ID:dummy-client-id}
     client-secret: ${NAVER_GEOCODING_CLIENT_SECRET:dummy-client-secret}
     base-url: https://maps.apigw.ntruss.com
+    connect-timeout-seconds: ${NAVER_GEOCODING_CONNECT_TIMEOUT_SECONDS:2}
+    read-timeout-seconds: ${NAVER_GEOCODING_READ_TIMEOUT_SECONDS:3}
 
 app:
   oauth2:

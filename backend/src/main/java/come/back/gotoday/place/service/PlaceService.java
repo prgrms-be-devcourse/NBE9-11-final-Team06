@@ -6,6 +6,7 @@ import come.back.gotoday.external.kakao.dto.KakaoPlaceDocument;
 import come.back.gotoday.external.naver.NaverLocalSearchClient;
 import come.back.gotoday.external.naver.NaverReverseGeocodingClient;
 import come.back.gotoday.external.naver.dto.NaverLocalSearchResponse;
+import come.back.gotoday.global.exception.BusinessException;
 import come.back.gotoday.place.dto.PlaceCreateRequest;
 import come.back.gotoday.place.dto.PlaceResponse;
 import come.back.gotoday.place.dto.PlaceSearchResponse;
@@ -14,10 +15,10 @@ import come.back.gotoday.place.entity.Place;
 import come.back.gotoday.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -55,7 +56,7 @@ public class PlaceService {
                 request.description(),
                 request.source(),
                 request.externalId(),
-                true // isActive 기본값
+                true
         );
 
         placeRepository.save(place);
@@ -117,7 +118,18 @@ public class PlaceService {
             return List.of();
         }
 
-        NaverLocalSearchResponse response = naverLocalSearchClient.search(query, 5, 1);
+        NaverLocalSearchResponse response;
+        try {
+            response = naverLocalSearchClient.search(query, 5, 1);
+        } catch (BusinessException exception) {
+            log.warn(
+                    "네이버 지역 검색 API 호출 실패 또는 timeout으로 빈 검색 결과를 반환합니다. query={}",
+                    query,
+                    exception
+            );
+            return List.of();
+        }
+
         if (response == null || response.items() == null) {
             log.warn("장소 검색 실패: 네이버 지역 검색 API 응답이 비어 있습니다. query={}", query);
             return List.of();
@@ -135,23 +147,33 @@ public class PlaceService {
     public ReverseGeocodingResponse reverseGeocode(double latitude, double longitude) {
         log.info("좌표 기반 지역명 조회 처리 시작: latitude={}, longitude={}", latitude, longitude);
 
-        NaverReverseGeocodingClient.ReverseGeocodingResult result =
-                naverReverseGeocodingClient.reverseGeocode(latitude, longitude);
+        try {
+            NaverReverseGeocodingClient.ReverseGeocodingResult result =
+                    naverReverseGeocodingClient.reverseGeocode(latitude, longitude);
 
-        ReverseGeocodingResponse response = new ReverseGeocodingResponse(
-                result.areaName(),
-                result.district(),
-                result.neighborhood()
-        );
+            ReverseGeocodingResponse response = new ReverseGeocodingResponse(
+                    result.areaName(),
+                    result.district(),
+                    result.neighborhood()
+            );
 
-        log.info(
-                "좌표 기반 지역명 조회 처리 완료: latitude={}, longitude={}, areaName={}",
-                latitude,
-                longitude,
-                response.areaName()
-        );
+            log.info(
+                    "좌표 기반 지역명 조회 처리 완료: latitude={}, longitude={}, areaName={}",
+                    latitude,
+                    longitude,
+                    response.areaName()
+            );
 
-        return response;
+            return response;
+        } catch (BusinessException exception) {
+            log.warn(
+                    "네이버 Reverse Geocoding API 호출 실패 또는 timeout으로 빈 지역 정보를 반환합니다. latitude={}, longitude={}",
+                    latitude,
+                    longitude,
+                    exception
+            );
+            return new ReverseGeocodingResponse(null, null, null);
+        }
     }
 
     @Transactional
@@ -211,7 +233,6 @@ public class PlaceService {
     }
 
     private Place createPlace(KakaoPlaceDocument doc, Category category, String externalId) {
-
         return placeRepository.saveAndFlush(
                 Place.create(
                         category,
@@ -234,7 +255,4 @@ public class PlaceService {
         if (placeUrl == null || !placeUrl.contains("/")) return null;
         return placeUrl.substring(placeUrl.lastIndexOf("/") + 1);
     }
-
-
-
 }
