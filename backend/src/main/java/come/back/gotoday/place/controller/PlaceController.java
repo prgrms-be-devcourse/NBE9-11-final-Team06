@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -97,6 +98,7 @@ public class PlaceController {
     }
 
     // 장소 삭제
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{placeId}")
     public ResponseEntity<ApiResponse<Void>> deletePlace(
             @PathVariable Long placeId
