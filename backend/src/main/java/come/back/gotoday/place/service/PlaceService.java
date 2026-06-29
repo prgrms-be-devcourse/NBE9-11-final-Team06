@@ -23,7 +23,6 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PlaceService {
 
     private final PlaceRepository placeRepository;
@@ -62,6 +61,7 @@ public class PlaceService {
         return place.getId();
     }
 
+    @Transactional(readOnly = true)
     public PlaceResponse getPlace(Long placeId) {
         log.info("장소 단건 조회 처리 시작: placeId={}", placeId);
 
@@ -85,6 +85,7 @@ public class PlaceService {
         return response;
     }
 
+    @Transactional(readOnly = true)
     public List<PlaceResponse> getPlaces() {
         log.info("장소 목록 조회 처리 시작");
 

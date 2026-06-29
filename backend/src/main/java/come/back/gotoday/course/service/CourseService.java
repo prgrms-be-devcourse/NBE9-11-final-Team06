@@ -34,6 +34,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
@@ -55,6 +57,10 @@ public class CourseService {
     private static final int DEFAULT_PREVIEW_EVENT_COUNT = 3;
     private static final double NEARBY_PLACE_RADIUS_METER = 500.0;
     private static final int DEFAULT_ROUTE_BEAM_WIDTH = 5;
+    private static final String DEFAULT_COURSE_RECOMMENDATION_REASON =
+            "선택한 장소와 이동 동선을 고려해 구성한 추천 코스입니다.";
+    private static final String DEFAULT_PLACE_RECOMMENDATION_REASON =
+            "선택한 일정과 가까운 위치를 기준으로 추천된 장소입니다.";
 
     private final CourseRepository courseRepository;
     private final CoursePlaceRepository coursePlaceRepository;
@@ -69,10 +75,91 @@ public class CourseService {
     private final KakaoLocalService kakaoLocalService;
     private final PlaceService placeService;
     private final AiRecommendationReasonService aiRecommendationReasonService;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long createCourse(Long memberId, CourseCreateRequest request) {
-        Member member = getMemberOrThrow(memberId);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        CourseCreationContext creationContext = transactionTemplate.execute(
+                status -> prepareCourseCreation(memberId, request)
+        );
+
+        if (creationContext == null) {
+            throw new IllegalStateException("코스 생성 준비에 실패했습니다.");
+        }
+
+        String finalCourseRecommendationReason = generateFinalCourseRecommendationReason(
+                memberId,
+                creationContext
+        );
+
+        List<String> finalPlaceRecommendationReasons = generateFinalPlaceRecommendationReasons(
+                creationContext.orderedPlaces()
+        );
+
+        Long courseId = transactionTemplate.execute(status -> saveCourse(
+                memberId,
+                creationContext,
+                finalCourseRecommendationReason,
+                finalPlaceRecommendationReasons
+        ));
+
+        if (courseId == null) {
+            throw new IllegalStateException("코스 저장에 실패했습니다.");
+        }
+
+        return courseId;
+    }
+
+    private String generateFinalCourseRecommendationReason(
+            Long memberId,
+            CourseCreationContext creationContext
+    ) {
+        try {
+            return aiRecommendationReasonService.generateFinalCourseReason(
+                    new AiRecommendationReasonService.FinalCourseReasonContext(
+                            creationContext.request().startDate(),
+                            creationContext.request().baseArea(),
+                            creationContext.request().companionType(),
+                            List.of(),
+                            creationContext.orderedPlaces().stream()
+                                    .map(this::getCandidateName)
+                                    .toList()
+                    )
+            );
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "AI 최종 코스 추천 이유 생성에 실패해 기본 문구를 사용합니다. memberId={}",
+                    memberId,
+                    exception
+            );
+            return DEFAULT_COURSE_RECOMMENDATION_REASON;
+        }
+    }
+
+    private List<String> generateFinalPlaceRecommendationReasons(
+            List<CourseRouteCandidate> orderedPlaces
+    ) {
+        try {
+            return aiRecommendationReasonService.generateFinalPlaceReasons(
+                    buildFinalPlaceReasonContexts(orderedPlaces)
+            );
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "AI 장소별 추천 이유 생성에 실패해 기본 문구를 사용합니다. placeCount={}",
+                    orderedPlaces.size(),
+                    exception
+            );
+            return java.util.Collections.nCopies(
+                    orderedPlaces.size(),
+                    DEFAULT_PLACE_RECOMMENDATION_REASON
+            );
+        }
+    }
+
+    private CourseCreationContext prepareCourseCreation(Long memberId, CourseCreateRequest request) {
+        getMemberOrThrow(memberId);
 
         List<Event> events = findEventsByIds(request.eventIds());
         List<Tour> tours = findToursByIds(request.tourIds());
@@ -131,21 +218,17 @@ public class CourseService {
                 request.startLongitude()
         );
 
-        String finalCourseRecommendationReason = aiRecommendationReasonService.generateFinalCourseReason(
-                new AiRecommendationReasonService.FinalCourseReasonContext(
-                        request.startDate(),
-                        request.baseArea(),
-                        request.companionType(),
-                        List.of(),
-                        orderedPlaces.stream()
-                                .map(this::getCandidateName)
-                                .toList()
-                )
-        );
+        return new CourseCreationContext(request, orderedPlaces);
+    }
 
-        List<String> finalPlaceRecommendationReasons = aiRecommendationReasonService.generateFinalPlaceReasons(
-                buildFinalPlaceReasonContexts(orderedPlaces)
-        );
+    private Long saveCourse(
+            Long memberId,
+            CourseCreationContext creationContext,
+            String finalCourseRecommendationReason,
+            List<String> finalPlaceRecommendationReasons
+    ) {
+        CourseCreateRequest request = creationContext.request();
+        Member member = getMemberOrThrow(memberId);
 
         Course course = Course.create(
                 member,
@@ -164,10 +247,10 @@ public class CourseService {
         );
 
         int order = 1;
-        for (int index = 0; index < orderedPlaces.size(); index++) {
+        for (int index = 0; index < creationContext.orderedPlaces().size(); index++) {
             addCoursePlace(
                     course,
-                    orderedPlaces.get(index),
+                    creationContext.orderedPlaces().get(index),
                     order++,
                     finalPlaceRecommendationReasons.get(index)
             );
@@ -331,11 +414,13 @@ public class CourseService {
             String recommendationReason
     ) {
         if (candidate.itemType() == CourseItemType.EVENT) {
+            Event event = eventRepository.getReferenceById(candidate.event().getId());
+
             course.addCoursePlace(
                     CoursePlace.create(
                             course,
-                            candidate.event().getPlace(),
-                            candidate.event(),
+                            event.getPlace(),
+                            event,
                             visitOrder,
                             null,
                             null,
@@ -350,10 +435,12 @@ public class CourseService {
         }
 
         if (candidate.itemType() == CourseItemType.TOUR) {
+            Tour tour = tourRepository.getReferenceById(candidate.tour().getId());
+
             course.addCoursePlace(
                     CoursePlace.createWithTour(
                             course,
-                            candidate.tour(),
+                            tour,
                             visitOrder,
                             null,
                             null,
@@ -370,7 +457,7 @@ public class CourseService {
         course.addCoursePlace(
                 CoursePlace.create(
                         course,
-                        candidate.place(),
+                        placeRepository.getReferenceById(candidate.place().getId()),
                         null,
                         visitOrder,
                         null,
@@ -382,6 +469,12 @@ public class CourseService {
                         recommendationReason
                 )
         );
+    }
+
+    private record CourseCreationContext(
+            CourseCreateRequest request,
+            List<CourseRouteCandidate> orderedPlaces
+    ) {
     }
 
     private record CourseRouteCandidate(
@@ -491,7 +584,7 @@ public class CourseService {
     }
 
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CoursePreviewResponse previewCourse(Long memberId,
                                                CoursePreviewRequest request) {
 
@@ -600,7 +693,6 @@ public class CourseService {
 
         KakaoPlaceResponse restaurantResponse =
                 kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
-
 
         List<PlacePreviewResponse> restaurants =
                 getDocumentsOrEmpty(restaurantResponse)
