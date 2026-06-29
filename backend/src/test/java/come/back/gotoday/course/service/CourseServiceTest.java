@@ -28,6 +28,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {
@@ -133,6 +135,60 @@ class CourseServiceTest {
         assertThat(route).hasSize(2);
         assertThat(itemIds(route)).containsExactlyInAnyOrder(1L, 2L);
         assertThat(itemTypes(route)).containsExactlyInAnyOrder("EVENT", "TOUR");
+    }
+
+    @Test
+    @DisplayName("카카오 카페 검색 timeout 발생 시 빈 목록 fallback을 위해 null 응답을 반환한다")
+    void searchCafeOrEmptyReturnsNullWhenKakaoCafeSearchTimesOut() {
+        double latitude = 37.5260087284496;
+        double longitude = 126.900109255921;
+
+        given(kakaoLocalService.searchCafe(latitude, longitude))
+                .willThrow(new org.springframework.web.client.RestClientException("Read timed out"));
+
+        Object response = ReflectionTestUtils.invokeMethod(
+                courseService,
+                "searchCafeOrEmpty",
+                null,
+                1L,
+                latitude,
+                longitude
+        );
+
+        assertThat(response).isNull();
+        verify(kakaoLocalService).searchCafe(latitude, longitude);
+        verifyNoInteractions(placeService);
+    }
+
+    @Test
+    @DisplayName("카카오 식당 검색 timeout 발생 시 빈 목록 fallback을 위해 null 응답을 반환한다")
+    void searchRestaurantOrEmptyReturnsNullWhenKakaoRestaurantSearchTimesOut() {
+        double latitude = 37.5260087284496;
+        double longitude = 126.900109255921;
+
+        given(kakaoLocalService.searchRestaurant(
+                latitude,
+                longitude,
+                come.back.gotoday.course.type.RestaurantType.KOREAN
+        )).willThrow(new org.springframework.web.client.RestClientException("Read timed out"));
+
+        Object response = ReflectionTestUtils.invokeMethod(
+                courseService,
+                "searchRestaurantOrEmpty",
+                null,
+                1L,
+                latitude,
+                longitude,
+                come.back.gotoday.course.type.RestaurantType.KOREAN
+        );
+
+        assertThat(response).isNull();
+        verify(kakaoLocalService).searchRestaurant(
+                latitude,
+                longitude,
+                come.back.gotoday.course.type.RestaurantType.KOREAN
+        );
+        verifyNoInteractions(placeService);
     }
 
     @SuppressWarnings("unchecked")

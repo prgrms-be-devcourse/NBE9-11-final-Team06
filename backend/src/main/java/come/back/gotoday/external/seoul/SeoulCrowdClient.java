@@ -5,11 +5,14 @@ import come.back.gotoday.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
+import java.time.Duration;
 
 /**
  * 서울시 실시간 도시데이터 API를 호출하는 외부 API 클라이언트입니다.
@@ -52,12 +55,27 @@ public class SeoulCrowdClient {
     public SeoulCrowdClient(
             SeoulApiProperties seoulApiProperties,
             SeoulCrowdArea seoulCrowdArea,
-            ObjectProvider<RestClient.Builder> restClientBuilderProvider
+            ObjectProvider<RestClient.Builder> restClientBuilderProvider,
+            @Value("${external.seoul.connect-timeout-seconds:2}") int connectTimeoutSeconds,
+            @Value("${external.seoul.read-timeout-seconds:3}") int readTimeoutSeconds
     ) {
         RestClient.Builder restClientBuilder = restClientBuilderProvider.getIfAvailable(RestClient::builder);
-        this.restClient = restClientBuilder.build();
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(connectTimeoutSeconds));
+        requestFactory.setReadTimeout(Duration.ofSeconds(readTimeoutSeconds));
+
+        this.restClient = restClientBuilder
+                .requestFactory(requestFactory)
+                .build();
         this.seoulApiProperties = seoulApiProperties;
         this.seoulCrowdArea = seoulCrowdArea;
+
+        log.info(
+                "서울시 실시간 도시데이터 API timeout 설정 완료: connectTimeoutSeconds={}, readTimeoutSeconds={}",
+                connectTimeoutSeconds,
+                readTimeoutSeconds
+        );
     }
 
     /**
@@ -113,7 +131,13 @@ public class SeoulCrowdClient {
         } catch (BusinessException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            log.error("서울시 실시간 도시데이터 API 호출 실패: areaName={}, message={}", areaName, exception.getMessage(), exception);
+            log.warn(
+                    "서울시 실시간 도시데이터 API 호출 실패 또는 timeout 발생: areaName={}, exceptionType={}, message={}",
+                    areaName,
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage(),
+                    exception
+            );
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }

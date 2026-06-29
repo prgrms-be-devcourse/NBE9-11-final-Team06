@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
@@ -683,16 +684,25 @@ public class CourseService {
             Category restaurantCategory,
             Category cafeCategory
     ) {
-        KakaoPlaceResponse cafeResponse =
-                kakaoLocalService.searchCafe(latitude, longitude);
+        KakaoPlaceResponse cafeResponse = searchCafeOrEmpty(
+                itemType,
+                itemId,
+                latitude,
+                longitude
+        );
 
         RestaurantType restaurantType =
                 request.restaurantType() != null
                         ? request.restaurantType()
                         : RestaurantType.KOREAN;
 
-        KakaoPlaceResponse restaurantResponse =
-                kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
+        KakaoPlaceResponse restaurantResponse = searchRestaurantOrEmpty(
+                itemType,
+                itemId,
+                latitude,
+                longitude,
+                restaurantType
+        );
 
         List<PlacePreviewResponse> restaurants =
                 getDocumentsOrEmpty(restaurantResponse)
@@ -733,6 +743,50 @@ public class CourseService {
                 restaurants,
                 cafes
         );
+    }
+
+    private KakaoPlaceResponse searchCafeOrEmpty(
+            CourseItemType itemType,
+            Long itemId,
+            Double latitude,
+            Double longitude
+    ) {
+        try {
+            return kakaoLocalService.searchCafe(latitude, longitude);
+        } catch (RestClientException exception) {
+            log.warn(
+                    "카카오 카페 검색 실패로 빈 목록을 반환합니다. itemType={}, itemId={}, latitude={}, longitude={}",
+                    itemType,
+                    itemId,
+                    latitude,
+                    longitude,
+                    exception
+            );
+            return null;
+        }
+    }
+
+    private KakaoPlaceResponse searchRestaurantOrEmpty(
+            CourseItemType itemType,
+            Long itemId,
+            Double latitude,
+            Double longitude,
+            RestaurantType restaurantType
+    ) {
+        try {
+            return kakaoLocalService.searchRestaurant(latitude, longitude, restaurantType);
+        } catch (RestClientException exception) {
+            log.warn(
+                    "카카오 식당 검색 실패로 빈 목록을 반환합니다. itemType={}, itemId={}, restaurantType={}, latitude={}, longitude={}",
+                    itemType,
+                    itemId,
+                    restaurantType,
+                    latitude,
+                    longitude,
+                    exception
+            );
+            return null;
+        }
     }
 
     private List<KakaoPlaceDocument> getDocumentsOrEmpty(KakaoPlaceResponse response) {
