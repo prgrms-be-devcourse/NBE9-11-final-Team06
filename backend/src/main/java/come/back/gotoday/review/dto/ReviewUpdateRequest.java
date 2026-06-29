@@ -2,14 +2,12 @@ package come.back.gotoday.review.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import lombok.Getter;
 
-@Getter
-public class ReviewUpdateRequest {
+public record ReviewUpdateRequest (
 
     @Min(1)
     @Max(5)
-    private Integer rating;
+    Integer rating,
 
-    private String content;
-}
+    String content
+){}

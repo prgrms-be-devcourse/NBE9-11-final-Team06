@@ -38,8 +38,8 @@ public class ReviewService {
         Review review = Review.create(
                 member,
                 course,
-                request.getRating(),
-                request.getContent());
+                request.rating(),
+                request.content());
 
         reviewRepository.save(review);
         updateCourseRating(course);
@@ -65,8 +65,8 @@ public class ReviewService {
             throw new IllegalArgumentException("본인 리뷰만 수정 가능");
         }
 
-        Integer rating = request.getRating();
-        String content = request.getContent();
+        Integer rating = request.rating();
+        String content = request.content();
 
         if (rating == null) rating = review.getRating();
         if (content == null) content = review.getContent();
