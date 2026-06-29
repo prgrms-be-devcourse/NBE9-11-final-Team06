@@ -50,6 +50,119 @@ class PlaceServiceTest {
     private PlaceService placeService;
 
     @Test
+    void 기존_카카오_장소들은_한번의_IN_조회로_반환한다() {
+        // given
+        KakaoPlaceDocument firstDocument = new KakaoPlaceDocument(
+                "첫 번째 카페",
+                "서울 종로구 테스트동 1",
+                "서울 종로구 테스트로 1",
+                "02-0000-0001",
+                "http://place.map.kakao.com/existing-cafe-1",
+                "음식점 > 카페",
+                "0",
+                "126.9573421635",
+                "37.5746723659"
+        );
+        KakaoPlaceDocument secondDocument = new KakaoPlaceDocument(
+                "두 번째 카페",
+                "서울 종로구 테스트동 2",
+                "서울 종로구 테스트로 2",
+                "02-0000-0002",
+                "http://place.map.kakao.com/existing-cafe-2",
+                "음식점 > 카페",
+                "0",
+                "126.9573421636",
+                "37.5746723660"
+        );
+        Category category = mock(Category.class);
+        Place firstPlace = mock(Place.class);
+        Place secondPlace = mock(Place.class);
+
+        when(firstPlace.getExternalId()).thenReturn("existing-cafe-1");
+        when(secondPlace.getExternalId()).thenReturn("existing-cafe-2");
+        when(placeRepository.findAllBySourceAndExternalIdIn(
+                "KAKAO",
+                List.of("existing-cafe-1", "existing-cafe-2")
+        )).thenReturn(List.of(firstPlace, secondPlace));
+
+        // when
+        List<Place> result = placeService.getOrCreatePlaces(
+                List.of(firstDocument, secondDocument),
+                category
+        );
+
+        // then
+        assertThat(result).containsExactly(firstPlace, secondPlace);
+        verify(placeRepository).findAllBySourceAndExternalIdIn(
+                "KAKAO",
+                List.of("existing-cafe-1", "existing-cafe-2")
+        );
+        verify(placeRepository, never()).findBySourceAndExternalId(anyString(), anyString());
+        verify(placeRepository, never()).saveAndFlush(any(Place.class));
+        verifyNoInteractions(transactionTemplate);
+    }
+
+    @Test
+    void 배치_조회에_없는_카카오_장소만_기존_생성_로직으로_처리한다() {
+        // given
+        KakaoPlaceDocument existingDocument = new KakaoPlaceDocument(
+                "기존 카페",
+                "서울 종로구 테스트동 1",
+                "서울 종로구 테스트로 1",
+                "02-0000-0001",
+                "http://place.map.kakao.com/existing-cafe-1",
+                "음식점 > 카페",
+                "0",
+                "126.9573421635",
+                "37.5746723659"
+        );
+        KakaoPlaceDocument newDocument = new KakaoPlaceDocument(
+                "신규 카페",
+                "서울 종로구 테스트동 2",
+                "서울 종로구 테스트로 2",
+                "02-0000-0002",
+                "http://place.map.kakao.com/new-cafe-2",
+                "음식점 > 카페",
+                "0",
+                "126.9573421636",
+                "37.5746723660"
+        );
+        Category category = mock(Category.class);
+        Place existingPlace = mock(Place.class);
+        Place savedPlace = mock(Place.class);
+
+        when(existingPlace.getExternalId()).thenReturn("existing-cafe-1");
+        when(placeRepository.findAllBySourceAndExternalIdIn(
+                "KAKAO",
+                List.of("existing-cafe-1", "new-cafe-2")
+        )).thenReturn(List.of(existingPlace));
+        when(placeRepository.findBySourceAndExternalId("KAKAO", "new-cafe-2"))
+                .thenReturn(Optional.empty());
+        when(placeRepository.saveAndFlush(any(Place.class))).thenReturn(savedPlace);
+
+        doAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        }).when(transactionTemplate).execute(any(TransactionCallback.class));
+
+        // when
+        List<Place> result = placeService.getOrCreatePlaces(
+                List.of(existingDocument, newDocument),
+                category
+        );
+
+        // then
+        assertThat(result).containsExactly(existingPlace, savedPlace);
+        verify(placeRepository).findAllBySourceAndExternalIdIn(
+                "KAKAO",
+                List.of("existing-cafe-1", "new-cafe-2")
+        );
+        verify(placeRepository).findBySourceAndExternalId("KAKAO", "new-cafe-2");
+        verify(placeRepository).saveAndFlush(any(Place.class));
+        verify(transactionTemplate).execute(any(TransactionCallback.class));
+    }
+
+    @Test
     void 동일한_카카오_장소가_동시에_생성되어_중복키_예외가_발생하면_기존_장소를_반환한다() {
         // given
         KakaoPlaceDocument document = new KakaoPlaceDocument(

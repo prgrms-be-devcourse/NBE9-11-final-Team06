@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -191,14 +194,43 @@ public class PlaceService {
     }
 
     public Place getOrCreatePlace(KakaoPlaceDocument doc, Category category) {
-        String externalId = extractExternalId(doc.placeUrl());
-
-        if (externalId == null) {
-            throw new IllegalArgumentException("externalId is null");
-        }
+        String externalId = requireExternalId(doc.placeUrl());
 
         return placeRepository.findBySourceAndExternalId("KAKAO", externalId)
                 .orElseGet(() -> createOrGetPlaceAfterDuplicate(doc, category, externalId));
+    }
+
+    public List<Place> getOrCreatePlaces(
+            List<KakaoPlaceDocument> documents,
+            Category category
+    ) {
+        if (documents == null || documents.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> externalIds = documents.stream()
+                .map(document -> requireExternalId(document.placeUrl()))
+                .distinct()
+                .toList();
+
+        Map<String, Place> placesByExternalId = new HashMap<>();
+        placeRepository.findAllBySourceAndExternalIdIn("KAKAO", externalIds)
+                .forEach(place -> placesByExternalId.put(place.getExternalId(), place));
+
+        List<Place> places = new ArrayList<>();
+        for (KakaoPlaceDocument document : documents) {
+            String externalId = requireExternalId(document.placeUrl());
+            Place place = placesByExternalId.get(externalId);
+
+            if (place == null) {
+                place = createOrGetPlaceAfterDuplicate(document, category, externalId);
+                placesByExternalId.put(externalId, place);
+            }
+
+            places.add(place);
+        }
+
+        return places;
     }
 
     private Place createOrGetPlaceAfterDuplicate(
@@ -249,6 +281,16 @@ public class PlaceService {
                         true
                 )
         );
+    }
+
+    private String requireExternalId(String placeUrl) {
+        String externalId = extractExternalId(placeUrl);
+
+        if (externalId == null) {
+            throw new IllegalArgumentException("externalId is null");
+        }
+
+        return externalId;
     }
 
     private String extractExternalId(String placeUrl) {
