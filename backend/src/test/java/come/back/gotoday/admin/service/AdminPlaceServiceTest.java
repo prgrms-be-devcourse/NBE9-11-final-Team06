@@ -102,6 +102,59 @@ class AdminPlaceServiceTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 카테고리로 장소를 수정하면 예외가 발생한다")
+    void updatePlace_categoryNotFound_fail() {
+        Long placeId = 1L;
+        AdminPlaceUpdateRequest request = updateRequest();
+        Place place = mock(Place.class);
+
+        when(placeRepository.findByIdAndIsActiveTrue(placeId))
+                .thenReturn(Optional.of(place));
+        when(categoryRepository.findById(request.categoryId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adminPlaceService.updatePlace(placeId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("중복된 장소 정보로 수정하면 예외가 발생한다")
+    void updatePlace_duplicate_fail() {
+        Long placeId = 1L;
+        AdminPlaceUpdateRequest request = updateRequest();
+        Place place = mock(Place.class);
+        Category category = mock(Category.class);
+
+        when(placeRepository.findByIdAndIsActiveTrue(placeId))
+                .thenReturn(Optional.of(place));
+        when(categoryRepository.findById(request.categoryId()))
+                .thenReturn(Optional.of(category));
+        when(placeRepository.existsByNameAndAddressAndIsActiveTrueAndIdNot(
+                request.name(),
+                request.address(),
+                placeId
+        )).thenReturn(true);
+
+        assertThatThrownBy(() -> adminPlaceService.updatePlace(placeId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PLACE_ALREADY_EXISTS);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 장소를 삭제하면 예외가 발생한다")
+    void deletePlace_placeNotFound_fail() {
+        Long placeId = 999L;
+
+        when(placeRepository.findByIdAndIsActiveTrue(placeId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adminPlaceService.deletePlace(placeId))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PLACE_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("관리자는 장소를 삭제 처리할 수 있다")
     void deletePlace_success() {
         Long placeId = 1L;
