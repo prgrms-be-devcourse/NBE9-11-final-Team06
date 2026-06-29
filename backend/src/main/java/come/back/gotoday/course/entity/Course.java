@@ -1,6 +1,7 @@
 package come.back.gotoday.course.entity;
 
 import come.back.gotoday.member.entity.Member;
+import come.back.gotoday.review.entity.Review;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -109,6 +110,21 @@ public class Course {
             orphanRemoval = true
     )
     private List<CoursePlace> coursePlaces = new ArrayList<>();
+
+    @OneToMany(
+            mappedBy = "course",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<SavedCourse> savedCourses = new ArrayList<>();
+
+
+    @OneToMany(
+            mappedBy = "course",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<Review> reviews = new ArrayList<>();
 
     public void addCoursePlace(CoursePlace coursePlace) {
         coursePlaces.add(coursePlace);
