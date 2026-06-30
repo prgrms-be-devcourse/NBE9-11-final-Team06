@@ -6,6 +6,7 @@ import come.back.gotoday.global.exception.ErrorCode;
 import come.back.gotoday.payment.billing.dto.TossBillingKeyResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -30,6 +31,7 @@ public class TossPaymentsClient {
     private final TossErrorHandler tossErrorHandler;
     private final String secretKey;
 
+    @Autowired
     public TossPaymentsClient(
             @Value("${toss.payments.secret-key}") String secretKey,
             TossErrorHandler tossErrorHandler) {
@@ -45,6 +47,15 @@ public class TossPaymentsClient {
                 .requestFactory(requestFactory)
                 .baseUrl("https://api.tosspayments.com/v1")
                 .build();
+    }
+
+    TossPaymentsClient(
+            String secretKey,
+            TossErrorHandler tossErrorHandler,
+            RestClient restClient) {
+        this.secretKey = secretKey;
+        this.tossErrorHandler = tossErrorHandler;
+        this.restClient = restClient;
     }
 
     @Retryable(
@@ -319,7 +330,7 @@ public class TossPaymentsClient {
             // GET /v1/settlements?startDate={startDate}&endDate={endDate}
             List<SettlementDto.TossSettlementResponse> response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/v1/settlements")
+                            .path("/settlements")
                             .queryParam("startDate", startDate.toString())
                             .queryParam("endDate", endDate.toString())
                             .build())
