@@ -1,7 +1,6 @@
 package come.back.gotoday.admin.controller;
 
 import come.back.gotoday.global.response.ApiResponse;
-import come.back.gotoday.tour.dto.TourSyncRequest;
 import come.back.gotoday.tour.dto.TourSyncResponse;
 import come.back.gotoday.tour.service.TourSyncService;
 import lombok.RequiredArgsConstructor;
@@ -13,21 +12,6 @@ import org.springframework.web.bind.annotation.*;
 public class AdminTourController {
 
     private final TourSyncService tourSyncService;
-
-    @PostMapping("/sync")
-    public ApiResponse<TourSyncResponse> syncTours(
-            @RequestBody TourSyncRequest request
-    ) {
-        int syncedCount = tourSyncService.syncTours(
-                request.areaCode(),
-                request.sigunguCode()
-        );
-
-        return ApiResponse.success(
-                new TourSyncResponse(syncedCount),
-                "관광지 데이터 동기화에 성공했습니다."
-        );
-    }
 
     @PostMapping("/sync/seoul")
     public ApiResponse<TourSyncResponse> syncAllSeoulTours() {
