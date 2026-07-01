@@ -306,11 +306,6 @@ export default function AdminPage() {
   }, [])
 
   async function checkAdminAuth() {
-    if (!getAccessToken()) {
-      router.replace("/login")
-      return
-    }
-
     try {
       const response = await apiFetch<ApiResponse<MemberInfo>>("/api/members/me")
       const member = response.data
