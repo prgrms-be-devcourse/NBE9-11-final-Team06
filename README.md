@@ -104,8 +104,6 @@
 | Language     | TypeScript    |
 | Framework    | React         |
 | Styling      | Tailwind CSS  |
-| Server State | React Query   |
-| Client State | Zustand       |
 | Map          | Kakao Map API |
 
 ---
@@ -382,7 +380,9 @@ MVP에는 다음 기능을 포함합니다.
 * 코스 저장 / 조회 / 삭제
 * 지도 마커 표시
 * 추천 사유 제공
-
+* 북마크 기능
+* 리뷰 및 이미지 업로드
+* 결제 및 구독 기능
 ---
 
 ## 향후 확장 기능
@@ -391,10 +391,7 @@ MVP에는 다음 기능을 포함합니다.
 * 미세먼지 기반 추천
 * 예약 가능 장소 연동
 * 주차 정보 제공
-* 리뷰 및 이미지 업로드
-* 북마크 기능
 * 알림 기능
-* 결제 및 구독 기능
 * 프리미엄 추천 기능
 * 관리자 페이지 고도화
 
